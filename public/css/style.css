@@ -1,0 +1,86 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    overflow: hidden;
+    background-color: #222;
+}
+
+#game-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+}
+
+#loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 24px;
+}
+
+#game-info {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: white;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 10px;
+    border-radius: 5px;
+}
+
+#emote-panel {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.emote-btn {
+    font-size: 24px;
+    width: 50px;
+    height: 50px;
+    border: none;
+    border-radius: 50%;
+    background-color: #444;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.emote-btn:hover {
+    transform: scale(1.1);
+    background-color: #555;
+}
+
+.hidden {
+    display: none;
+}
+
+.emote-bubble {
+    position: absolute;
+    background-color: white;
+    border-radius: 15px;
+    padding: 5px 10px;
+    font-size: 20px;
+    white-space: nowrap;
+    animation: bubble-fade 2s forwards;
+    pointer-events: none;
+}
+
+@keyframes bubble-fade {
+    0% { opacity: 0; transform: translateY(0); }
+    10% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-20px); }
+} 

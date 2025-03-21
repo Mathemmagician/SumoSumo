@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SumoSumo - Multiplayer Sumo Fighting Game</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="loading">Loading SumoSumo...</div>
+        <div id="emote-panel" class="hidden">
+            <button class="emote-btn" data-emote="cheer">🎉</button>
+            <button class="emote-btn" data-emote="laugh">😂</button>
+            <button class="emote-btn" data-emote="wow">😮</button>
+            <button class="emote-btn" data-emote="clap">👏</button>
+            <button class="emote-btn" data-emote="heart">❤️</button>
+        </div>
+        <div id="game-info" class="hidden">
+            <div id="status">Waiting for players...</div>
+        </div>
+    </div>
+
+    <!-- Libraries -->
+    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.137.0/build/three.min.js"></script>
+    
+    <!-- Game scripts -->
+    <script src="js/utils.js"></script>
+    <script src="js/sumoFighter.js"></script>
+    <script src="js/referee.js"></script>
+    <script src="js/viewer.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html> 
