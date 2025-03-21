@@ -230,7 +230,7 @@ class Game {
     
     // Handle fighter updates
     this.socket.on('fighterUpdated', (fighterData) => {
-      this.updateFighter(fighterData);
+      this.handleFighterUpdated(fighterData);
     });
     
     // Handle viewer emotes
@@ -245,33 +245,52 @@ class Game {
   }
   
   initEventListeners() {
-    // Keyboard controls for fighters
+    // Handle keyboard input for fighter movement
     document.addEventListener('keydown', (event) => {
       if (this.playerRole !== 'fighter') return;
       
+      let direction = null;
       if (event.key === 'ArrowLeft') {
-        this.socket.emit('fighterMove', { direction: -1 });
-        if (this.fighters[this.playerId]) {
-          this.fighters[this.playerId].startMoving('left');
-        }
+        direction = 'left';
       } else if (event.key === 'ArrowRight') {
-        this.socket.emit('fighterMove', { direction: 1 });
+        direction = 'right';
+      }
+      
+      if (direction) {
+        // Send movement to server
+        this.socket.emit('fighterMove', { 
+          direction: direction === 'left' ? -1 : 1,
+          isStarting: true
+        });
+        
+        // Start local animation immediately for responsive feel
         if (this.fighters[this.playerId]) {
-          this.fighters[this.playerId].startMoving('right');
+          this.fighters[this.playerId].startMoving(direction);
         }
       }
     });
     
+    // Handle key up to stop movement
     document.addEventListener('keyup', (event) => {
       if (this.playerRole !== 'fighter') return;
       
+      let direction = null;
       if (event.key === 'ArrowLeft') {
-        if (this.fighters[this.playerId]) {
-          this.fighters[this.playerId].stopMoving('left');
-        }
+        direction = 'left';
       } else if (event.key === 'ArrowRight') {
+        direction = 'right';
+      }
+      
+      if (direction) {
+        // Send stop movement to server
+        this.socket.emit('fighterMove', { 
+          direction: direction === 'left' ? -1 : 1,
+          isStarting: false
+        });
+        
+        // Stop local animation immediately
         if (this.fighters[this.playerId]) {
-          this.fighters[this.playerId].stopMoving('right');
+          this.fighters[this.playerId].stopMoving(direction);
         }
       }
     });
@@ -455,9 +474,18 @@ class Game {
     }
   }
   
-  updateFighter(fighterData) {
+  handleFighterUpdated(fighterData) {
     if (this.fighters[fighterData.id]) {
+      // Update the fighter's position
       this.fighters[fighterData.id].setPosition(fighterData.position);
+      
+      // Update movement state if needed
+      if (fighterData.isMovingLeft !== undefined) {
+        this.fighters[fighterData.id].isMovingLeft = fighterData.isMovingLeft;
+      }
+      if (fighterData.isMovingRight !== undefined) {
+        this.fighters[fighterData.id].isMovingRight = fighterData.isMovingRight;
+      }
     }
   }
   

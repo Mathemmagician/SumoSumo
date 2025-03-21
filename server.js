@@ -65,8 +65,18 @@ io.on('connection', (socket) => {
   // Handle fighter movements
   socket.on('fighterMove', (moveData) => {
     if (isFighter(socket.id)) {
-      updateFighterPosition(socket.id, moveData);
-      io.emit('fighterUpdated', getFighterById(socket.id));
+      const fighter = getFighterById(socket.id);
+      if (fighter) {
+        // Update movement state
+        if (moveData.direction < 0) {
+          fighter.isMovingLeft = moveData.isStarting;
+        } else {
+          fighter.isMovingRight = moveData.isStarting;
+        }
+        
+        // Broadcast the updated fighter state to all clients
+        io.emit('fighterUpdated', fighter);
+      }
     }
   });
   
@@ -273,6 +283,44 @@ setInterval(() => {
     selectNewFighters();
   }
 }, 10000);
+
+// Add this to the game loop that runs on the server
+function updateGameState() {
+  // Update fighter positions based on their movement state
+  gameState.fighters.forEach(fighter => {
+    let movementX = 0;
+    if (fighter.isMovingLeft) movementX -= 0.1;
+    if (fighter.isMovingRight) movementX += 0.1;
+    
+    if (movementX !== 0) {
+      fighter.position.x += movementX;
+      
+      // Keep fighter within the ring
+      const maxX = gameState.ring.radius - 1;
+      fighter.position.x = Math.max(-maxX, Math.min(maxX, fighter.position.x));
+      
+      // Check for ring out
+      if (Math.abs(fighter.position.x) >= maxX) {
+        const loserId = fighter.id;
+        const winnerId = gameState.fighters.find(f => f.id !== loserId)?.id;
+        
+        if (winnerId) {
+          endFight(winnerId, loserId);
+          return; // Exit early if fight ended
+        }
+      }
+      
+      // Broadcast position update
+      io.emit('fighterUpdated', fighter);
+    }
+  });
+  
+  // Schedule next update
+  setTimeout(updateGameState, 16); // ~60fps
+}
+
+// Start the game loop
+updateGameState();
 
 // Start the server
 const PORT = process.env.PORT || 3000;
