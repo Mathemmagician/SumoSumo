@@ -9,6 +9,10 @@ class Viewer {
     this.mesh = null;
     this.radius = 0.8;
     this.emotes = [];
+    this.highlightMesh = null;
+    this.isHighlighted = false;
+    this.leftPupil = null;
+    this.rightPupil = null;
     
     this.init();
   }
@@ -27,6 +31,9 @@ class Viewer {
     
     // Create a simple face for the viewer
     this.createFace();
+    
+    // Make pupils look toward the center (where the fight happens)
+    this.updatePupilsLookDirection();
   }
   
   createFace() {
@@ -49,14 +56,14 @@ class Viewer {
     const pupilMaterial = createMaterial('#000000');
     
     // Left pupil
-    const leftPupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
-    leftPupil.position.set(0, 0, 0.1);
-    leftEye.add(leftPupil);
+    this.leftPupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
+    this.leftPupil.position.set(0, 0, 0.1);
+    leftEye.add(this.leftPupil);
     
     // Right pupil
-    const rightPupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
-    rightPupil.position.set(0, 0, 0.1);
-    rightEye.add(rightPupil);
+    this.rightPupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
+    this.rightPupil.position.set(0, 0, 0.1);
+    rightEye.add(this.rightPupil);
     
     // Mouth (neutral)
     const mouthGeometry = new THREE.BufferGeometry();
@@ -70,6 +77,28 @@ class Viewer {
     mouthGeometry.setFromPoints(points);
     const mouth = new THREE.Line(mouthGeometry, mouthMaterial);
     this.mesh.add(mouth);
+  }
+  
+  updatePupilsLookDirection() {
+    if (!this.leftPupil || !this.rightPupil) return;
+    
+    // Calculate direction to center (where the fight is)
+    const directionX = -this.position.x;
+    const directionY = -this.position.y;
+    
+    // Normalize the direction
+    const length = Math.sqrt(directionX * directionX + directionY * directionY);
+    const normalizedX = directionX / length;
+    const normalizedY = directionY / length;
+    
+    // Scale the movement (how far pupils can move within the eyes)
+    const maxOffset = 0.05;
+    const offsetX = normalizedX * maxOffset;
+    const offsetY = normalizedY * maxOffset;
+    
+    // Apply the offset to pupils
+    this.leftPupil.position.set(offsetX, offsetY, 0.1);
+    this.rightPupil.position.set(offsetX, offsetY, 0.1);
   }
   
   emote(emoteType) {
@@ -149,8 +178,94 @@ class Viewer {
     scaleUp();
   }
   
+  chat(message) {
+    // Create a chat bubble
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble';
+    bubble.textContent = message;
+    this.container.appendChild(bubble);
+    
+    // Position the bubble above the viewer
+    positionBubbleAt3DPoint(bubble, {
+      x: this.position.x,
+      y: this.position.y + 1.8,
+      z: this.position.z
+    }, this.camera, this.container);
+    
+    // Remove the bubble after animation completes
+    setTimeout(() => {
+      bubble.remove();
+    }, 4000);
+    
+    // Also do a small animation
+    const initialScale = { x: 1, y: 1, z: 1 };
+    const targetScale = { x: 1.1, y: 1.1, z: 1.1 };
+    
+    // Scale up briefly
+    let t = 0;
+    const animate = () => {
+      t += 0.1;
+      if (t <= 1) {
+        const scale = easeInOut(t);
+        this.mesh.scale.set(
+          lerp(initialScale.x, targetScale.x, scale > 0.5 ? 1 - scale : scale),
+          lerp(initialScale.y, targetScale.y, scale > 0.5 ? 1 - scale : scale),
+          lerp(initialScale.z, targetScale.z, scale > 0.5 ? 1 - scale : scale)
+        );
+        requestAnimationFrame(animate);
+      } else {
+        this.mesh.scale.set(1, 1, 1);
+      }
+    };
+    animate();
+  }
+  
   update() {
-    // Any continuous updates for the viewer
+    // Update pupils to look toward the center
+    this.updatePupilsLookDirection();
+  }
+  
+  highlight() {
+    if (this.isHighlighted) return;
+    
+    // Create a slightly larger circle behind the viewer for the highlight effect
+    const highlightGeometry = createCircleGeometry(this.radius + 0.2);
+    const highlightMaterial = createMaterial('#ffff00'); // Yellow highlight
+    highlightMaterial.transparent = true;
+    highlightMaterial.opacity = 0.6;
+    
+    this.highlightMesh = new THREE.Mesh(highlightGeometry, highlightMaterial);
+    this.highlightMesh.position.set(0, 0, -0.05); // Slightly behind the viewer
+    this.mesh.add(this.highlightMesh);
+    
+    // Add pulsing animation
+    this.startHighlightAnimation();
+    
+    this.isHighlighted = true;
+  }
+  
+  startHighlightAnimation() {
+    if (!this.highlightMesh) return;
+    
+    const animate = () => {
+      if (!this.highlightMesh || !this.isHighlighted) return;
+      
+      // Pulse the highlight
+      const scale = 1 + 0.1 * Math.sin(Date.now() * 0.005);
+      this.highlightMesh.scale.set(scale, scale, 1);
+      
+      requestAnimationFrame(animate);
+    };
+    
+    animate();
+  }
+  
+  removeHighlight() {
+    if (this.highlightMesh) {
+      this.mesh.remove(this.highlightMesh);
+      this.highlightMesh = null;
+    }
+    this.isHighlighted = false;
   }
   
   remove() {

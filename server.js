@@ -69,6 +69,14 @@ io.on('connection', (socket) => {
       io.emit('fighterUpdated', getFighterById(socket.id));
     }
   });
+  
+  // Handle chat messages
+  socket.on('chatMessage', (messageData) => {
+    io.emit('viewerChat', {
+      viewerId: socket.id,
+      message: messageData.message.substring(0, 30) // Limit message length
+    });
+  });
 });
 
 // Helper functions

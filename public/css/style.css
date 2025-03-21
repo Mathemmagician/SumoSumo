@@ -83,4 +83,66 @@ body {
     10% { opacity: 1; }
     80% { opacity: 1; }
     100% { opacity: 0; transform: translateY(-20px); }
+}
+
+#chat-input-container {
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 5px;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 10px;
+    border-radius: 5px;
+    width: 300px;
+}
+
+#chat-input {
+    flex-grow: 1;
+    padding: 8px;
+    border: none;
+    border-radius: 3px;
+    background-color: #333;
+    color: white;
+}
+
+#chat-input:focus {
+    outline: none;
+    background-color: #444;
+}
+
+#chat-send-btn {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 3px;
+    background-color: #4CAF50;
+    color: white;
+    cursor: pointer;
+}
+
+#chat-send-btn:hover {
+    background-color: #45a049;
+}
+
+.chat-bubble {
+    position: absolute;
+    background-color: white;
+    border-radius: 15px;
+    padding: 8px 15px;
+    font-size: 16px;
+    white-space: nowrap;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    animation: bubble-fade 4s forwards;
+    pointer-events: none;
+    z-index: 10;
+}
+
+@keyframes bubble-fade {
+    0% { opacity: 0; transform: translateY(0); }
+    10% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-20px); }
 } 

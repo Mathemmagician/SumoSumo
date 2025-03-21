@@ -132,6 +132,11 @@ class Game {
     this.socket.on('viewerEmote', (emoteData) => {
       this.handleViewerEmote(emoteData);
     });
+    
+    // Handle viewer chat messages
+    this.socket.on('viewerChat', (chatData) => {
+      this.handleViewerChat(chatData);
+    });
   }
   
   initEventListeners() {
@@ -179,6 +184,33 @@ class Game {
         }
       });
     });
+    
+    // Chat input
+    const chatInput = document.getElementById('chat-input');
+    const chatSendBtn = document.getElementById('chat-send-btn');
+    
+    const sendChatMessage = () => {
+      const message = chatInput.value.trim();
+      if (message) {
+        this.socket.emit('chatMessage', { message });
+        
+        // Show the message for the current player too
+        if (this.playerRole === 'viewer' && this.viewers[this.playerId]) {
+          this.viewers[this.playerId].chat(message);
+        }
+        
+        // Clear the input
+        chatInput.value = '';
+      }
+    };
+    
+    chatSendBtn.addEventListener('click', sendChatMessage);
+    
+    chatInput.addEventListener('keypress', (event) => {
+      if (event.key === 'Enter') {
+        sendChatMessage();
+      }
+    });
   }
   
   handleGameState(gameState) {
@@ -209,6 +241,9 @@ class Game {
     
     // Update status
     this.updateStatus(gameState);
+    
+    // Show chat input for all players
+    document.getElementById('chat-input-container').classList.remove('hidden');
   }
   
   addViewer(viewerData) {
@@ -229,6 +264,12 @@ class Game {
     if (viewerData.id === this.playerId) {
       this.playerRole = 'viewer';
       this.emotePanel.classList.remove('hidden');
+      
+      // Highlight the player's character
+      viewer.highlight();
+      
+      // Add a "You" label to the status
+      this.statusElement.innerHTML += '<br><span style="color: #ffff00;">You are a viewer</span>';
     }
   }
   
@@ -255,6 +296,12 @@ class Game {
     if (fighterData.id === this.playerId) {
       this.playerRole = 'fighter';
       this.emotePanel.classList.add('hidden');
+      
+      // Highlight the player's character
+      fighter.highlight();
+      
+      // Add a "You" label to the status
+      this.statusElement.innerHTML = 'Fight in progress!<br><span style="color: #ffff00;">You are a fighter</span>';
     }
   }
   
@@ -318,12 +365,23 @@ class Game {
   }
   
   updateStatus(gameState) {
+    let statusText = '';
+    
     if (gameState.currentFight) {
-      this.statusElement.textContent = 'Fight in progress!';
+      statusText = 'Fight in progress!';
     } else if (gameState.viewers.length < 2) {
-      this.statusElement.textContent = 'Waiting for more players...';
+      statusText = 'Waiting for more players...';
     } else {
-      this.statusElement.textContent = 'Selecting fighters...';
+      statusText = 'Selecting fighters...';
+    }
+    
+    this.statusElement.innerHTML = statusText;
+    
+    // Add player role indicator
+    if (this.playerRole === 'viewer') {
+      this.statusElement.innerHTML += '<br><span style="color: #ffff00;">You are a viewer</span>';
+    } else if (this.playerRole === 'fighter') {
+      this.statusElement.innerHTML += '<br><span style="color: #ffff00;">You are a fighter</span>';
     }
   }
   
@@ -363,6 +421,18 @@ class Game {
     if (this.playerRole === 'fighter') {
       this.playerRole = 'viewer';
       this.emotePanel.classList.remove('hidden');
+      
+      // The player will be added back as a viewer by the server
+      // We'll highlight them when they're added in the addViewer method
+    }
+  }
+  
+  handleViewerChat(chatData) {
+    const { viewerId, message } = chatData;
+    
+    // Don't show the message for the sender (they already see it)
+    if (viewerId !== this.playerId && this.viewers[viewerId]) {
+      this.viewers[viewerId].chat(message);
     }
   }
 }

@@ -10,6 +10,8 @@ class SumoFighter {
     this.isMovingLeft = false;
     this.isMovingRight = false;
     this.speed = 0.1;
+    this.highlightMesh = null;
+    this.isHighlighted = false;
     
     this.init();
   }
@@ -148,6 +150,49 @@ class SumoFighter {
     };
     
     scaleUp();
+  }
+  
+  highlight() {
+    if (this.isHighlighted) return;
+    
+    // Create a slightly larger circle behind the fighter for the highlight effect
+    const highlightGeometry = createCircleGeometry(this.radius + 0.2);
+    const highlightMaterial = createMaterial('#ffff00'); // Yellow highlight
+    highlightMaterial.transparent = true;
+    highlightMaterial.opacity = 0.6;
+    
+    this.highlightMesh = new THREE.Mesh(highlightGeometry, highlightMaterial);
+    this.highlightMesh.position.set(0, 0, -0.05); // Slightly behind the fighter
+    this.mesh.add(this.highlightMesh);
+    
+    // Add pulsing animation
+    this.startHighlightAnimation();
+    
+    this.isHighlighted = true;
+  }
+  
+  startHighlightAnimation() {
+    if (!this.highlightMesh) return;
+    
+    const animate = () => {
+      if (!this.highlightMesh || !this.isHighlighted) return;
+      
+      // Pulse the highlight
+      const scale = 1 + 0.1 * Math.sin(Date.now() * 0.005);
+      this.highlightMesh.scale.set(scale, scale, 1);
+      
+      requestAnimationFrame(animate);
+    };
+    
+    animate();
+  }
+  
+  removeHighlight() {
+    if (this.highlightMesh) {
+      this.mesh.remove(this.highlightMesh);
+      this.highlightMesh = null;
+    }
+    this.isHighlighted = false;
   }
   
   remove() {
