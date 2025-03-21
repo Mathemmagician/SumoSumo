@@ -323,7 +323,7 @@ class Viewer {
     const normalizedY = directionY / length;
     
     // Scale the movement (how far pupils can move within the eyes)
-    const maxOffset = 0.08;
+    const maxOffset = 0.17;
     const offsetX = normalizedX * maxOffset;
     const offsetY = normalizedY * maxOffset;
     
@@ -560,19 +560,27 @@ class Viewer {
   highlight() {
     if (this.isHighlighted) return;
     
-    // Create a slightly larger circle behind the viewer for the highlight effect
-    const highlightGeometry = createCircleGeometry(this.radius + 0.2);
-    const highlightMaterial = createMaterial('#ffff00'); // Yellow highlight
-    highlightMaterial.transparent = true;
-    highlightMaterial.opacity = 0.6;
+    // Create a red triangle above the head
+    const triangleGeometry = new THREE.BufferGeometry();
+    const vertices = new Float32Array([
+      0, -0.5, 0,    // top
+      -0.3, 0, 0,   // bottom left
+      0.3, 0, 0     // bottom right
+    ]);
+    triangleGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
     
-    this.highlightMesh = new THREE.Mesh(highlightGeometry, highlightMaterial);
-    this.highlightMesh.position.set(0, 0, -0.05); // Slightly behind the viewer
-    this.mesh.add(this.highlightMesh);
+    const triangleMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0xFF0000,
+      side: THREE.DoubleSide
+    });
     
-    // Add pulsing animation
+    this.highlightMesh = new THREE.Mesh(triangleGeometry, triangleMaterial);
+    this.highlightMesh.position.set(0, this.radius * 2.1, 0); // Position above head
+    
+    // Add subtle floating animation
     this.startHighlightAnimation();
     
+    this.mesh.add(this.highlightMesh);
     this.isHighlighted = true;
   }
   
@@ -582,9 +590,12 @@ class Viewer {
     const animate = () => {
       if (!this.highlightMesh || !this.isHighlighted) return;
       
-      // Pulse the highlight
-      const scale = 1 + 0.1 * Math.sin(Date.now() * 0.005);
-      this.highlightMesh.scale.set(scale, scale, 1);
+      // Make the triangle float up and down slightly
+      const floatOffset = Math.sin(Date.now() * 0.005) * 0.1;
+      this.highlightMesh.position.y = this.radius * 1.8 + floatOffset;
+      
+      // Rotate the triangle slightly
+      this.highlightMesh.rotation.z += 0.01;
       
       requestAnimationFrame(animate);
     };
