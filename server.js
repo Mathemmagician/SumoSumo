@@ -169,7 +169,13 @@ function updateFighterPosition(fighterId, moveData) {
 function selectNewFighters() {
   if (gameState.viewers.length < 2) return;
   
-  // Select two random viewers to become fighters
+  // IMPORTANT: Check that we don't already have fighters
+  if (gameState.fighters.length > 0) {
+    console.log("Cannot select new fighters: there are already fighters in the ring");
+    return;
+  }
+  
+  // Select two random viewers
   const randomIndices = [];
   while (randomIndices.length < 2) {
     const idx = Math.floor(Math.random() * gameState.viewers.length);
@@ -181,23 +187,32 @@ function selectNewFighters() {
   const fighter1 = gameState.viewers[randomIndices[0]];
   const fighter2 = gameState.viewers[randomIndices[1]];
   
-  // Remove selected viewers
-  gameState.viewers = gameState.viewers.filter((_, idx) => !randomIndices.includes(idx));
+  // Remove selected viewers (in reverse order to avoid index issues)
+  const sortedIndices = [...randomIndices].sort((a, b) => b - a);
+  sortedIndices.forEach(idx => {
+    gameState.viewers.splice(idx, 1);
+  });
   
   // Add as fighters
   const newFighter1 = {
     ...fighter1,
     position: { x: -3, y: 0, z: 0 },
-    score: 0
+    score: 0,
+    isMovingLeft: false,
+    isMovingRight: false
   };
   
   const newFighter2 = {
     ...fighter2,
     position: { x: 3, y: 0, z: 0 },
-    score: 0
+    score: 0,
+    isMovingLeft: false,
+    isMovingRight: false
   };
   
   gameState.fighters = [newFighter1, newFighter2];
+  
+  // Start a new fight
   gameState.currentFight = {
     startTime: Date.now(),
     fighters: [newFighter1.id, newFighter2.id]
@@ -232,29 +247,33 @@ function endFight(winnerId, loserId) {
     const fighter1 = gameState.fighters[0];
     const fighter2 = gameState.fighters[1];
     
-    if (fighter1) {
-      gameState.viewers.push({
-        id: fighter1.id,
-        position: getRandomViewerPosition(),
-        color: fighter1.color
-      });
-    }
+    // IMPORTANT: Clear the fighters array BEFORE adding them back as viewers
+    // This prevents race conditions where a fighter might be selected again
+    const tempFighters = [...gameState.fighters]; // Make a copy
+    gameState.fighters = []; // Clear the array
     
-    if (fighter2) {
-      gameState.viewers.push({
-        id: fighter2.id,
-        position: getRandomViewerPosition(),
-        color: fighter2.color
-      });
-    }
+    // Create an array to store the new viewers
+    const newViewers = [];
     
-    // Clear the fighters array
-    gameState.fighters = [];
+    // Now add the fighters back as viewers
+    tempFighters.forEach(fighter => {
+      if (fighter) {
+        const newViewer = {
+          id: fighter.id,
+          position: getRandomViewerPosition(),
+          color: fighter.color
+        };
+        
+        gameState.viewers.push(newViewer);
+        newViewers.push(newViewer);
+      }
+    });
     
     // Notify clients that fighters have returned to viewers
     io.emit('fightersReturnedToViewers', {
       fighter1Id: fighter1 ? fighter1.id : null,
-      fighter2Id: fighter2 ? fighter2.id : null
+      fighter2Id: fighter2 ? fighter2.id : null,
+      newViewers: newViewers // Send the new viewer objects to all clients
     });
     
     // After another short delay, select new fighters
@@ -287,33 +306,37 @@ setInterval(() => {
 // Add this to the game loop that runs on the server
 function updateGameState() {
   // Update fighter positions based on their movement state
-  gameState.fighters.forEach(fighter => {
-    let movementX = 0;
-    if (fighter.isMovingLeft) movementX -= 0.1;
-    if (fighter.isMovingRight) movementX += 0.1;
-    
-    if (movementX !== 0) {
-      fighter.position.x += movementX;
+  if (gameState.fighters.length === 2) { // Only process if we have exactly 2 fighters
+    gameState.fighters.forEach(fighter => {
+      if (!fighter) return; // Skip if fighter is undefined
       
-      // Keep fighter within the ring
-      const maxX = gameState.ring.radius - 1;
-      fighter.position.x = Math.max(-maxX, Math.min(maxX, fighter.position.x));
+      let movementX = 0;
+      if (fighter.isMovingLeft) movementX -= 0.1;
+      if (fighter.isMovingRight) movementX += 0.1;
       
-      // Check for ring out
-      if (Math.abs(fighter.position.x) >= maxX) {
-        const loserId = fighter.id;
-        const winnerId = gameState.fighters.find(f => f.id !== loserId)?.id;
+      if (movementX !== 0) {
+        fighter.position.x += movementX;
         
-        if (winnerId) {
-          endFight(winnerId, loserId);
-          return; // Exit early if fight ended
+        // Keep fighter within the ring
+        const maxX = gameState.ring.radius - 1;
+        fighter.position.x = Math.max(-maxX, Math.min(maxX, fighter.position.x));
+        
+        // Check for ring out
+        if (Math.abs(fighter.position.x) >= maxX) {
+          const loserId = fighter.id;
+          const winnerId = gameState.fighters.find(f => f && f.id !== loserId)?.id;
+          
+          if (winnerId) {
+            endFight(winnerId, loserId);
+            return; // Exit early if fight ended
+          }
         }
+        
+        // Broadcast position update
+        io.emit('fighterUpdated', fighter);
       }
-      
-      // Broadcast position update
-      io.emit('fighterUpdated', fighter);
-    }
-  });
+    });
+  }
   
   // Schedule next update
   setTimeout(updateGameState, 16); // ~60fps

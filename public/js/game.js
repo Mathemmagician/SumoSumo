@@ -554,9 +554,13 @@ class Game {
     if (this.playerRole === 'fighter') {
       this.playerRole = 'viewer';
       this.emotePanel.classList.remove('hidden');
-      
-      // The player will be added back as a viewer by the server
-      // We'll highlight them when they're added in the addViewer method
+    }
+    
+    // Add the returned fighters as viewers
+    if (data.newViewers && Array.isArray(data.newViewers)) {
+      data.newViewers.forEach(viewerData => {
+        this.addViewer(viewerData);
+      });
     }
   }
   
