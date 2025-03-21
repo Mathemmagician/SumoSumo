@@ -68,29 +68,39 @@ class Game {
   }
   
   createRing() {
-    // Create a traditional sumo dohyo
+    // Create a traditional sumo dohyo with accurate details
     const ringGroup = new THREE.Group();
     
-    // Base platform (slightly larger than the ring)
-    const baseGeometry = new THREE.CircleGeometry(this.ringRadius + 1, 64);
-    const baseMaterial = new THREE.MeshBasicMaterial({ color: 0x8B4513 }); // Dark brown
-    const base = new THREE.Mesh(baseGeometry, baseMaterial);
-    base.position.set(0, 0, -0.2);
-    ringGroup.add(base);
+    // Square foundation platform (dohyo-damari)
+    const foundationGeometry = new THREE.BoxGeometry(this.ringRadius * 2.5, this.ringRadius * 2.5, 0.3);
+    const foundationMaterial = new THREE.MeshBasicMaterial({ color: 0x8B4513 }); // Dark brown
+    const foundation = new THREE.Mesh(foundationGeometry, foundationMaterial);
+    foundation.position.set(0, 0, -0.3);
+    ringGroup.add(foundation);
     
-    // Main clay ring
+    // Add clay layer on top of foundation (slightly smaller square)
+    const clayBaseGeometry = new THREE.BoxGeometry(this.ringRadius * 2.2, this.ringRadius * 2.2, 0.1);
+    const clayBaseMaterial = new THREE.MeshBasicMaterial({ color: 0xD2B48C }); // Tan clay color
+    const clayBase = new THREE.Mesh(clayBaseGeometry, clayBaseMaterial);
+    clayBase.position.set(0, 0, -0.1);
+    ringGroup.add(clayBase);
+    
+    // Main circular clay ring (dohyo)
     const ringGeometry = new THREE.CircleGeometry(this.ringRadius, 64);
     const ringMaterial = new THREE.MeshBasicMaterial({ color: 0xD2B48C }); // Tan clay color
     this.ring = new THREE.Mesh(ringGeometry, ringMaterial);
-    this.ring.position.set(0, 0, -0.1);
+    this.ring.position.set(0, 0, -0.05);
     ringGroup.add(this.ring);
     
     // Rice straw border (tawara)
     const borderGeometry = new THREE.RingGeometry(this.ringRadius - 0.2, this.ringRadius, 64);
     const borderMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFE0 }); // Light straw color
     const border = new THREE.Mesh(borderGeometry, borderMaterial);
-    border.position.set(0, 0, -0.05);
+    border.position.set(0, 0, -0.04);
     ringGroup.add(border);
+    
+    // Add the four corner posts (tawara-zumiishi)
+    this.createCornerPosts(ringGroup);
     
     // Rice bales markers (around the ring)
     this.createRiceBales(ringGroup);
@@ -99,7 +109,7 @@ class Game {
     const centerCircleGeometry = new THREE.CircleGeometry(0.8, 32);
     const centerCircleMaterial = new THREE.MeshBasicMaterial({ color: 0xC0C0C0 }); // Silver
     const centerCircle = new THREE.Mesh(centerCircleGeometry, centerCircleMaterial);
-    centerCircle.position.set(0, 0, -0.09);
+    centerCircle.position.set(0, 0, -0.04);
     ringGroup.add(centerCircle);
     
     // Starting lines
@@ -112,6 +122,40 @@ class Game {
     this.scene.add(ringGroup);
   }
   
+  createCornerPosts(ringGroup) {
+    // Create the four corner posts (tawara-zumiishi)
+    const postSize = 0.4;
+    const postGeometry = new THREE.BoxGeometry(postSize, postSize, 0.15);
+    const postMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFE0 }); // Light straw color
+    
+    // Calculate position - slightly inside the square platform corners
+    const postDistance = this.ringRadius * 1.05;
+    
+    // Create four posts at the corners
+    const positions = [
+      { x: postDistance, y: postDistance },
+      { x: -postDistance, y: postDistance },
+      { x: -postDistance, y: -postDistance },
+      { x: postDistance, y: -postDistance }
+    ];
+    
+    positions.forEach(pos => {
+      const post = new THREE.Mesh(postGeometry, postMaterial);
+      post.position.set(pos.x, pos.y, -0.1);
+      ringGroup.add(post);
+      
+      // Add decorative lines on each post
+      const lineGeometry = new THREE.PlaneGeometry(postSize - 0.05, 0.03);
+      const lineMaterial = new THREE.MeshBasicMaterial({ color: 0x8B4513 });
+      
+      for (let i = 0; i < 3; i++) {
+        const line = new THREE.Mesh(lineGeometry, lineMaterial);
+        line.position.set(0, 0.05 - i * 0.05, 0.08);
+        post.add(line);
+      }
+    });
+  }
+  
   createRiceBales(ringGroup) {
     // Create rice bales (tawara) around the ring
     const baleCount = 20; // Number of bales around the ring
@@ -120,11 +164,11 @@ class Game {
     
     for (let i = 0; i < baleCount; i++) {
       const angle = (i / baleCount) * Math.PI * 2;
-      const x = Math.cos(angle) * (this.ringRadius + 0.1);
-      const y = Math.sin(angle) * (this.ringRadius + 0.1);
+      const x = Math.cos(angle) * (this.ringRadius - 0.1);
+      const y = Math.sin(angle) * (this.ringRadius - 0.1);
       
       const bale = new THREE.Mesh(baleGeometry, baleMaterial);
-      bale.position.set(x, y, -0.1);
+      bale.position.set(x, y, -0.05);
       bale.rotation.z = angle + Math.PI/2;
       ringGroup.add(bale);
       
@@ -147,34 +191,69 @@ class Game {
     
     // Left starting line
     const leftLine = new THREE.Mesh(lineGeometry, lineMaterial);
-    leftLine.position.set(-1.5, 0, -0.08);
+    leftLine.position.set(-1.5, 0, -0.04);
     ringGroup.add(leftLine);
     
     // Right starting line
     const rightLine = new THREE.Mesh(lineGeometry, lineMaterial);
-    rightLine.position.set(1.5, 0, -0.08);
+    rightLine.position.set(1.5, 0, -0.04);
     ringGroup.add(rightLine);
+    
+    // Add salt piles near the starting lines
+    this.createSaltPiles(ringGroup);
+  }
+  
+  createSaltPiles(ringGroup) {
+    // Create small salt piles near the starting lines
+    const saltGeometry = new THREE.ConeGeometry(0.2, 0.15, 16);
+    const saltMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+    
+    // Left salt pile
+    const leftSalt = new THREE.Mesh(saltGeometry, saltMaterial);
+    leftSalt.position.set(-2.2, 0, -0.05);
+    leftSalt.rotation.x = Math.PI; // Flip the cone
+    ringGroup.add(leftSalt);
+    
+    // Right salt pile
+    const rightSalt = new THREE.Mesh(saltGeometry, saltMaterial);
+    rightSalt.position.set(2.2, 0, -0.05);
+    rightSalt.rotation.x = Math.PI; // Flip the cone
+    ringGroup.add(rightSalt);
   }
   
   addRingTexture(ring) {
-    // Add a subtle texture to the clay surface
-    const textureSize = 100;
+    // Create a canvas for the texture
+    const textureSize = 512;
     const canvas = document.createElement('canvas');
     canvas.width = textureSize;
     canvas.height = textureSize;
     const context = canvas.getContext('2d');
     
-    // Fill with base color
+    // Base color
     context.fillStyle = '#D2B48C';
     context.fillRect(0, 0, textureSize, textureSize);
     
-    // Add subtle grain texture
-    context.fillStyle = '#C2A478';
-    for (let i = 0; i < 1000; i++) {
+    // Add texture details - small dots and lines for clay texture
+    context.fillStyle = '#C2A278';
+    
+    // Add small dots
+    for (let i = 0; i < 5000; i++) {
       const x = Math.random() * textureSize;
       const y = Math.random() * textureSize;
       const size = Math.random() * 2 + 1;
       context.fillRect(x, y, size, size);
+    }
+    
+    // Add some lines to simulate raked clay
+    context.strokeStyle = '#C2A278';
+    context.lineWidth = 1;
+    
+    for (let i = 0; i < 50; i++) {
+      const y = Math.random() * textureSize;
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(textureSize, y);
+      context.stroke();
     }
     
     // Create texture from canvas
