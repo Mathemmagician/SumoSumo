@@ -321,6 +321,22 @@ class Game {
     this.socket.on('viewerChat', (chatData) => {
       this.handleViewerChat(chatData);
     });
+    
+    // Handle sumo techniques
+    this.socket.on('sumoTechniquePerformed', (data) => {
+      this.handleSumoTechnique(data);
+    });
+    
+    this.socket.on('fighterStaggered', (data) => {
+      if (this.fighters[data.fighterId]) {
+        this.fighters[data.fighterId].getStaggered();
+      }
+    });
+    
+    // Handle fighter collisions
+    this.socket.on('fighterCollision', (data) => {
+      this.handleFighterCollision(data);
+    });
   }
   
   initEventListeners() {
@@ -412,6 +428,57 @@ class Game {
     chatInput.addEventListener('keypress', (event) => {
       if (event.key === 'Enter') {
         sendChatMessage();
+      }
+    });
+    
+    // Sumo technique controls
+    document.addEventListener('keydown', (event) => {
+      if (this.playerRole !== 'fighter' || this.playerRole === 'transitioning') return;
+      
+      const fighter = this.fighters[this.playerId];
+      if (!fighter) return;
+      
+      switch (event.key) {
+        case 'q':
+        case 'Q':
+          // Shove technique
+          fighter.performShove();
+          break;
+        case 'w':
+        case 'W':
+          // Slap technique
+          fighter.performSlap();
+          break;
+        case 'e':
+        case 'E':
+          // Start charging
+          fighter.startCharge();
+          break;
+        case 'r':
+        case 'R':
+          // Defend
+          fighter.startDefending();
+          break;
+      }
+    });
+    
+    document.addEventListener('keyup', (event) => {
+      if (this.playerRole !== 'fighter' || this.playerRole === 'transitioning') return;
+      
+      const fighter = this.fighters[this.playerId];
+      if (!fighter) return;
+      
+      switch (event.key) {
+        case 'e':
+        case 'E':
+          // Release charge
+          fighter.releaseCharge();
+          break;
+        case 'r':
+        case 'R':
+          // Stop defending
+          fighter.stopDefending();
+          break;
       }
     });
   }
@@ -534,22 +601,36 @@ class Game {
     if (this.referee) {
       this.referee.startFight();
     }
+    
+    // Display technique instructions for fighters
+    if (this.playerRole === 'fighter') {
+      this.showTechniqueInstructions();
+    }
   }
   
-  handleFightResult(resultData) {
-    const { winnerId, loserId } = resultData;
+  handleFightResult(result) {
+    const { winnerId, loserId } = result;
     
     // Update status
-    this.statusElement.textContent = `Fighter ${winnerId.substring(0, 4)} wins!`;
+    this.statusElement.textContent = `Fight ended! ${winnerId === this.playerId ? 'You won!' : 'Winner: ' + winnerId}`;
     
-    // Winner celebration
+    // If this player was a fighter, immediately update their role to transitioning
+    // This prevents any fighter controls from being active during the transition
+    if (this.playerRole === 'fighter') {
+      this.playerRole = 'transitioning';
+      
+      // Disable all fighter controls immediately
+      this.disableFighterControls();
+    }
+    
+    // Show victory animation for winner
     if (this.fighters[winnerId]) {
       this.fighters[winnerId].celebrate();
     }
     
-    // Referee animation
-    if (this.referee) {
-      this.referee.declareFightResult(winnerId);
+    // Show defeat animation for loser
+    if (this.fighters[loserId]) {
+      this.fighters[loserId].defeat();
     }
   }
   
@@ -629,8 +710,8 @@ class Game {
       delete this.fighters[fighterId];
     });
     
-    // If this player was a fighter, update their role to viewer
-    if (this.playerRole === 'fighter') {
+    // If this player was transitioning from fighter, update their role to viewer
+    if (this.playerRole === 'transitioning' || this.playerRole === 'fighter') {
       this.playerRole = 'viewer';
       this.emotePanel.classList.remove('hidden');
     }
@@ -649,6 +730,166 @@ class Game {
     // Don't show the message for the sender (they already see it)
     if (viewerId !== this.playerId && this.viewers[viewerId]) {
       this.viewers[viewerId].chat(message);
+    }
+  }
+  
+  handleSumoTechnique(data) {
+    const { fighterId, technique, targetId } = data;
+    
+    // If this is the player who performed the technique, we already animated it
+    if (fighterId === this.playerId) return;
+    
+    // Otherwise, show the opponent performing the technique
+    const fighter = this.fighters[fighterId];
+    if (!fighter) return;
+    
+    switch (technique) {
+      case 'shove':
+        fighter.performShove();
+        break;
+      case 'slap':
+        fighter.performSlap();
+        break;
+      case 'charge':
+        // For charges from other players, we just show the result
+        fighter.releaseCharge();
+        break;
+    }
+  }
+  
+  showTechniqueInstructions() {
+    const instructions = document.createElement('div');
+    instructions.className = 'technique-instructions';
+    instructions.innerHTML = `
+      <h3>Sumo Techniques:</h3>
+      <ul>
+        <li><strong>Q</strong>: Shove (Oshi-dashi)</li>
+        <li><strong>W</strong>: Slap (Harite)</li>
+        <li><strong>E</strong>: Charge (Tachi-ai) - Hold to charge, release to attack</li>
+        <li><strong>R</strong>: Defend - Hold to maintain defensive stance</li>
+        <li><strong>←/→</strong>: Move left/right</li>
+      </ul>
+    `;
+    
+    this.container.appendChild(instructions);
+    
+    // Remove after 10 seconds
+    setTimeout(() => {
+      if (this.container.contains(instructions)) {
+        this.container.removeChild(instructions);
+      }
+    }, 10000);
+  }
+  
+  handleFighterCollision(data) {
+    const { fighter1Id, fighter2Id, intensity } = data;
+    
+    // Play collision sound
+    this.playCollisionSound(intensity);
+    
+    // Visual feedback for collision
+    if (this.fighters[fighter1Id]) {
+      this.fighters[fighter1Id].collide(intensity);
+    }
+    
+    if (this.fighters[fighter2Id]) {
+      this.fighters[fighter2Id].collide(intensity);
+    }
+    
+    // Camera shake effect for intense collisions
+    if (intensity > 0.5) {
+      this.shakeCamera(intensity);
+    }
+  }
+  
+  playCollisionSound(intensity) {
+    // Create audio context if it doesn't exist
+    if (!this.audioContext) {
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    // Create oscillator for collision sound
+    const oscillator = this.audioContext.createOscillator();
+    const gainNode = this.audioContext.createGain();
+    
+    // Set sound properties based on intensity
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 100 + intensity * 100; // Higher pitch for stronger hits
+    
+    gainNode.gain.value = Math.min(0.2, intensity * 0.3); // Limit volume
+    
+    // Connect nodes
+    oscillator.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+    
+    // Play sound
+    oscillator.start();
+    
+    // Quick fade out
+    gainNode.gain.exponentialRampToValueAtTime(
+      0.001, this.audioContext.currentTime + 0.2
+    );
+    
+    // Stop after fade out
+    setTimeout(() => {
+      oscillator.stop();
+    }, 200);
+  }
+  
+  shakeCamera(intensity) {
+    // Save original camera position
+    const originalPosition = {
+      x: this.camera.position.x,
+      y: this.camera.position.y,
+      z: this.camera.position.z
+    };
+    
+    // Shake duration and max offset
+    const duration = 300; // ms
+    const maxOffset = intensity * 0.3;
+    const startTime = Date.now();
+    
+    // Shake animation
+    const shakeAnimation = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = elapsed / duration;
+      
+      if (progress < 1) {
+        // Random offset that decreases over time
+        const factor = (1 - progress);
+        const offsetX = (Math.random() * 2 - 1) * maxOffset * factor;
+        const offsetY = (Math.random() * 2 - 1) * maxOffset * factor;
+        
+        // Apply shake
+        this.camera.position.x = originalPosition.x + offsetX;
+        this.camera.position.y = originalPosition.y + offsetY;
+        
+        // Continue animation
+        requestAnimationFrame(shakeAnimation);
+      } else {
+        // Reset to original position
+        this.camera.position.x = originalPosition.x;
+        this.camera.position.y = originalPosition.y;
+        this.camera.position.z = originalPosition.z;
+      }
+    };
+    
+    // Start shake animation
+    shakeAnimation();
+  }
+  
+  disableFighterControls() {
+    // Remove any technique instructions that might be showing
+    const instructionsElement = document.querySelector('.technique-instructions');
+    if (instructionsElement && instructionsElement.parentNode) {
+      instructionsElement.parentNode.removeChild(instructionsElement);
+    }
+    
+    // Reset any active techniques or states
+    const fighter = this.fighters[this.playerId];
+    if (fighter) {
+      if (fighter.isCharging) fighter.releaseCharge();
+      if (fighter.isDefending) fighter.stopDefending();
     }
   }
 }

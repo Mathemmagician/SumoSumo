@@ -23,6 +23,21 @@ class SumoFighter {
     this.isHeavy = Math.random() > 0.3; // 70% chance of being heavier
     this.hasMustache = Math.random() > 0.7; // 30% chance of having a mustache
     
+    this.specialMoveReady = true;
+    this.specialMoveCooldown = 3000; // 3 seconds cooldown
+    this.isCharging = false;
+    this.isDefending = false;
+    this.staggered = false;
+    this.momentum = 0;
+    this.maxMomentum = 5;
+    this.lastMoveTime = 0;
+    this.opponentId = null;
+    this.techniques = {
+      shove: { name: 'Oshi-dashi', power: 1.2, cooldown: 1000 },
+      slap: { name: 'Harite', power: 0.8, cooldown: 500 },
+      charge: { name: 'Tachi-ai', power: 2.0, cooldown: 2000 }
+    };
+    
     this.init();
   }
   
@@ -34,6 +49,9 @@ class SumoFighter {
     
     // Create sumo wrestler body
     this.createSumoBody();
+    
+    // Create momentum indicator
+    this.createMomentumIndicator();
   }
   
   createSumoBody() {
@@ -473,6 +491,15 @@ class SumoFighter {
   update() {
     // Update eyes to look in the direction of movement
     this.updateEyes();
+    
+    // Update momentum bar
+    this.updateMomentumBar();
+    
+    // Gradually decrease momentum over time
+    if (this.momentum > 0 && !this.isCharging && Date.now() % 50 === 0) {
+      this.momentum = Math.max(0, this.momentum - 0.01);
+      this.updateMomentumBar();
+    }
   }
   
   updateEyes() {
@@ -596,5 +623,442 @@ class SumoFighter {
     if (this.mesh && this.scene) {
       this.scene.remove(this.mesh);
     }
+  }
+  
+  createMomentumIndicator() {
+    // Create a momentum bar above the fighter
+    const barWidth = this.radius * 2;
+    const barHeight = 0.2;
+    
+    // Background bar
+    const bgGeometry = new THREE.PlaneGeometry(barWidth, barHeight);
+    const bgMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0x333333,
+      transparent: true,
+      opacity: 0.7
+    });
+    const bgBar = new THREE.Mesh(bgGeometry, bgMaterial);
+    bgBar.position.set(0, this.radius * 1.5, 0.1);
+    this.mesh.add(bgBar);
+    this.bodyParts.momentumBarBg = bgBar;
+    
+    // Momentum fill bar
+    const fillGeometry = new THREE.PlaneGeometry(0.001, barHeight - 0.05);
+    const fillMaterial = new THREE.MeshBasicMaterial({ color: 0xFF4500 }); // Orange-red
+    const fillBar = new THREE.Mesh(fillGeometry, fillMaterial);
+    fillBar.position.set(-barWidth/2 + 0.025, 0, 0.01);
+    bgBar.add(fillBar);
+    this.bodyParts.momentumBarFill = fillBar;
+    
+    // Hide initially
+    bgBar.visible = false;
+  }
+  
+  updateMomentumBar() {
+    if (!this.bodyParts.momentumBarFill) return;
+    
+    const barWidth = this.radius * 2 - 0.05;
+    const fillWidth = (this.momentum / this.maxMomentum) * barWidth;
+    
+    this.bodyParts.momentumBarFill.scale.x = fillWidth;
+    this.bodyParts.momentumBarFill.position.x = -this.radius + fillWidth/2;
+    
+    // Show bar only during fights
+    this.bodyParts.momentumBarBg.visible = this.momentum > 0;
+    
+    // Change color based on momentum
+    if (this.momentum > this.maxMomentum * 0.7) {
+      this.bodyParts.momentumBarFill.material.color.set(0xFF0000); // Red when high
+    } else if (this.momentum > this.maxMomentum * 0.3) {
+      this.bodyParts.momentumBarFill.material.color.set(0xFFA500); // Orange when medium
+    } else {
+      this.bodyParts.momentumBarFill.material.color.set(0xFFFF00); // Yellow when low
+    }
+  }
+  
+  performShove() {
+    if (Date.now() - this.lastMoveTime < this.techniques.shove.cooldown) return;
+    
+    this.lastMoveTime = Date.now();
+    const power = this.techniques.shove.power * (1 + this.momentum / this.maxMomentum);
+    
+    // Animation for shoving
+    const duration = 500; // 0.5 seconds
+    const startTime = Date.now();
+    const originalArmRotations = {
+      left: this.bodyParts.leftArm ? this.bodyParts.leftArm.rotation.z : 0,
+      right: this.bodyParts.rightArm ? this.bodyParts.rightArm.rotation.z : 0
+    };
+    
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      if (progress < 0.3) {
+        // Wind up
+        if (this.bodyParts.leftArm) {
+          this.bodyParts.leftArm.rotation.z = lerp(originalArmRotations.left, 0.8, easeInOut(progress / 0.3));
+        }
+        if (this.bodyParts.rightArm) {
+          this.bodyParts.rightArm.rotation.z = lerp(originalArmRotations.right, -0.8, easeInOut(progress / 0.3));
+        }
+      } else if (progress < 0.6) {
+        // Push forward
+        if (this.bodyParts.leftArm) {
+          this.bodyParts.leftArm.rotation.z = lerp(0.8, -0.2, easeInOut((progress - 0.3) / 0.3));
+        }
+        if (this.bodyParts.rightArm) {
+          this.bodyParts.rightArm.rotation.z = lerp(-0.8, 0.2, easeInOut((progress - 0.3) / 0.3));
+        }
+        
+        // Move body slightly forward
+        this.mesh.position.x += (this.facingDirection === 'right' ? 0.1 : -0.1);
+      } else {
+        // Return to normal
+        if (this.bodyParts.leftArm) {
+          this.bodyParts.leftArm.rotation.z = lerp(-0.2, originalArmRotations.left, easeInOut((progress - 0.6) / 0.4));
+        }
+        if (this.bodyParts.rightArm) {
+          this.bodyParts.rightArm.rotation.z = lerp(0.2, originalArmRotations.right, easeInOut((progress - 0.6) / 0.4));
+        }
+        
+        // Move body back
+        this.mesh.position.x -= (this.facingDirection === 'right' ? 0.1 : -0.1);
+      }
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        // Reset
+        if (this.bodyParts.leftArm) this.bodyParts.leftArm.rotation.z = originalArmRotations.left;
+        if (this.bodyParts.rightArm) this.bodyParts.rightArm.rotation.z = originalArmRotations.right;
+        
+        // Emit the move to the server
+        if (window.game && window.game.socket) {
+          window.game.socket.emit('sumoTechnique', {
+            technique: 'shove',
+            power: power
+          });
+        }
+        
+        // Decrease momentum after use
+        this.momentum = Math.max(0, this.momentum - 1);
+        this.updateMomentumBar();
+      }
+    };
+    
+    animate();
+  }
+  
+  performSlap() {
+    if (Date.now() - this.lastMoveTime < this.techniques.slap.cooldown) return;
+    
+    this.lastMoveTime = Date.now();
+    const power = this.techniques.slap.power * (1 + this.momentum / this.maxMomentum);
+    
+    // Animation for slapping
+    const duration = 400; // 0.4 seconds
+    const startTime = Date.now();
+    const isRightSlap = Math.random() > 0.5; // Randomly choose right or left arm
+    const arm = isRightSlap ? this.bodyParts.rightArm : this.bodyParts.leftArm;
+    const originalRotation = arm ? arm.rotation.z : 0;
+    
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      if (arm) {
+        if (progress < 0.4) {
+          // Wind up
+          arm.rotation.z = lerp(originalRotation, isRightSlap ? -1.2 : 1.2, easeInOut(progress / 0.4));
+        } else if (progress < 0.6) {
+          // Hold
+          arm.rotation.z = isRightSlap ? -1.2 : 1.2;
+        } else {
+          // Return
+          arm.rotation.z = lerp(isRightSlap ? -1.2 : 1.2, originalRotation, easeInOut((progress - 0.6) / 0.4));
+        }
+      }
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        // Reset
+        if (arm) arm.rotation.z = originalRotation;
+        
+        // Emit the move to the server
+        if (window.game && window.game.socket) {
+          window.game.socket.emit('sumoTechnique', {
+            technique: 'slap',
+            power: power,
+            isRightSlap: isRightSlap
+          });
+        }
+        
+        // Increase momentum slightly
+        this.momentum = Math.min(this.maxMomentum, this.momentum + 0.5);
+        this.updateMomentumBar();
+      }
+    };
+    
+    animate();
+  }
+  
+  startCharge() {
+    if (this.isCharging) return;
+    
+    this.isCharging = true;
+    const chargeStartTime = Date.now();
+    
+    // Visual indicator for charging
+    if (this.bodyParts.body) {
+      this.bodyParts.body.material.color.set(0xFF6347); // Tomato red
+    }
+    
+    // Charging animation - lower stance
+    if (this.bodyParts.body) {
+      this.bodyParts.body.position.y -= 0.2;
+    }
+    
+    // Increase momentum while charging
+    const chargeInterval = setInterval(() => {
+      if (!this.isCharging) {
+        clearInterval(chargeInterval);
+        return;
+      }
+      
+      this.momentum = Math.min(this.maxMomentum, this.momentum + 0.2);
+      this.updateMomentumBar();
+      
+      // Max charge time is 3 seconds
+      if (Date.now() - chargeStartTime > 3000) {
+        this.releaseCharge();
+        clearInterval(chargeInterval);
+      }
+    }, 100);
+  }
+  
+  releaseCharge() {
+    if (!this.isCharging) return;
+    
+    const power = this.techniques.charge.power * (1 + this.momentum / this.maxMomentum);
+    this.isCharging = false;
+    
+    // Reset body color
+    if (this.bodyParts.body) {
+      this.bodyParts.body.material.color.set(this.color);
+      this.bodyParts.body.position.y += 0.2; // Reset stance
+    }
+    
+    // Charge forward animation
+    const duration = 600; // 0.6 seconds
+    const startTime = Date.now();
+    const originalX = this.mesh.position.x;
+    const chargeDistance = 1.5 * (this.momentum / this.maxMomentum);
+    
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      if (progress < 0.7) {
+        // Move forward quickly
+        const moveX = chargeDistance * easeInOut(progress / 0.7);
+        this.mesh.position.x = originalX + (this.facingDirection === 'right' ? moveX : -moveX);
+      } else {
+        // Slow down at the end
+        const moveX = chargeDistance * (1 - easeInOut((progress - 0.7) / 0.3));
+        this.mesh.position.x = originalX + (this.facingDirection === 'right' ? chargeDistance - moveX : -(chargeDistance - moveX));
+      }
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        // Emit the move to the server
+        if (window.game && window.game.socket) {
+          window.game.socket.emit('sumoTechnique', {
+            technique: 'charge',
+            power: power,
+            distance: chargeDistance
+          });
+        }
+        
+        // Reset momentum after a charge
+        this.momentum = 0;
+        this.updateMomentumBar();
+      }
+    };
+    
+    animate();
+  }
+  
+  startDefending() {
+    if (this.isDefending) return;
+    
+    this.isDefending = true;
+    
+    // Visual indicator for defending
+    if (this.bodyParts.body) {
+      this.bodyParts.body.material.color.set(0x4682B4); // Steel blue
+    }
+    
+    // Defensive stance - arms forward
+    if (this.bodyParts.leftArm) {
+      this.bodyParts.leftArm.rotation.z = 0;
+    }
+    if (this.bodyParts.rightArm) {
+      this.bodyParts.rightArm.rotation.z = 0;
+    }
+    
+    // Lower stance
+    if (this.bodyParts.body) {
+      this.bodyParts.body.position.y -= 0.1;
+    }
+    
+    // Increase momentum slightly while defending
+    this.momentum = Math.min(this.maxMomentum, this.momentum + 0.3);
+    this.updateMomentumBar();
+  }
+  
+  stopDefending() {
+    if (!this.isDefending) return;
+    
+    this.isDefending = false;
+    
+    // Reset body color
+    if (this.bodyParts.body) {
+      this.bodyParts.body.material.color.set(this.color);
+      this.bodyParts.body.position.y += 0.1; // Reset stance
+    }
+    
+    // Reset arm positions
+    if (this.bodyParts.leftArm) {
+      this.bodyParts.leftArm.rotation.z = 0.3;
+    }
+    if (this.bodyParts.rightArm) {
+      this.bodyParts.rightArm.rotation.z = -0.3;
+    }
+  }
+  
+  getStaggered() {
+    if (this.staggered) return;
+    
+    this.staggered = true;
+    
+    // Visual effect for being staggered
+    const originalColor = this.color;
+    if (this.bodyParts.body) {
+      this.bodyParts.body.material.color.set(0x808080); // Gray
+    }
+    
+    // Wobble animation
+    const duration = 1000; // 1 second
+    const startTime = Date.now();
+    const originalRotation = this.mesh.rotation.z;
+    
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Wobble back and forth
+      this.mesh.rotation.z = originalRotation + Math.sin(progress * Math.PI * 6) * 0.2 * (1 - progress);
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        // Reset
+        this.mesh.rotation.z = originalRotation;
+        if (this.bodyParts.body) {
+          this.bodyParts.body.material.color.set(originalColor);
+        }
+        this.staggered = false;
+        
+        // Lose momentum when staggered
+        this.momentum = Math.max(0, this.momentum - 2);
+        this.updateMomentumBar();
+      }
+    };
+    
+    animate();
+  }
+  
+  collide(intensity) {
+    // Visual feedback for collision
+    const flashDuration = 100; // ms
+    const originalColor = this.color;
+    
+    // Flash the body
+    if (this.bodyParts.body) {
+      this.bodyParts.body.material.color.set(0xFFFFFF); // White flash
+      
+      // Reset color after flash
+      setTimeout(() => {
+        if (this.bodyParts.body) {
+          this.bodyParts.body.material.color.set(originalColor);
+        }
+      }, flashDuration);
+    }
+    
+    // Grunt sound effect
+    if (window.game && window.game.audioContext) {
+      const audioContext = window.game.audioContext;
+      
+      // Create noise for grunt
+      const bufferSize = 4096;
+      const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      
+      // Fill buffer with noise
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+      
+      // Create noise source
+      const noise = audioContext.createBufferSource();
+      noise.buffer = noiseBuffer;
+      
+      // Create filter for grunt sound
+      const filter = audioContext.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 300;
+      
+      // Create gain node
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = Math.min(0.15, intensity * 0.2);
+      
+      // Connect nodes
+      noise.connect(filter);
+      filter.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      // Play grunt
+      noise.start();
+      
+      // Quick fade out
+      gainNode.gain.exponentialRampToValueAtTime(
+        0.001, audioContext.currentTime + 0.3
+      );
+      
+      // Stop after fade out
+      setTimeout(() => {
+        noise.stop();
+      }, 300);
+    }
+    
+    // Physical reaction - slight body rotation
+    const rotationAmount = intensity * 0.2;
+    const originalRotation = this.mesh.rotation.z;
+    const direction = Math.random() > 0.5 ? 1 : -1;
+    
+    // Quick rotation
+    this.mesh.rotation.z = originalRotation + (rotationAmount * direction);
+    
+    // Reset rotation
+    setTimeout(() => {
+      this.mesh.rotation.z = originalRotation;
+    }, 200);
+    
+    // Increase momentum slightly on collision
+    this.momentum = Math.min(this.maxMomentum, this.momentum + (intensity * 0.5));
+    this.updateMomentumBar();
   }
 } 

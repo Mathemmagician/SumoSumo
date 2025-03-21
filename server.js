@@ -87,6 +87,28 @@ io.on('connection', (socket) => {
       message: messageData.message.substring(0, 30) // Limit message length
     });
   });
+  
+  // Handle sumo techniques
+  socket.on('sumoTechnique', (techniqueData) => {
+    if (isFighter(socket.id)) {
+      const fighter = getFighterById(socket.id);
+      if (!fighter) return;
+      
+      // Find opponent
+      const opponent = gameState.fighters.find(f => f.id !== socket.id);
+      if (!opponent) return;
+      
+      // Process the technique
+      processSumoTechnique(fighter, opponent, techniqueData);
+      
+      // Broadcast the technique to all clients
+      io.emit('sumoTechniquePerformed', {
+        fighterId: fighter.id,
+        technique: techniqueData.technique,
+        targetId: opponent.id
+      });
+    }
+  });
 });
 
 // Helper functions
@@ -178,9 +200,9 @@ function selectNewFighters() {
   // Select two random viewers
   const randomIndices = [];
   while (randomIndices.length < 2) {
-    const idx = Math.floor(Math.random() * gameState.viewers.length);
-    if (!randomIndices.includes(idx)) {
-      randomIndices.push(idx);
+    const randomIndex = Math.floor(Math.random() * gameState.viewers.length);
+    if (!randomIndices.includes(randomIndex)) {
+      randomIndices.push(randomIndex);
     }
   }
   
@@ -199,7 +221,10 @@ function selectNewFighters() {
     position: { x: -3, y: 0, z: 0 },
     score: 0,
     isMovingLeft: false,
-    isMovingRight: false
+    isMovingRight: false,
+    momentum: 0,
+    isDefending: false,
+    isCharging: false
   };
   
   const newFighter2 = {
@@ -207,7 +232,10 @@ function selectNewFighters() {
     position: { x: 3, y: 0, z: 0 },
     score: 0,
     isMovingLeft: false,
-    isMovingRight: false
+    isMovingRight: false,
+    momentum: 0,
+    isDefending: false,
+    isCharging: false
   };
   
   gameState.fighters = [newFighter1, newFighter2];
@@ -215,7 +243,8 @@ function selectNewFighters() {
   // Start a new fight
   gameState.currentFight = {
     startTime: Date.now(),
-    fighters: [newFighter1.id, newFighter2.id]
+    fighter1Id: newFighter1.id,
+    fighter2Id: newFighter2.id
   };
   
   // Notify all clients about the new fight
@@ -232,7 +261,7 @@ function endFight(winnerId, loserId) {
     winner.score += 1;
   }
   
-  // Notify all clients about the fight result
+  // Notify all clients about the fight result BEFORE changing any state
   io.emit('fightResult', {
     winnerId,
     loserId
@@ -281,8 +310,8 @@ function endFight(winnerId, loserId) {
       if (gameState.viewers.length >= 2) {
         selectNewFighters();
       }
-    }, 1500);
-  }, 2000);
+    }, 2000); // Increased delay to ensure proper transition
+  }, 2000); // Increased delay to ensure proper transition
 }
 
 function endCurrentFight() {
@@ -307,6 +336,7 @@ setInterval(() => {
 function updateGameState() {
   // Update fighter positions based on their movement state
   if (gameState.fighters.length === 2) { // Only process if we have exactly 2 fighters
+    // First update positions based on movement input
     gameState.fighters.forEach(fighter => {
       if (!fighter) return; // Skip if fighter is undefined
       
@@ -316,25 +346,35 @@ function updateGameState() {
       
       if (movementX !== 0) {
         fighter.position.x += movementX;
-        
-        // Keep fighter within the ring
-        const maxX = gameState.ring.radius - 1;
-        fighter.position.x = Math.max(-maxX, Math.min(maxX, fighter.position.x));
-        
-        // Check for ring out
-        if (Math.abs(fighter.position.x) >= maxX) {
-          const loserId = fighter.id;
-          const winnerId = gameState.fighters.find(f => f && f.id !== loserId)?.id;
-          
-          if (winnerId) {
-            endFight(winnerId, loserId);
-            return; // Exit early if fight ended
-          }
-        }
-        
-        // Broadcast position update
-        io.emit('fighterUpdated', fighter);
       }
+    });
+    
+    // Then check for collisions between fighters
+    if (gameState.fighters[0] && gameState.fighters[1]) {
+      handleFighterCollision(gameState.fighters[0], gameState.fighters[1]);
+    }
+    
+    // Finally, check boundaries and broadcast updates
+    gameState.fighters.forEach(fighter => {
+      if (!fighter) return;
+      
+      // Keep fighter within the ring
+      const maxX = gameState.ring.radius - 1;
+      fighter.position.x = Math.max(-maxX, Math.min(maxX, fighter.position.x));
+      
+      // Check for ring out
+      if (Math.abs(fighter.position.x) >= maxX) {
+        const loserId = fighter.id;
+        const winnerId = gameState.fighters.find(f => f && f.id !== loserId)?.id;
+        
+        if (winnerId) {
+          endFight(winnerId, loserId);
+          return; // Exit early if fight ended
+        }
+      }
+      
+      // Broadcast position update
+      io.emit('fighterUpdated', fighter);
     });
   }
   
@@ -349,4 +389,132 @@ updateGameState();
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-}); 
+});
+
+function processSumoTechnique(attacker, defender, techniqueData) {
+  // Calculate distance between fighters
+  const distance = Math.abs(attacker.position.x - defender.position.x);
+  const inRange = distance < 2.5; // Within striking distance
+  
+  if (!inRange) return; // Too far to hit
+  
+  let pushPower = 0;
+  let knockoutChance = 0;
+  
+  switch (techniqueData.technique) {
+    case 'shove':
+      pushPower = 0.5 * techniqueData.power;
+      knockoutChance = 0.1 * techniqueData.power;
+      break;
+    case 'slap':
+      pushPower = 0.3 * techniqueData.power;
+      knockoutChance = 0.05 * techniqueData.power;
+      break;
+    case 'charge':
+      pushPower = 0.8 * techniqueData.power;
+      knockoutChance = 0.2 * techniqueData.power;
+      break;
+  }
+  
+  // Reduce push power if defender is defending
+  if (defender.isDefending) {
+    pushPower *= 0.5;
+    knockoutChance *= 0.3;
+  }
+  
+  // Defender is pushed back
+  const direction = attacker.position.x < defender.position.x ? 1 : -1;
+  defender.position.x += direction * pushPower;
+  
+  // Attacker gets pushed back slightly (recoil)
+  attacker.position.x -= direction * (pushPower * 0.2);
+  
+  // Check for ring out
+  const maxX = gameState.ring.radius - 1;
+  if (Math.abs(defender.position.x) >= maxX) {
+    // Ring out - attacker wins
+    endFight(attacker.id, defender.id);
+    return;
+  }
+  
+  // Check for knockout
+  if (Math.random() < knockoutChance) {
+    // Knockout - attacker wins
+    endFight(attacker.id, defender.id);
+    return;
+  }
+  
+  // Update both fighters' positions
+  io.emit('fighterUpdated', defender);
+  io.emit('fighterUpdated', attacker);
+  
+  // Emit stagger effect if powerful hit
+  if (pushPower > 0.5 && !defender.isDefending) {
+    io.emit('fighterStaggered', {
+      fighterId: defender.id,
+      duration: Math.floor(pushPower * 1000) // Stagger duration based on power
+    });
+  }
+}
+
+// Add this new function for collision handling
+function handleFighterCollision(fighter1, fighter2) {
+  // Calculate distance between fighters
+  const distance = Math.abs(fighter1.position.x - fighter2.position.x);
+  const collisionThreshold = 2.0; // Minimum distance before collision occurs
+  
+  if (distance < collisionThreshold) {
+    // Collision detected!
+    
+    // Calculate collision response
+    const overlap = collisionThreshold - distance;
+    const direction = fighter1.position.x < fighter2.position.x ? 1 : -1;
+    
+    // Calculate push force based on momentum and weight
+    const fighter1Momentum = fighter1.momentum || 0;
+    const fighter2Momentum = fighter2.momentum || 0;
+    
+    // Default weights if not specified
+    const fighter1Weight = fighter1.isHeavy ? 1.3 : 1.0;
+    const fighter2Weight = fighter2.isHeavy ? 1.3 : 1.0;
+    
+    // Calculate push factors
+    const totalForce = fighter1Momentum + fighter2Momentum;
+    let fighter1PushFactor = 0.5; // Default to equal push
+    let fighter2PushFactor = 0.5;
+    
+    if (totalForce > 0) {
+      // Adjust push based on momentum
+      fighter1PushFactor = fighter2Momentum / totalForce;
+      fighter2PushFactor = fighter1Momentum / totalForce;
+    }
+    
+    // Adjust for weight
+    fighter1PushFactor *= (fighter2Weight / fighter1Weight);
+    fighter2PushFactor *= (fighter1Weight / fighter2Weight);
+    
+    // Normalize factors
+    const totalFactor = fighter1PushFactor + fighter2PushFactor;
+    fighter1PushFactor /= totalFactor;
+    fighter2PushFactor /= totalFactor;
+    
+    // Apply push to both fighters
+    fighter1.position.x -= overlap * fighter1PushFactor * direction;
+    fighter2.position.x += overlap * fighter2PushFactor * direction;
+    
+    // Collision feedback - reduce momentum
+    if (fighter1.momentum !== undefined) {
+      fighter1.momentum = Math.max(0, fighter1.momentum - 0.2);
+    }
+    if (fighter2.momentum !== undefined) {
+      fighter2.momentum = Math.max(0, fighter2.momentum - 0.2);
+    }
+    
+    // Emit collision event to clients for visual/audio feedback
+    io.emit('fighterCollision', {
+      fighter1Id: fighter1.id,
+      fighter2Id: fighter2.id,
+      intensity: overlap * Math.max(fighter1Momentum, fighter2Momentum)
+    });
+  }
+} 
