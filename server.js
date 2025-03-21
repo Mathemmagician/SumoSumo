@@ -19,7 +19,7 @@ const gameState = {
   fighters: [],
   viewers: [],
   referee: {
-    position: { x: 0, y: 1.5, z: 0 }
+    position: { x: 0, y: 3, z: 0 }
   },
   currentFight: null
 };
