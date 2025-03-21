@@ -47,7 +47,7 @@ class SumoFighter {
     this.mesh.position.set(this.position.x, this.position.y, this.position.z);
     this.scene.add(this.mesh);
     
-    // Create sumo wrestler body
+    // Create simplified sumo wrestler body
     this.createSumoBody();
     
     // Create momentum indicator
@@ -55,328 +55,141 @@ class SumoFighter {
   }
   
   createSumoBody() {
-    // Body (larger circle)
+    // Main body - large circle
     const bodyGeometry = createCircleGeometry(this.radius);
-    const bodyMaterial = createMaterial(this.color);
+    const bodyMaterial = createMaterial(this.skinTone());
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-    
-    // Apply size variations
-    if (this.isTall) {
-      body.scale.y = 1.2;
-    }
-    if (this.isHeavy) {
-      body.scale.x = 1.3;
-    }
-    
     this.mesh.add(body);
     this.bodyParts.body = body;
     
-    // Flip the model if facing left
-    if (this.facingDirection === 'left') {
-      body.scale.x = -Math.abs(body.scale.x);
-    }
-    
-    // Mawashi (sumo belt)
-    this.createMawashi(body);
-    
-    // Head
-    this.createHead(body);
-    
-    // Arms
-    this.createArms(body);
-    
-    // Legs
-    this.createLegs(body);
-    
-    // Add traditional sumo details
-    this.addTraditionalDetails(body);
-  }
-  
-  createMawashi(body) {
-    // Mawashi (sumo belt)
-    const mawashiGeometry = new THREE.RingGeometry(this.radius * 0.7, this.radius, 32);
-    const mawashiMaterial = createMaterial('#FFFFFF'); // White belt
-    const mawashi = new THREE.Mesh(mawashiGeometry, mawashiMaterial);
-    mawashi.position.set(0, -0.1, 0.01);
-    body.add(mawashi);
-    this.bodyParts.mawashi = mawashi;
-    
-    // Decorative front knot
-    const knotGeometry = new THREE.CircleGeometry(this.radius * 0.2, 32);
-    const knotMaterial = createMaterial('#FFFFFF');
-    const knot = new THREE.Mesh(knotGeometry, knotMaterial);
-    knot.position.set(0, -0.5, 0.02);
-    body.add(knot);
-    this.bodyParts.knot = knot;
-    
-    // Decorative stripes on mawashi
-    for (let i = 0; i < 3; i++) {
-      const stripeGeometry = new THREE.PlaneGeometry(this.radius * 0.3, this.radius * 0.05);
-      const stripeMaterial = createMaterial('#000080'); // Navy blue
-      const stripe = new THREE.Mesh(stripeGeometry, stripeMaterial);
-      stripe.position.set(0, -0.3 - i * 0.1, 0.03);
-      knot.add(stripe);
-    }
-  }
-  
-  createHead(body) {
-    // Head (smaller circle)
-    const headGeometry = createCircleGeometry(this.radius * 0.5);
+    // Head - circle on top
+    const headGeometry = createCircleGeometry(this.radius * 0.4);
     const headMaterial = createMaterial(this.skinTone());
     const head = new THREE.Mesh(headGeometry, headMaterial);
-    head.position.set(0, this.radius * 0.7, 0.02);
-    body.add(head);
+    head.position.set(0, this.radius * 0.7, 0.01);
+    this.mesh.add(head);
     this.bodyParts.head = head;
     
-    // Hair (chonmage - traditional sumo hairstyle)
-    this.createChonmage(head);
-    
-    // Face
-    this.createFace(head);
-  }
-  
-  createChonmage(head) {
-    // Top knot (chonmage)
-    const hairGeometry = new THREE.CircleGeometry(this.radius * 0.25, 32);
+    // Traditional sumo hair (chonmage)
+    const hairGeometry = new THREE.CircleGeometry(this.radius * 0.2, 32, 0, Math.PI);
     const hairMaterial = createMaterial('#000000');
     const hair = new THREE.Mesh(hairGeometry, hairMaterial);
-    hair.position.set(0, this.radius * 0.3, 0.01);
+    hair.position.set(0, this.radius * 0.2, 0.01);
+    hair.rotation.z = Math.PI;
     head.add(hair);
     this.bodyParts.hair = hair;
     
-    // Folded top part
-    const topKnotGeometry = new THREE.PlaneGeometry(this.radius * 0.3, this.radius * 0.1);
-    const topKnotMaterial = createMaterial('#000000');
-    const topKnot = new THREE.Mesh(topKnotGeometry, topKnotMaterial);
-    topKnot.position.set(0, this.radius * 0.4, 0.02);
-    head.add(topKnot);
-  }
-  
-  createFace(head) {
-    // Eyes
-    const eyeGeometry = createCircleGeometry(this.radius * 0.08);
-    const eyeMaterial = createMaterial('#FFFFFF');
+    // Eyes - simple black dots
+    const eyeSize = this.radius * 0.05;
+    const eyeGeometry = createCircleGeometry(eyeSize);
+    const eyeMaterial = createMaterial('#000000');
     
-    // Left eye
     const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-    leftEye.position.set(-this.radius * 0.15, this.radius * 0.05, 0.01);
+    leftEye.position.set(-this.radius * 0.1, 0, 0.01);
     head.add(leftEye);
     this.bodyParts.leftEye = leftEye;
     
-    // Right eye
     const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
-    rightEye.position.set(this.radius * 0.15, this.radius * 0.05, 0.01);
+    rightEye.position.set(this.radius * 0.1, 0, 0.01);
     head.add(rightEye);
     this.bodyParts.rightEye = rightEye;
     
-    // Pupils
-    const pupilGeometry = createCircleGeometry(this.radius * 0.04);
-    const pupilMaterial = createMaterial('#000000');
+    // Mawashi (belt/underwear) - horizontal belt and vertical strip
+    this.createMawashi();
     
-    // Left pupil
-    const leftPupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
-    leftPupil.position.set(0, 0, 0.01);
-    leftEye.add(leftPupil);
-    this.bodyParts.leftPupil = leftPupil;
+    // Arms - simple rectangles
+    this.createArms();
     
-    // Right pupil
-    const rightPupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
-    rightPupil.position.set(0, 0, 0.01);
-    rightEye.add(rightPupil);
-    this.bodyParts.rightPupil = rightPupil;
-    
-    // Eyebrows (thicker for sumo wrestlers)
-    const eyebrowGeometry = new THREE.PlaneGeometry(this.radius * 0.2, this.radius * 0.05);
-    const eyebrowMaterial = createMaterial('#000000');
-    
-    // Left eyebrow
-    const leftEyebrow = new THREE.Mesh(eyebrowGeometry, eyebrowMaterial);
-    leftEyebrow.position.set(-this.radius * 0.15, this.radius * 0.15, 0.01);
-    leftEyebrow.rotation.z = -0.2;
-    head.add(leftEyebrow);
-    
-    // Right eyebrow
-    const rightEyebrow = new THREE.Mesh(eyebrowGeometry, eyebrowMaterial);
-    rightEyebrow.position.set(this.radius * 0.15, this.radius * 0.15, 0.01);
-    rightEyebrow.rotation.z = 0.2;
-    head.add(rightEyebrow);
-    
-    // Mouth (determined expression)
-    const mouthGeometry = new THREE.PlaneGeometry(this.radius * 0.2, this.radius * 0.03);
-    const mouthMaterial = createMaterial('#8B0000'); // Dark red
-    const mouth = new THREE.Mesh(mouthGeometry, mouthMaterial);
-    mouth.position.set(0, -this.radius * 0.15, 0.01);
-    head.add(mouth);
-    this.bodyParts.mouth = mouth;
-    
-    // Add mustache if applicable
-    if (this.hasMustache) {
-      const mustacheGeometry = new THREE.PlaneGeometry(this.radius * 0.3, this.radius * 0.05);
-      const mustacheMaterial = createMaterial('#000000');
-      const mustache = new THREE.Mesh(mustacheGeometry, mustacheMaterial);
-      mustache.position.set(0, -this.radius * 0.1, 0.01);
-      head.add(mustache);
-    }
-    
-    // Add sumo-style cheek lines
-    const cheekLineGeometry = new THREE.PlaneGeometry(this.radius * 0.15, this.radius * 0.02);
-    const cheekLineMaterial = createMaterial('#8B0000'); // Dark red
-    
-    // Left cheek line
-    const leftCheekLine = new THREE.Mesh(cheekLineGeometry, cheekLineMaterial);
-    leftCheekLine.position.set(-this.radius * 0.2, -this.radius * 0.05, 0.01);
-    leftCheekLine.rotation.z = 0.3;
-    head.add(leftCheekLine);
-    
-    // Right cheek line
-    const rightCheekLine = new THREE.Mesh(cheekLineGeometry, cheekLineMaterial);
-    rightCheekLine.position.set(this.radius * 0.2, -this.radius * 0.05, 0.01);
-    rightCheekLine.rotation.z = -0.3;
-    head.add(rightCheekLine);
+    // Legs - simple rectangles
+    this.createLegs();
   }
   
-  createArms(body) {
-    // Arms (thicker for sumo wrestlers)
-    const armGeometry = new THREE.PlaneGeometry(this.radius * 0.3, this.radius * 0.8);
+  createMawashi() {
+    // Traditional mawashi colors
+    const mawashiColors = ['#FFFFFF', '#000080', '#8B0000'];
+    const mawashiColor = mawashiColors[Math.floor(Math.random() * mawashiColors.length)];
+    const mawashiMaterial = createMaterial(mawashiColor);
+    
+    // Horizontal belt
+    const beltWidth = this.radius * 1.8;
+    const beltHeight = this.radius * 0.3;
+    const beltGeometry = new THREE.PlaneGeometry(beltWidth, beltHeight);
+    const belt = new THREE.Mesh(beltGeometry, mawashiMaterial);
+    belt.position.set(0, -this.radius * 0.2, 0.01);
+    this.mesh.add(belt);
+    this.bodyParts.belt = belt;
+    
+    // Vertical strip down the middle
+    const stripWidth = this.radius * 0.3;
+    const stripHeight = this.radius * 0.6;
+    const stripGeometry = new THREE.PlaneGeometry(stripWidth, stripHeight);
+    const strip = new THREE.Mesh(stripGeometry, mawashiMaterial);
+    strip.position.set(0, -this.radius * 0.6, 0.02); // Position below the belt
+    this.mesh.add(strip);
+    this.bodyParts.strip = strip;
+  }
+  
+  createArms() {
     const armMaterial = createMaterial(this.skinTone());
     
-    // Left arm
-    const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-    leftArm.position.set(-this.radius * 0.8, this.radius * 0.1, 0.01);
-    leftArm.rotation.z = 0.3;
-    body.add(leftArm);
+    // Left arm - simple rectangle
+    const armWidth = this.radius * 0.2;
+    const armHeight = this.radius * 0.6;
+    const leftArmGeometry = new THREE.PlaneGeometry(armWidth, armHeight);
+    const leftArm = new THREE.Mesh(leftArmGeometry, armMaterial);
+    leftArm.position.set(-this.radius * 0.7, 0, 0.01);
+    leftArm.rotation.z = 0.3; // Slightly outward
+    this.mesh.add(leftArm);
     this.bodyParts.leftArm = leftArm;
     
-    // Right arm
-    const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-    rightArm.position.set(this.radius * 0.8, this.radius * 0.1, 0.01);
-    rightArm.rotation.z = -0.3;
-    body.add(rightArm);
+    // Right arm - simple rectangle
+    const rightArmGeometry = new THREE.PlaneGeometry(armWidth, armHeight);
+    const rightArm = new THREE.Mesh(rightArmGeometry, armMaterial);
+    rightArm.position.set(this.radius * 0.7, 0, 0.01);
+    rightArm.rotation.z = -0.3; // Slightly outward
+    this.mesh.add(rightArm);
     this.bodyParts.rightArm = rightArm;
-    
-    // Hands
-    const handGeometry = createCircleGeometry(this.radius * 0.15);
-    const handMaterial = createMaterial(this.skinTone());
-    
-    // Left hand
-    const leftHand = new THREE.Mesh(handGeometry, handMaterial);
-    leftHand.position.set(-this.radius * 0.1, -this.radius * 0.4, 0.01);
-    leftArm.add(leftHand);
-    
-    // Right hand
-    const rightHand = new THREE.Mesh(handGeometry, handMaterial);
-    rightHand.position.set(this.radius * 0.1, -this.radius * 0.4, 0.01);
-    rightArm.add(rightHand);
   }
   
-  createLegs(body) {
-    // Legs (thicker for sumo wrestlers)
-    const legGeometry = new THREE.PlaneGeometry(this.radius * 0.4, this.radius * 0.6);
+  createLegs() {
     const legMaterial = createMaterial(this.skinTone());
     
-    // Left leg
-    const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+    // Left leg - simple rectangle
+    const legWidth = this.radius * 0.25;
+    const legHeight = this.radius * 0.5;
+    const leftLegGeometry = new THREE.PlaneGeometry(legWidth, legHeight);
+    const leftLeg = new THREE.Mesh(leftLegGeometry, legMaterial);
     leftLeg.position.set(-this.radius * 0.3, -this.radius * 0.8, 0.01);
-    body.add(leftLeg);
+    this.mesh.add(leftLeg);
     this.bodyParts.leftLeg = leftLeg;
     
-    // Right leg
-    const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+    // Right leg - simple rectangle
+    const rightLegGeometry = new THREE.PlaneGeometry(legWidth, legHeight);
+    const rightLeg = new THREE.Mesh(rightLegGeometry, legMaterial);
     rightLeg.position.set(this.radius * 0.3, -this.radius * 0.8, 0.01);
-    body.add(rightLeg);
+    this.mesh.add(rightLeg);
     this.bodyParts.rightLeg = rightLeg;
-    
-    // Feet
-    const footGeometry = createCircleGeometry(this.radius * 0.2);
-    const footMaterial = createMaterial(this.skinTone());
-    
-    // Left foot
-    const leftFoot = new THREE.Mesh(footGeometry, footMaterial);
-    leftFoot.position.set(0, -this.radius * 0.3, 0.01);
-    leftFoot.scale.y = 0.5; // Make it oval
-    leftLeg.add(leftFoot);
-    
-    // Right foot
-    const rightFoot = new THREE.Mesh(footGeometry, footMaterial);
-    rightFoot.position.set(0, -this.radius * 0.3, 0.01);
-    rightFoot.scale.y = 0.5; // Make it oval
-    rightLeg.add(rightFoot);
   }
   
-  addTraditionalDetails(body) {
-    // Add sagari (decorative rope hanging from mawashi)
-    this.createSagari(body);
-    
-    // Add muscle definition
-    this.addMuscleDefinition(body);
-  }
-  
-  createSagari(body) {
-    // Create sagari (hanging ropes from the mawashi)
-    const sagariCount = 5;
-    const sagariWidth = this.radius * 0.05;
-    const sagariHeight = this.radius * 0.4;
-    
-    for (let i = 0; i < sagariCount; i++) {
-      const sagariGeometry = new THREE.PlaneGeometry(sagariWidth, sagariHeight);
-      const sagariMaterial = createMaterial('#FFFFFF');
-      const sagari = new THREE.Mesh(sagariGeometry, sagariMaterial);
-      
-      // Position around the front of the mawashi
-      const angle = (i - (sagariCount - 1) / 2) * 0.2;
-      const x = Math.sin(angle) * this.radius * 0.7;
-      sagari.position.set(x, -this.radius * 0.6, 0.02);
-      body.add(sagari);
-      
-      // Add slight swing animation
-      this.animateSagari(sagari, i);
-    }
-  }
-  
-  animateSagari(sagari, index) {
-    const animate = () => {
-      const time = Date.now() * 0.001 + index * 0.5;
-      sagari.rotation.z = Math.sin(time) * 0.1;
-      
-      requestAnimationFrame(animate);
-    };
-    
-    animate();
-  }
-  
-  addMuscleDefinition(body) {
-    // Add chest muscle definition
-    const chestLineGeometry = new THREE.PlaneGeometry(this.radius * 0.8, this.radius * 0.05);
-    const chestLineMaterial = createMaterial(this.darkenColor(this.color, 20));
-    const chestLine = new THREE.Mesh(chestLineGeometry, chestLineMaterial);
-    chestLine.position.set(0, this.radius * 0.3, 0.01);
-    body.add(chestLine);
-    
-    // Add abdominal muscle definition
-    for (let i = 0; i < 3; i++) {
-      const abLineGeometry = new THREE.PlaneGeometry(this.radius * 0.6, this.radius * 0.03);
-      const abLineMaterial = createMaterial(this.darkenColor(this.color, 20));
-      const abLine = new THREE.Mesh(abLineGeometry, abLineMaterial);
-      abLine.position.set(0, this.radius * 0.1 - i * this.radius * 0.2, 0.01);
-      body.add(abLine);
-    }
-  }
-  
-  skinTone() {
-    // Return a skin tone color slightly darker than the body color
-    return this.darkenColor(this.color, 10);
+  // Helper methods for color manipulation
+  lightenColor(hex, percent) {
+    return this.adjustColor(hex, percent);
   }
   
   darkenColor(hex, percent) {
+    return this.adjustColor(hex, -percent);
+  }
+  
+  adjustColor(hex, percent) {
     // Convert hex to RGB
     let r = parseInt(hex.slice(1, 3), 16);
     let g = parseInt(hex.slice(3, 5), 16);
     let b = parseInt(hex.slice(5, 7), 16);
     
-    // Darken
-    r = Math.max(0, r - percent);
-    g = Math.max(0, g - percent);
-    b = Math.max(0, b - percent);
+    // Adjust color
+    r = Math.min(255, Math.max(0, r + Math.floor(r * percent / 100)));
+    g = Math.min(255, Math.max(0, g + Math.floor(g * percent / 100)));
+    b = Math.min(255, Math.max(0, b + Math.floor(b * percent / 100)));
     
     // Convert back to hex
     return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
@@ -1071,5 +884,15 @@ class SumoFighter {
     // Increase momentum slightly on collision
     this.momentum = Math.min(this.maxMomentum, this.momentum + (intensity * 0.5));
     this.updateMomentumBar();
+  }
+  
+  skinTone() {
+    // Simplified skin tones
+    const tones = [
+      '#E8B99B', // Medium tan
+      '#D2946B', // Darker tan
+      '#C68642'  // Brown
+    ];
+    return tones[Math.floor(Math.random() * tones.length)];
   }
 } 
