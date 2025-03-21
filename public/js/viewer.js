@@ -88,11 +88,13 @@ class Viewer {
     
     // Normalize the direction
     const length = Math.sqrt(directionX * directionX + directionY * directionY);
+    if (length === 0) return; // Avoid division by zero
+    
     const normalizedX = directionX / length;
     const normalizedY = directionY / length;
     
     // Scale the movement (how far pupils can move within the eyes)
-    const maxOffset = 0.05;
+    const maxOffset = 0.08;
     const offsetX = normalizedX * maxOffset;
     const offsetY = normalizedY * maxOffset;
     
