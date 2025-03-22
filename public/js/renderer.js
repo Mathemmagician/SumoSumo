@@ -4,6 +4,19 @@ let ring, playerModels = {};
 let textureLoader;
 let faceTextures = [];
 
+// Constants for scene dimensions
+const RING_RADIUS = 10; // Base measurement for the scene
+const RING_HEIGHT = 0.5;
+const FLOOR_SIZE = RING_RADIUS * 5;
+const FIRST_ROW_DISTANCE = RING_RADIUS * 1.5;
+const SECOND_ROW_DISTANCE = RING_RADIUS * 1.8;
+const BENCH_WIDTH = RING_RADIUS * 0.2;
+const BENCH_HEIGHT = 0.5;
+const BENCH_DEPTH = RING_RADIUS * 0.1;
+const PLATFORM_HEIGHT = 1;
+const PLATFORM_WIDTH = RING_RADIUS * 0.3;
+const PLATFORM_DEPTH = RING_RADIUS * 2;
+
 // Initialize the 3D scene
 function initScene(initialGameState) {
   // Create scene
@@ -11,8 +24,8 @@ function initScene(initialGameState) {
   scene.background = new THREE.Color(0x87CEEB); // Sky blue background
   
   // Create camera
-  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(0, 10, 15);
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(-2, 5, 15);
   camera.lookAt(0, 0, 0);
   
   // Create renderer
@@ -25,33 +38,97 @@ function initScene(initialGameState) {
   scene.add(ambientLight);
   
   const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  directionalLight.position.set(10, 20, 10);
+  directionalLight.position.set(RING_RADIUS, RING_RADIUS * 2, RING_RADIUS);
   scene.add(directionalLight);
   
   // Create texture loader
   textureLoader = new THREE.TextureLoader();
   
-  // Load face textures
+  // Generate face textures dynamically
   for (let i = 0; i < 10; i++) {
-    const texture = textureLoader.load(`/assets/face${i}.png`, () => {}, 
-      () => {
-        // If loading fails, create a fallback texture
-        const canvas = document.createElement('canvas');
-        canvas.width = 128;
-        canvas.height = 128;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = `hsl(${i * 36}, 100%, 50%)`;
-        ctx.fillRect(0, 0, 128, 128);
-        ctx.fillStyle = 'black';
-        ctx.font = '48px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(i, 64, 64);
-        
-        const fallbackTexture = new THREE.CanvasTexture(canvas);
-        faceTextures[i] = fallbackTexture;
-      }
-    );
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    
+    // Face background color
+    ctx.fillStyle = `hsl(${i * 36}, 80%, 80%)`;
+    ctx.fillRect(0, 0, 256, 256);
+    
+    // Draw eyes
+    ctx.fillStyle = 'black';
+    const eyeSize = 20 + Math.random() * 15;
+    
+    // Left eye
+    ctx.beginPath();
+    ctx.arc(90, 100, eyeSize, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Right eye
+    ctx.beginPath();
+    ctx.arc(166, 100, eyeSize, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Draw eyebrows
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    
+    // Left eyebrow
+    ctx.beginPath();
+    ctx.moveTo(60, 70);
+    ctx.lineTo(120, 70 + (Math.random() > 0.5 ? -10 : 10));
+    ctx.stroke();
+    
+    // Right eyebrow
+    ctx.beginPath();
+    ctx.moveTo(136, 70 + (Math.random() > 0.5 ? -10 : 10));
+    ctx.lineTo(196, 70);
+    ctx.stroke();
+    
+    // Draw mouth (different styles)
+    ctx.lineWidth = 6;
+    const mouthStyle = Math.floor(Math.random() * 4);
+    
+    switch (mouthStyle) {
+      case 0: // Happy mouth
+        ctx.beginPath();
+        ctx.arc(128, 160, 40, 0, Math.PI);
+        ctx.stroke();
+        break;
+      case 1: // Straight mouth
+        ctx.beginPath();
+        ctx.moveTo(88, 160);
+        ctx.lineTo(168, 160);
+        ctx.stroke();
+        break;
+      case 2: // Surprised mouth
+        ctx.beginPath();
+        ctx.arc(128, 160, 20, 0, Math.PI * 2);
+        ctx.stroke();
+        break;
+      case 3: // Frown
+        ctx.beginPath();
+        ctx.arc(128, 200, 40, Math.PI, Math.PI * 2);
+        ctx.stroke();
+        break;
+    }
+    
+    // Add some random details (like moles, scars, etc.)
+    if (Math.random() > 0.7) {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.beginPath();
+      ctx.arc(
+        80 + Math.random() * 100,
+        120 + Math.random() * 80,
+        3,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+    }
+    
+    // Create texture from canvas
+    const texture = new THREE.CanvasTexture(canvas);
     faceTextures[i] = texture;
   }
   
@@ -84,25 +161,25 @@ function initScene(initialGameState) {
 // Create the sumo ring
 function createRing() {
   // Create the sumo ring (dohyo)
-  const ringGeometry = new THREE.CylinderGeometry(10, 10, 0.5, 32); // Updated radius to 10
+  const ringGeometry = new THREE.CylinderGeometry(RING_RADIUS, RING_RADIUS, RING_HEIGHT, 32);
   const ringMaterial = new THREE.MeshLambertMaterial({ color: 0xD2B48C }); // Tan color
   ring = new THREE.Mesh(ringGeometry, ringMaterial);
-  ring.position.y = 0.25; // Half of the height
+  ring.position.y = RING_HEIGHT / 2; // Half of the height
   scene.add(ring);
   
   // Add a ring border
-  const borderGeometry = new THREE.RingGeometry(10, 10.5, 32); // Updated radius to match
+  const borderGeometry = new THREE.RingGeometry(RING_RADIUS, RING_RADIUS + 0.5, 32);
   const borderMaterial = new THREE.MeshLambertMaterial({ 
     color: 0x8B4513,
     side: THREE.DoubleSide
   });
   const border = new THREE.Mesh(borderGeometry, borderMaterial);
   border.rotation.x = Math.PI / 2; // Lay flat
-  border.position.y = 0.51; // Just above the ring
+  border.position.y = RING_HEIGHT + 0.01; // Just above the ring
   scene.add(border);
   
   // Add ring markings (lines)
-  const markingsGeometry = new THREE.CircleGeometry(8, 32); // Inner circle
+  const markingsGeometry = new THREE.CircleGeometry(RING_RADIUS * 0.8, 32); // Inner circle
   const markingsMaterial = new THREE.MeshBasicMaterial({ 
     color: 0xFFFFFF,
     transparent: true,
@@ -111,11 +188,11 @@ function createRing() {
   });
   const markings = new THREE.Mesh(markingsGeometry, markingsMaterial);
   markings.rotation.x = Math.PI / 2; // Lay flat
-  markings.position.y = 0.52; // Just above the ring
+  markings.position.y = RING_HEIGHT + 0.02; // Just above the ring
   scene.add(markings);
   
   // Add the floor around the ring
-  const floorGeometry = new THREE.PlaneGeometry(50, 50);
+  const floorGeometry = new THREE.PlaneGeometry(FLOOR_SIZE, FLOOR_SIZE);
   const floorMaterial = new THREE.MeshLambertMaterial({ 
     color: 0x333333,
     side: THREE.DoubleSide
@@ -129,33 +206,31 @@ function createRing() {
 // Create audience areas
 function createAudienceAreas() {
   // Create benches for the audience
-  const benchGeometry = new THREE.BoxGeometry(2, 0.5, 1);
+  const benchGeometry = new THREE.BoxGeometry(BENCH_WIDTH, BENCH_HEIGHT, BENCH_DEPTH);
   const benchMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // Brown
   
   // First row of benches - around the ring
-  const benchPositions = [
-    // Left side (10 benches)
-    { x: -15, z: -4 }, { x: -15, z: -2 }, { x: -15, z: 0 }, { x: -15, z: 2 }, { x: -15, z: 4 },
-    { x: -15, z: -6 }, { x: -15, z: -8 }, { x: -15, z: 6 }, { x: -15, z: 8 }, { x: -15, z: 10 },
-    
-    // Right side (10 benches)
-    { x: 15, z: -4 }, { x: 15, z: -2 }, { x: 15, z: 0 }, { x: 15, z: 2 }, { x: 15, z: 4 },
-    { x: 15, z: -6 }, { x: 15, z: -8 }, { x: 15, z: 6 }, { x: 15, z: 8 }, { x: 15, z: 10 },
-    
-    // Top side (10 benches)
-    { x: -4, z: -15 }, { x: -2, z: -15 }, { x: 0, z: -15 }, { x: 2, z: -15 }, { x: 4, z: -15 },
-    { x: -6, z: -15 }, { x: -8, z: -15 }, { x: 6, z: -15 }, { x: 8, z: -15 }, { x: 10, z: -15 }
-  ];
+  const benchPositions = [];
+  
+  // Generate bench positions for first row
+  for (let i = 0; i < 10; i++) {
+    // Left side benches
+    benchPositions.push({ x: -FIRST_ROW_DISTANCE, z: -4 + i * 2 });
+    // Right side benches
+    benchPositions.push({ x: FIRST_ROW_DISTANCE, z: -4 + i * 2 });
+    // Top side benches
+    benchPositions.push({ x: -4 + i * 2, z: -FIRST_ROW_DISTANCE });
+  }
   
   // Create first row of benches
   benchPositions.forEach(pos => {
     const bench = new THREE.Mesh(benchGeometry, benchMaterial);
-    bench.position.set(pos.x, 0.25, pos.z); // Half the height of the bench
+    bench.position.set(pos.x, BENCH_HEIGHT / 2, pos.z);
     
     // Rotate benches to face the ring
-    if (pos.x === -15) {
+    if (pos.x === -FIRST_ROW_DISTANCE) {
       bench.rotation.y = 0; // Left side benches face right
-    } else if (pos.x === 15) {
+    } else if (pos.x === FIRST_ROW_DISTANCE) {
       bench.rotation.y = Math.PI; // Right side benches face left
     } else {
       bench.rotation.y = Math.PI / 2; // Top side benches face down
@@ -165,29 +240,27 @@ function createAudienceAreas() {
   });
   
   // Second row of benches - elevated and further back
-  const secondRowBenchPositions = [
-    // Left side (10 benches)
-    { x: -18, z: -4 }, { x: -18, z: -2 }, { x: -18, z: 0 }, { x: -18, z: 2 }, { x: -18, z: 4 },
-    { x: -18, z: -6 }, { x: -18, z: -8 }, { x: -18, z: 6 }, { x: -18, z: 8 }, { x: -18, z: 10 },
-    
-    // Right side (10 benches)
-    { x: 18, z: -4 }, { x: 18, z: -2 }, { x: 18, z: 0 }, { x: 18, z: 2 }, { x: 18, z: 4 },
-    { x: 18, z: -6 }, { x: 18, z: -8 }, { x: 18, z: 6 }, { x: 18, z: 8 }, { x: 18, z: 10 },
-    
-    // Top side (10 benches)
-    { x: -4, z: -18 }, { x: -2, z: -18 }, { x: 0, z: -18 }, { x: 2, z: -18 }, { x: 4, z: -18 },
-    { x: -6, z: -18 }, { x: -8, z: -18 }, { x: 6, z: -18 }, { x: 8, z: -18 }, { x: 10, z: -18 }
-  ];
+  const secondRowBenchPositions = [];
+  
+  // Generate bench positions for second row
+  for (let i = 0; i < 10; i++) {
+    // Left side benches
+    secondRowBenchPositions.push({ x: -SECOND_ROW_DISTANCE, z: -4 + i * 2 });
+    // Right side benches
+    secondRowBenchPositions.push({ x: SECOND_ROW_DISTANCE, z: -4 + i * 2 });
+    // Top side benches
+    secondRowBenchPositions.push({ x: -4 + i * 2, z: -SECOND_ROW_DISTANCE });
+  }
   
   // Create second row of benches (elevated)
   secondRowBenchPositions.forEach(pos => {
     const bench = new THREE.Mesh(benchGeometry, benchMaterial);
-    bench.position.set(pos.x, 1.5, pos.z); // Elevated position
+    bench.position.set(pos.x, PLATFORM_HEIGHT + BENCH_HEIGHT / 2, pos.z);
     
     // Rotate benches to face the ring
-    if (pos.x === -18) {
+    if (pos.x === -SECOND_ROW_DISTANCE) {
       bench.rotation.y = 0; // Left side benches face right
-    } else if (pos.x === 18) {
+    } else if (pos.x === SECOND_ROW_DISTANCE) {
       bench.rotation.y = Math.PI; // Right side benches face left
     } else {
       bench.rotation.y = Math.PI / 2; // Top side benches face down
@@ -197,24 +270,53 @@ function createAudienceAreas() {
   });
   
   // Add platforms for the second row
-  const platformGeometry = new THREE.BoxGeometry(3, 1, 20);
+  const platformGeometry = new THREE.BoxGeometry(PLATFORM_WIDTH, PLATFORM_HEIGHT, PLATFORM_DEPTH);
   const platformMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 }); // Dark gray
   
   // Left platform
   const leftPlatform = new THREE.Mesh(platformGeometry, platformMaterial);
-  leftPlatform.position.set(-18, 0.5, 1); // Position under the left benches
+  leftPlatform.position.set(-SECOND_ROW_DISTANCE, PLATFORM_HEIGHT / 2, 1);
   scene.add(leftPlatform);
   
   // Right platform
   const rightPlatform = new THREE.Mesh(platformGeometry, platformMaterial);
-  rightPlatform.position.set(18, 0.5, 1); // Position under the right benches
+  rightPlatform.position.set(SECOND_ROW_DISTANCE, PLATFORM_HEIGHT / 2, 1);
   scene.add(rightPlatform);
   
   // Top platform
   const topPlatform = new THREE.Mesh(platformGeometry, platformMaterial);
   topPlatform.rotation.y = Math.PI / 2; // Rotate to align with top benches
-  topPlatform.position.set(1, 0.5, -18); // Position under the top benches
+  topPlatform.position.set(1, PLATFORM_HEIGHT / 2, -SECOND_ROW_DISTANCE);
   scene.add(topPlatform);
+}
+
+// Position viewers based on their index
+function positionViewer(model, viewerIndex) {
+  if (viewerIndex < 10) {
+    // Left side - first row
+    model.position.set(-FIRST_ROW_DISTANCE, BENCH_HEIGHT + 0.5, -4 + viewerIndex * 2);
+    model.rotation.y = 0; // Face right
+  } else if (viewerIndex < 20) {
+    // Right side - first row
+    model.position.set(FIRST_ROW_DISTANCE, BENCH_HEIGHT + 0.5, -4 + (viewerIndex - 10) * 2);
+    model.rotation.y = Math.PI; // Face left
+  } else if (viewerIndex < 30) {
+    // Top side - first row
+    model.position.set(-4 + (viewerIndex - 20) * 2, BENCH_HEIGHT + 0.5, -FIRST_ROW_DISTANCE);
+    model.rotation.y = Math.PI / 2; // Face down
+  } else if (viewerIndex < 40) {
+    // Left side - second row (elevated)
+    model.position.set(-SECOND_ROW_DISTANCE, PLATFORM_HEIGHT + BENCH_HEIGHT + 0.5, -4 + (viewerIndex - 30) * 2);
+    model.rotation.y = 0; // Face right
+  } else if (viewerIndex < 50) {
+    // Right side - second row (elevated)
+    model.position.set(SECOND_ROW_DISTANCE, PLATFORM_HEIGHT + BENCH_HEIGHT + 0.5, -4 + (viewerIndex - 40) * 2);
+    model.rotation.y = Math.PI; // Face left
+  } else {
+    // Top side - second row (elevated)
+    model.position.set(-4 + (viewerIndex - 50) * 2, PLATFORM_HEIGHT + BENCH_HEIGHT + 0.5, -SECOND_ROW_DISTANCE);
+    model.rotation.y = Math.PI / 2; // Face down
+  }
 }
 
 // Create a sumo wrestler model
@@ -327,53 +429,46 @@ function createSumoModel(player) {
 
 // Add a player to the scene
 function addPlayerToScene(player) {
+  // Create a sumo model for the player
   const model = createSumoModel(player);
   
   // Position the player based on their role
   if (player.role === 'fighter') {
     // Fighters are on the ring
-    model.position.set(player.position.x, 0, player.position.z);
+    model.position.set(
+      player.position.x,
+      RING_HEIGHT + 0.5, // On top of the ring
+      player.position.z
+    );
+    model.rotation.y = player.rotation;
   } else if (player.role === 'referee') {
-    // Referee is in the middle of the ring
-    model.position.set(0, 0, 0);
-    // Make referee smaller
+    // Referee is in the center of the ring
+    model.position.set(0, RING_HEIGHT + 0.5, 0);
     model.scale.set(0.8, 0.8, 0.8);
   } else {
     // Viewer positioning - now with two rows
     const viewerIndex = gameState.viewers.findIndex(v => v.id === player.id);
     
     if (viewerIndex !== -1) {
-      // First 30 viewers go in the first row
-      if (viewerIndex < 10) {
-        // Left side - first row
-        model.position.set(-15, 1, -4 + viewerIndex);
-        model.rotation.y = 0; // Face right
-      } else if (viewerIndex < 20) {
-        // Right side - first row
-        model.position.set(15, 1, -4 + (viewerIndex - 10));
-        model.rotation.y = Math.PI; // Face left
-      } else if (viewerIndex < 30) {
-        // Top side - first row
-        model.position.set(-4 + (viewerIndex - 20), 1, -15);
-        model.rotation.y = Math.PI / 2; // Face down
-      } else if (viewerIndex < 40) {
-        // Left side - second row (elevated)
-        model.position.set(-18, 2.25, -4 + (viewerIndex - 30));
-        model.rotation.y = 0; // Face right
-      } else if (viewerIndex < 50) {
-        // Right side - second row (elevated)
-        model.position.set(18, 2.25, -4 + (viewerIndex - 40));
-        model.rotation.y = Math.PI; // Face left
-      } else {
-        // Top side - second row (elevated)
-        model.position.set(-4 + (viewerIndex - 50), 2.25, -18);
-        model.rotation.y = Math.PI / 2; // Face down
-      }
+      positionViewer(model, viewerIndex);
     }
   }
   
+  // Add to scene and store in playerModels
   scene.add(model);
   playerModels[player.id] = model;
+  
+  // If the player has an emote, show it
+  if (player.emote) {
+    showPlayerEmote(player.id, player.emote);
+  }
+  
+  // If the player has a message, show it
+  if (player.message) {
+    showPlayerMessage(player.id, player.message);
+  }
+  
+  return model;
 }
 
 // Remove a player from the scene
