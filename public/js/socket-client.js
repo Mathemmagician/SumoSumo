@@ -168,11 +168,6 @@ function connectToServer() {
   // Pre-ceremony start
   socket.on('preCeremonyStart', (data) => {
     console.log('Pre-ceremony started:', data);
-    
-    // Show ritual ready button if I'm a fighter
-    if (gameState.myRole === 'fighter') {
-      document.getElementById('ritual-ready-button').style.display = 'block';
-    }
   });
   
   // Fighter ready
@@ -203,9 +198,6 @@ function connectToServer() {
   // Match start
   socket.on('matchStart', (data) => {
     console.log('Match started:', data);
-    
-    // Hide ritual ready button
-    document.getElementById('ritual-ready-button').style.display = 'none';
     
     // Show match start animation
     showMatchStart();
@@ -391,18 +383,7 @@ function updateUI() {
     // Count unique players
     const totalPlayers = playerIds.size;
     
-    // Log for debugging
-    console.log("Unique player IDs:", Array.from(playerIds));
-    console.log("Total unique players:", totalPlayers);
-    
     playersCount.textContent = `Players: ${totalPlayers}`;
-  }
-  
-  // Show/hide ritual ready button
-  const ritualReadyButton = document.getElementById('ritual-ready-button');
-  if (ritualReadyButton) {
-    ritualReadyButton.style.display = 
-      (gameState.myRole === 'fighter' && gameState.stage === 'PRE_MATCH_CEREMONY') ? 'block' : 'none';
   }
 }
 
@@ -451,14 +432,11 @@ function startStageTimer(duration) {
 
 // Handle stage-specific UI updates
 function handleStageChange(stage) {
-  // Reset UI elements
-  document.getElementById('ritual-ready-button').style.display = 'none';
+  // No need to reset ritual ready button display
   
   switch (stage) {
     case 'PRE_MATCH_CEREMONY':
-      if (gameState.myRole === 'fighter') {
-        document.getElementById('ritual-ready-button').style.display = 'block';
-      }
+      // Removed ritual ready button code
       break;
       
     case 'MATCH_IN_PROGRESS':
@@ -477,10 +455,7 @@ function sendMovement(direction) {
 
 // Send ritual ready signal to the server
 function sendRitualReady() {
-  if (gameState.myRole === 'fighter' && gameState.stage === 'PRE_MATCH_CEREMONY') {
-    socket.emit('ritualReady');
-    document.getElementById('ritual-ready-button').style.display = 'none';
-  }
+  // Function removed or emptied
 }
 
 // Send emote to the server
