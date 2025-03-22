@@ -5,7 +5,7 @@ let textureLoader;
 let faceTextures = [];
 
 // Constants for scene dimensions
-const RING_RADIUS = 10; // Base measurement for the scene
+const RING_RADIUS = 7; // Base measurement for the scene
 const RING_HEIGHT = 0.5;
 const FLOOR_SIZE = RING_RADIUS * 5;
 const FIRST_ROW_DISTANCE = RING_RADIUS * 1.5;
@@ -31,15 +31,50 @@ function initScene(initialGameState) {
   // Create renderer
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   document.getElementById('game-container').appendChild(renderer.domElement);
   
-  // Add lights
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  // Enhanced lighting setup
+  // Soft ambient light for overall scene illumination
+  const ambientLight = new THREE.AmbientLight(0xf5e1c0, 0.4); // Warm ambient light
   scene.add(ambientLight);
   
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-  directionalLight.position.set(RING_RADIUS, RING_RADIUS * 2, RING_RADIUS);
-  scene.add(directionalLight);
+  // Main spotlight from above - simulates traditional sumo arena lighting
+  const mainSpotlight = new THREE.SpotLight(0xffffff, 1.0);
+  mainSpotlight.position.set(0, 30, 0);
+  mainSpotlight.angle = Math.PI / 6;
+  mainSpotlight.penumbra = 0.3;
+  mainSpotlight.decay = 1.5;
+  mainSpotlight.distance = 50;
+  mainSpotlight.castShadow = true;
+  mainSpotlight.shadow.mapSize.width = 1024;
+  mainSpotlight.shadow.mapSize.height = 1024;
+  mainSpotlight.shadow.camera.near = 10;
+  mainSpotlight.shadow.camera.far = 50;
+  mainSpotlight.target.position.set(0, 0, 0);
+  scene.add(mainSpotlight);
+  scene.add(mainSpotlight.target);
+  
+  // Warm fill light from one side (simulates sunset/traditional lighting)
+  const fillLight = new THREE.DirectionalLight(0xffcc88, 0.6);
+  fillLight.position.set(RING_RADIUS * 2, RING_RADIUS, RING_RADIUS * 2);
+  fillLight.castShadow = true;
+  fillLight.shadow.mapSize.width = 1024;
+  fillLight.shadow.mapSize.height = 1024;
+  scene.add(fillLight);
+  
+  // Cool rim light from the opposite side (creates depth)
+  const rimLight = new THREE.DirectionalLight(0x8888ff, 0.5);
+  rimLight.position.set(-RING_RADIUS * 2, RING_RADIUS, -RING_RADIUS * 2);
+  scene.add(rimLight);
+  
+  // Subtle ground bounce light (reflects off the floor)
+  const bounceLight = new THREE.DirectionalLight(0xffffcc, 0.2);
+  bounceLight.position.set(0, -5, 0);
+  bounceLight.target.position.set(0, 0, 0);
+  scene.add(bounceLight);
+  scene.add(bounceLight.target);
   
   // Create texture loader
   textureLoader = new THREE.TextureLoader();
@@ -165,6 +200,8 @@ function createRing() {
   const ringMaterial = new THREE.MeshLambertMaterial({ color: 0xD2B48C }); // Tan color
   ring = new THREE.Mesh(ringGeometry, ringMaterial);
   ring.position.y = RING_HEIGHT / 2; // Half of the height
+  ring.castShadow = true;
+  ring.receiveShadow = true;
   scene.add(ring);
   
   // Add a ring border
@@ -176,6 +213,7 @@ function createRing() {
   const border = new THREE.Mesh(borderGeometry, borderMaterial);
   border.rotation.x = Math.PI / 2; // Lay flat
   border.position.y = RING_HEIGHT + 0.01; // Just above the ring
+  border.receiveShadow = true;
   scene.add(border);
   
   // Add ring markings (lines)
@@ -200,6 +238,7 @@ function createRing() {
   const floor = new THREE.Mesh(floorGeometry, floorMaterial);
   floor.rotation.x = Math.PI / 2; // Lay flat
   floor.position.y = 0; // At the bottom
+  floor.receiveShadow = true;
   scene.add(floor);
 }
 
@@ -209,17 +248,18 @@ function createAudienceAreas() {
   // We'll create multiple rows on each of the sides of the ring
   
   // Constants for bench layout
-  const FIRST_ROW_DISTANCE = RING_RADIUS * 1.5;
-  const ROW_SPACING = RING_RADIUS * 0.4; // Distance between rows
-  
-  const BENCH_WIDTH = RING_RADIUS * 0.4;
-  const BENCH_HEIGHT = 0.1;
-  const BENCH_DEPTH = RING_RADIUS * 0.4;
-  
-  const ELEVATION_INCREMENT = 0.5; // Height increase every 2 rows
-  const SEATS_PER_FIRST_ROW = 5; // Number of seats in the first row
+  const ELEVATION_INCREMENT = 0.8; // Height increase every 2 rows
+  const SEATS_PER_FIRST_ROW = 10; // Number of seats in the first row
   const SEATS_INCREMENT = 2; // Additional seats per row as we go back
-  const NUM_ROWS = 6; // Total number of rows
+  const NUM_ROWS = 16; // Total number of rows
+
+  const FIRST_ROW_DISTANCE = RING_RADIUS * 1.3;
+  
+  const BENCH_WIDTH = 2.0 * RING_RADIUS / SEATS_PER_FIRST_ROW;
+  const BENCH_HEIGHT = 0.1;
+  const BENCH_DEPTH = 2.0 * RING_RADIUS / SEATS_PER_FIRST_ROW;
+
+  const ROW_SPACING = BENCH_WIDTH; // Distance between rows
   
   // Materials
   const benchMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // Brown wood
@@ -229,7 +269,8 @@ function createAudienceAreas() {
   const sides = [
     { name: 'North', rotation: 0, z: -1 },
     { name: 'East', rotation: Math.PI / 2, x: 1 },
-    { name: 'West', rotation: -Math.PI / 2, x: -1 }
+    { name: 'West', rotation: -Math.PI / 2, x: -1 },
+    { name: 'South', rotation: Math.PI, z: 1 }
   ];
   
   // For each side
@@ -403,6 +444,7 @@ function createSumoModel(player) {
   const bodyGeometry = new THREE.SphereGeometry(1, 32, 32);
   const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700 }); // Gold color for the sumo mawashi
   const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+  body.castShadow = true;
   model.add(body);
   
   // Head (smaller sphere)
