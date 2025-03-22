@@ -20,6 +20,10 @@ class Game {
     this.ringRadius = 5;
     this.isInitialized = false;
     
+    this.countdownElement = document.getElementById('countdown-timer');
+    this.countdownInterval = null;
+    this.nextFightTime = null;
+    
     this.init();
   }
   
@@ -336,6 +340,11 @@ class Game {
     // Handle fighter collisions
     this.socket.on('fighterCollision', (data) => {
       this.handleFighterCollision(data);
+    });
+    
+    // Handle fight countdown
+    this.socket.on('fightCountdown', (data) => {
+      this.handleFightCountdown(data);
     });
   }
   
@@ -891,6 +900,254 @@ class Game {
       if (fighter.isCharging) fighter.releaseCharge();
       if (fighter.isDefending) fighter.stopDefending();
     }
+  }
+  
+  createCountdownDisplay() {
+    // Create countdown container if it doesn't exist
+    if (!this.countdownElement) {
+      this.countdownElement = document.createElement('div');
+      this.countdownElement.id = 'countdown-timer';
+      document.body.appendChild(this.countdownElement);
+    }
+    
+    // Style the countdown element
+    this.countdownElement.style.position = 'absolute';
+    this.countdownElement.style.top = '20px';
+    this.countdownElement.style.left = '50%';
+    this.countdownElement.style.transform = 'translateX(-50%)';
+    this.countdownElement.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    this.countdownElement.style.color = 'white';
+    this.countdownElement.style.padding = '10px 20px';
+    this.countdownElement.style.borderRadius = '5px';
+    this.countdownElement.style.fontFamily = 'Arial, sans-serif';
+    this.countdownElement.style.fontSize = '24px';
+    this.countdownElement.style.fontWeight = 'bold';
+    this.countdownElement.style.zIndex = '1000';
+    this.countdownElement.style.textAlign = 'center';
+    this.countdownElement.style.display = 'none'; // Hidden by default
+  }
+  
+  startCountdown(seconds) {
+    // Create the display if it doesn't exist
+    if (!this.countdownElement) {
+      this.createCountdownDisplay();
+    }
+    
+    // Clear any existing countdown
+    this.stopCountdown();
+    
+    // Set the next fight time
+    this.nextFightTime = Date.now() + (seconds * 500);
+    
+    // Show the countdown element
+    this.countdownElement.style.display = 'block';
+    
+    // Update the countdown immediately
+    this.updateCountdown();
+    
+    // Set interval to update the countdown every second
+    this.countdownInterval = setInterval(() => {
+      this.updateCountdown();
+    }, 1000);
+  }
+  
+  updateCountdown() {
+    if (!this.nextFightTime) return;
+    
+    // Calculate remaining time
+    const now = Date.now();
+    const timeLeft = Math.max(0, this.nextFightTime - now);
+    
+    if (timeLeft <= 0) {
+      // Time's up
+      this.countdownElement.textContent = 'FIGHT!';
+      
+      // Update 3D countdown
+      this.update3DCountdown('GO!');
+      
+      // Flash the countdown for emphasis
+      this.countdownElement.style.backgroundColor = 'rgba(255, 0, 0, 0.8)';
+      
+      // Hide after a short delay
+      setTimeout(() => {
+        this.stopCountdown();
+      }, 1500);
+      
+      return;
+    }
+    
+    // Convert to seconds
+    const secondsLeft = Math.ceil(timeLeft / 1000);
+    
+    // Update the display
+    this.countdownElement.textContent = `Next Fight: ${secondsLeft}s`;
+    
+    // Update 3D countdown
+    this.update3DCountdown(secondsLeft);
+    
+    // Change color as time gets lower
+    if (secondsLeft <= 5) {
+      this.countdownElement.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
+    } else if (secondsLeft <= 10) {
+      this.countdownElement.style.backgroundColor = 'rgba(255, 165, 0, 0.7)';
+    } else {
+      this.countdownElement.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    }
+  }
+  
+  stopCountdown() {
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+      this.countdownInterval = null;
+    }
+    
+    if (this.countdownElement) {
+      this.countdownElement.style.display = 'none';
+    }
+    
+    this.nextFightTime = null;
+  }
+  
+  handleFightCountdown(data) {
+    const { seconds, startTime, nextFightTime } = data;
+    
+    // Calculate how much time has already passed since the server sent this
+    const now = Date.now();
+    const elapsedMs = now - startTime;
+    const remainingSeconds = Math.max(0, seconds - Math.floor(elapsedMs / 1000));
+    
+    // Start the countdown with the adjusted time
+    this.startCountdown(remainingSeconds);
+    
+    // Update status
+    this.statusElement.textContent = 'Selecting fighters for next match...';
+    
+    // Play a gong sound to announce the upcoming fight
+    this.playGongSound();
+  }
+  
+  playGongSound() {
+    if (!this.audioContext) {
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    // Create oscillator for gong sound
+    const oscillator = this.audioContext.createOscillator();
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(100, this.audioContext.currentTime);
+    
+    // Create gain node for volume control
+    const gainNode = this.audioContext.createGain();
+    gainNode.gain.setValueAtTime(0.7, this.audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 3);
+    
+    // Connect nodes
+    oscillator.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+    
+    // Start and stop the sound
+    oscillator.start();
+    setTimeout(() => {
+      oscillator.stop();
+    }, 3000);
+  }
+  
+  // Add this method to create a visual tableau for the countdown
+  createTableau() {
+    // Create a tableau group
+    const tableauGroup = new THREE.Group();
+    tableauGroup.position.set(0, 6, 0); // Position at the top center
+    this.scene.add(tableauGroup);
+    this.tableauGroup = tableauGroup;
+    
+    // Create a backdrop for the tableau
+    const backdropGeometry = new THREE.PlaneGeometry(8, 2);
+    const backdropMaterial = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 0.7
+    });
+    const backdrop = new THREE.Mesh(backdropGeometry, backdropMaterial);
+    tableauGroup.add(backdrop);
+    
+    // Create text for the tableau
+    const loader = new THREE.FontLoader();
+    loader.load('fonts/helvetiker_regular.typeface.json', (font) => {
+      // Create text geometry
+      const textGeometry = new THREE.TextGeometry('NEXT FIGHT', {
+        font: font,
+        size: 0.5,
+        height: 0.1
+      });
+      
+      // Center the text
+      textGeometry.computeBoundingBox();
+      const textWidth = textGeometry.boundingBox.max.x - textGeometry.boundingBox.min.x;
+      
+      // Create text material
+      const textMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+      
+      // Create text mesh
+      const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+      textMesh.position.set(-textWidth / 2, 0.5, 0.1);
+      tableauGroup.add(textMesh);
+      
+      // Create countdown text (will be updated)
+      this.createCountdownText(font, tableauGroup);
+    });
+    
+    return tableauGroup;
+  }
+  
+  // Add this method to create and update the 3D countdown text
+  createCountdownText(font, parent) {
+    // Create initial countdown text
+    const countdownGeometry = new THREE.TextGeometry('00', {
+      font: font,
+      size: 0.8,
+      height: 0.1
+    });
+    
+    const countdownMaterial = new THREE.MeshBasicMaterial({ color: 0xFF0000 });
+    this.countdownTextMesh = new THREE.Mesh(countdownGeometry, countdownMaterial);
+    
+    // Center the text
+    countdownGeometry.computeBoundingBox();
+    const textWidth = countdownGeometry.boundingBox.max.x - countdownGeometry.boundingBox.min.x;
+    this.countdownTextMesh.position.set(-textWidth / 2, -0.5, 0.1);
+    
+    parent.add(this.countdownTextMesh);
+  }
+  
+  // Add this method to update the 3D countdown text
+  update3DCountdown(seconds) {
+    if (!this.countdownTextMesh || !this.tableauGroup) return;
+    
+    // Remove old text
+    this.tableauGroup.remove(this.countdownTextMesh);
+    
+    // Create new text with updated seconds
+    const loader = new THREE.FontLoader();
+    loader.load('fonts/helvetiker_regular.typeface.json', (font) => {
+      const countdownGeometry = new THREE.TextGeometry(seconds.toString().padStart(2, '0'), {
+        font: font,
+        size: 0.8,
+        height: 0.1
+      });
+      
+      const countdownMaterial = new THREE.MeshBasicMaterial({ 
+        color: seconds <= 5 ? 0xFF0000 : 0xFFFFFF 
+      });
+      
+      this.countdownTextMesh = new THREE.Mesh(countdownGeometry, countdownMaterial);
+      
+      // Center the text
+      countdownGeometry.computeBoundingBox();
+      const textWidth = countdownGeometry.boundingBox.max.x - countdownGeometry.boundingBox.min.x;
+      this.countdownTextMesh.position.set(-textWidth / 2, -0.5, 0.1);
+      
+      this.tableauGroup.add(this.countdownTextMesh);
+    });
   }
 }
 

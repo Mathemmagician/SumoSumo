@@ -21,7 +21,8 @@ const gameState = {
   referee: {
     position: { x: 0, y: 3, z: 0 }
   },
-  currentFight: null
+  currentFight: null,
+  nextFightTime: null
 };
 
 // Add these variables at the top of the file with other game state variables
@@ -394,61 +395,75 @@ function selectNewFighters() {
     return;
   }
   
-  // Select two random viewers
-  const randomIndices = [];
-  while (randomIndices.length < 2) {
-    const randomIndex = Math.floor(Math.random() * gameState.viewers.length);
-    if (!randomIndices.includes(randomIndex)) {
-      randomIndices.push(randomIndex);
-    }
-  }
+  // Set the next fight time (10 seconds from now)
+  const countdownSeconds = 10;
+  gameState.nextFightTime = Date.now() + (countdownSeconds * 1000);
   
-  const fighter1 = gameState.viewers[randomIndices[0]];
-  const fighter2 = gameState.viewers[randomIndices[1]];
-  
-  // Remove selected viewers (in reverse order to avoid index issues)
-  const sortedIndices = [...randomIndices].sort((a, b) => b - a);
-  sortedIndices.forEach(idx => {
-    gameState.viewers.splice(idx, 1);
-  });
-  
-  // Add as fighters
-  const newFighter1 = {
-    ...fighter1,
-    position: { x: -3, y: 0, z: 0 },
-    score: 0,
-    isMovingLeft: false,
-    isMovingRight: false,
-    momentum: 0,
-    isDefending: false,
-    isCharging: false
-  };
-  
-  const newFighter2 = {
-    ...fighter2,
-    position: { x: 3, y: 0, z: 0 },
-    score: 0,
-    isMovingLeft: false,
-    isMovingRight: false,
-    momentum: 0,
-    isDefending: false,
-    isCharging: false
-  };
-  
-  gameState.fighters = [newFighter1, newFighter2];
-  
-  // Start a new fight
-  gameState.currentFight = {
+  // Notify clients about the countdown
+  io.emit('fightCountdown', {
+    seconds: countdownSeconds,
     startTime: Date.now(),
-    fighter1Id: newFighter1.id,
-    fighter2Id: newFighter2.id
-  };
-  
-  // Notify all clients about the new fight
-  io.emit('newFight', {
-    fighter1: newFighter1,
-    fighter2: newFighter2
+    nextFightTime: gameState.nextFightTime
   });
+  
+  // Schedule the actual fighter selection
+  setTimeout(() => {
+    // Select two random viewers
+    const randomIndices = [];
+    while (randomIndices.length < 2) {
+      const randomIndex = Math.floor(Math.random() * gameState.viewers.length);
+      if (!randomIndices.includes(randomIndex)) {
+        randomIndices.push(randomIndex);
+      }
+    }
+    
+    const fighter1 = gameState.viewers[randomIndices[0]];
+    const fighter2 = gameState.viewers[randomIndices[1]];
+    
+    // Remove selected viewers (in reverse order to avoid index issues)
+    const sortedIndices = [...randomIndices].sort((a, b) => b - a);
+    sortedIndices.forEach(idx => {
+      gameState.viewers.splice(idx, 1);
+    });
+    
+    // Add as fighters
+    const newFighter1 = {
+      ...fighter1,
+      position: { x: -3, y: 0, z: 0 },
+      score: 0,
+      isMovingLeft: false,
+      isMovingRight: false,
+      momentum: 0,
+      isDefending: false,
+      isCharging: false
+    };
+    
+    const newFighter2 = {
+      ...fighter2,
+      position: { x: 3, y: 0, z: 0 },
+      score: 0,
+      isMovingLeft: false,
+      isMovingRight: false,
+      momentum: 0,
+      isDefending: false,
+      isCharging: false
+    };
+    
+    gameState.fighters = [newFighter1, newFighter2];
+    
+    // Start a new fight
+    gameState.currentFight = {
+      startTime: Date.now(),
+      fighter1Id: newFighter1.id,
+      fighter2Id: newFighter2.id
+    };
+    
+    // Notify all clients about the new fight
+    io.emit('newFight', {
+      fighter1: newFighter1,
+      fighter2: newFighter2
+    });
+  }, countdownSeconds * 1000);
 }
 
 function endFight(winnerId, loserId) {
@@ -502,10 +517,24 @@ function endFight(winnerId, loserId) {
       newViewers: newViewers
     });
     
-    // After another short delay, select new fighters
+    // After another short delay, start countdown for next fight
     setTimeout(() => {
       if (gameState.viewers.length >= 2) {
-        selectNewFighters();
+        // Set the next fight time (15 seconds from now)
+        const countdownSeconds = 15;
+        gameState.nextFightTime = Date.now() + (countdownSeconds * 1000);
+        
+        // Notify clients about the countdown
+        io.emit('fightCountdown', {
+          seconds: countdownSeconds,
+          startTime: Date.now(),
+          nextFightTime: gameState.nextFightTime
+        });
+        
+        // Schedule the actual fighter selection
+        setTimeout(() => {
+          selectNewFighters();
+        }, countdownSeconds * 1000);
       }
     }, 2000);
   }, 2000);
