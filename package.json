@@ -1,17 +1,17 @@
 {
-  "name": "sumosumo",
+  "name": "sumo-sumo",
   "version": "1.0.0",
-  "description": "A social multiplayer sumo fighting browser game",
+  "description": "A multiplayer sumo wrestling game",
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js",
     "dev": "nodemon server/server.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "socket.io": "^4.7.2"
+    "express": "^4.17.1",
+    "socket.io": "^4.4.1"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "nodemon": "^2.0.15"
   }
 } 

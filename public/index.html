@@ -3,32 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SumoSumo - Multiplayer Sumo Fighting Game</title>
-    <link rel="stylesheet" href="css/style.css">
+    <title>SumoSumo!</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        #ui-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 10;
+        }
+        #emote-buttons {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            z-index: 10;
+        }
+        #emote-buttons button {
+            margin: 5px;
+            padding: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #message-input {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            z-index: 10;
+        }
+        #message-input input {
+            padding: 8px;
+            width: 200px;
+        }
+        #message-input button {
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
     <div id="game-container">
-        <div id="game-canvas"></div>
-        <div id="ui-container">
-            <div id="game-info">
-                <h1>SumoSumo</h1>
-                <div id="round-info">Waiting for players...</div>
-            </div>
-            <div id="emote-panel">
-                <button class="emote-btn" data-emote="cheer">🎉</button>
-                <button class="emote-btn" data-emote="laugh">😂</button>
-                <button class="emote-btn" data-emote="wow">😮</button>
-                <button class="emote-btn" data-emote="sad">😢</button>
-            </div>
+        <div id="ui-overlay">
+            <h2>SumoSumo!</h2>
+            <p id="role-display">Loading...</p>
+            <p id="players-count">Players: 0</p>
+        </div>
+        <div id="emote-buttons">
+            <button onclick="sendEmote('cheer')">👏 Cheer</button>
+            <button onclick="sendEmote('laugh')">😂 Laugh</button>
+            <button onclick="sendEmote('surprise')">😮 Surprise</button>
+            <button onclick="sendEmote('angry')">😠 Angry</button>
+        </div>
+        <div id="message-input">
+            <input type="text" id="message-text" placeholder="Type a message..." maxlength="50">
+            <button onclick="sendMessage()">Send</button>
         </div>
     </div>
 
-    <!-- Scripts -->
     <script src="/socket.io/socket.io.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="js/renderer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
     <script src="js/socket-client.js"></script>
-    <script src="js/ui.js"></script>
-    <script src="js/game.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/main.js"></script>
 </body>
 </html> 
