@@ -15,9 +15,276 @@ const gameState = {
   fighters: [], // Current fighters (max 2)
   referee: null, // Current referee
   viewers: [], // Current viewers
-  queue: [], // Queue of players waiting to fight
-  ringRadius: 5, // Ring radius in Three.js units
+  ringRadius: 10, // Increased ring radius in Three.js units
+  stage: 'WAITING_FOR_PLAYERS', // Current game stage
+  stageTimer: null, // Timer for current stage
+  stageStartTime: null, // When the current stage started
+  stageDuration: 0, // Duration of current stage in milliseconds
 };
+
+// Game stage constants
+const GAME_STAGES = {
+  WAITING_FOR_PLAYERS: 'WAITING_FOR_PLAYERS', // Not enough players to start
+  FIGHTER_SELECTION: 'FIGHTER_SELECTION',     // Selecting fighters from viewers
+  PRE_MATCH_CEREMONY: 'PRE_MATCH_CEREMONY',   // Pre-match ritual and sponsor banners
+  MATCH_IN_PROGRESS: 'MATCH_IN_PROGRESS',     // The actual sumo fight
+  VICTORY_CEREMONY: 'VICTORY_CEREMONY',       // Winner/loser declaration
+  POST_MATCH_COOLDOWN: 'POST_MATCH_COOLDOWN'  // Post-fight transition period
+};
+
+// Stage durations in milliseconds
+const STAGE_DURATIONS = {
+  [GAME_STAGES.WAITING_FOR_PLAYERS]: 0, // Indefinite until enough players
+  [GAME_STAGES.FIGHTER_SELECTION]: 5000,
+  [GAME_STAGES.PRE_MATCH_CEREMONY]: 10000,
+  [GAME_STAGES.MATCH_IN_PROGRESS]: 60000, // Max match duration
+  [GAME_STAGES.VICTORY_CEREMONY]: 8000,
+  [GAME_STAGES.POST_MATCH_COOLDOWN]: 5000
+};
+
+// Function to change the game stage
+function changeGameStage(newStage) {
+  // Clear any existing stage timer
+  if (gameState.stageTimer) {
+    clearTimeout(gameState.stageTimer);
+    gameState.stageTimer = null;
+  }
+  
+  const oldStage = gameState.stage;
+  gameState.stage = newStage;
+  gameState.stageStartTime = Date.now();
+  gameState.stageDuration = STAGE_DURATIONS[newStage];
+  
+  console.log(`Game stage changed: ${oldStage} -> ${newStage}`);
+  
+  // Broadcast stage change to all clients
+  io.emit('stageChange', {
+    stage: newStage,
+    duration: gameState.stageDuration
+  });
+  
+  // Handle stage-specific logic
+  switch (newStage) {
+    case GAME_STAGES.WAITING_FOR_PLAYERS:
+      // Nothing to do, just wait for players
+      break;
+      
+    case GAME_STAGES.FIGHTER_SELECTION:
+      selectFighters();
+      break;
+      
+    case GAME_STAGES.PRE_MATCH_CEREMONY:
+      startPreMatchCeremony();
+      break;
+      
+    case GAME_STAGES.MATCH_IN_PROGRESS:
+      startMatch();
+      break;
+      
+    case GAME_STAGES.VICTORY_CEREMONY:
+      // This is triggered by match end, not by timer
+      break;
+      
+    case GAME_STAGES.POST_MATCH_COOLDOWN:
+      resetFighters();
+      break;
+  }
+  
+  // Set timer for next stage if this stage has a duration
+  if (gameState.stageDuration > 0) {
+    gameState.stageTimer = setTimeout(() => {
+      progressToNextStage(newStage);
+    }, gameState.stageDuration);
+  }
+}
+
+// Function to determine and progress to the next stage
+function progressToNextStage(currentStage) {
+  switch (currentStage) {
+    case GAME_STAGES.WAITING_FOR_PLAYERS:
+      // This transition happens when enough players join
+      if (gameState.viewers.length >= 2) {
+        changeGameStage(GAME_STAGES.FIGHTER_SELECTION);
+      }
+      break;
+      
+    case GAME_STAGES.FIGHTER_SELECTION:
+      changeGameStage(GAME_STAGES.PRE_MATCH_CEREMONY);
+      break;
+      
+    case GAME_STAGES.PRE_MATCH_CEREMONY:
+      changeGameStage(GAME_STAGES.MATCH_IN_PROGRESS);
+      break;
+      
+    case GAME_STAGES.MATCH_IN_PROGRESS:
+      // This should be triggered by match end, not timeout
+      // But if time runs out, we'll declare a draw
+      declareDraw();
+      break;
+      
+    case GAME_STAGES.VICTORY_CEREMONY:
+      changeGameStage(GAME_STAGES.POST_MATCH_COOLDOWN);
+      break;
+      
+    case GAME_STAGES.POST_MATCH_COOLDOWN:
+      // Start a new round if we have enough viewers
+      if (gameState.viewers.length >= 2) {
+        changeGameStage(GAME_STAGES.FIGHTER_SELECTION);
+      } else {
+        changeGameStage(GAME_STAGES.WAITING_FOR_PLAYERS);
+      }
+      break;
+  }
+}
+
+// Select fighters from viewers
+function selectFighters() {
+  // Need at least 2 viewers to start a round
+  if (gameState.viewers.length < 2) {
+    changeGameStage(GAME_STAGES.WAITING_FOR_PLAYERS);
+    return;
+  }
+  
+  // Select 2 random viewers to be fighters
+  const fighter1Index = Math.floor(Math.random() * gameState.viewers.length);
+  const fighter1 = gameState.viewers[fighter1Index];
+  gameState.viewers.splice(fighter1Index, 1);
+  
+  const fighter2Index = Math.floor(Math.random() * gameState.viewers.length);
+  const fighter2 = gameState.viewers[fighter2Index];
+  gameState.viewers.splice(fighter2Index, 1);
+  
+  // Set their roles and positions
+  fighter1.role = 'fighter';
+  fighter1.position = { x: -3, y: 0, z: 0 };
+  fighter1.rotation = -Math.PI / 2; // Face right
+  fighter1.ready = false; // For pre-match ritual
+  
+  fighter2.role = 'fighter';
+  fighter2.position = { x: 3, y: 0, z: 0 };
+  fighter2.rotation = Math.PI / 2; // Face left
+  fighter2.ready = false; // For pre-match ritual
+  
+  // Add them to fighters array
+  gameState.fighters = [fighter1, fighter2];
+  
+  // If no referee, select one
+  if (!gameState.referee && gameState.viewers.length > 0) {
+    const refereeIndex = Math.floor(Math.random() * gameState.viewers.length);
+    gameState.referee = gameState.viewers[refereeIndex];
+    gameState.viewers.splice(refereeIndex, 1);
+    gameState.referee.role = 'referee';
+    gameState.referee.position = { x: 0, y: 0, z: 0 };
+  }
+  
+  // Announce fighter selection
+  io.emit('fightersSelected', {
+    fighter1: fighter1,
+    fighter2: fighter2,
+    referee: gameState.referee
+  });
+}
+
+// Start pre-match ceremony
+function startPreMatchCeremony() {
+  // Broadcast pre-match ceremony start
+  io.emit('preCeremonyStart', {
+    fighters: gameState.fighters,
+    referee: gameState.referee
+  });
+  
+  // Move fighters to ceremony positions
+  gameState.fighters[0].position = { x: -5, y: 0, z: 0 };
+  gameState.fighters[1].position = { x: 5, y: 0, z: 0 };
+  
+  // Broadcast updated positions
+  gameState.fighters.forEach(fighter => {
+    io.emit('playerMoved', {
+      id: fighter.id,
+      position: fighter.position,
+      rotation: fighter.rotation
+    });
+  });
+  
+  // Simulate sponsor banners
+  setTimeout(() => {
+    io.emit('sponsorBanner', { 
+      sponsor: 'SumoEnergy Drinks',
+      duration: 3000
+    });
+  }, 2000);
+  
+  setTimeout(() => {
+    io.emit('sponsorBanner', { 
+      sponsor: 'MegaSumo Protein',
+      duration: 3000
+    });
+  }, 6000);
+}
+
+// Start the actual match
+function startMatch() {
+  // Move fighters to starting positions
+  gameState.fighters[0].position = { x: -3, y: 0, z: 0 };
+  gameState.fighters[1].position = { x: 3, y: 0, z: 0 };
+  
+  // Broadcast updated positions
+  gameState.fighters.forEach(fighter => {
+    io.emit('playerMoved', {
+      id: fighter.id,
+      position: fighter.position,
+      rotation: fighter.rotation
+    });
+  });
+  
+  // Announce match start
+  io.emit('matchStart', {
+    fighters: gameState.fighters,
+    referee: gameState.referee
+  });
+}
+
+// Declare a draw (if time runs out)
+function declareDraw() {
+  io.emit('matchDraw', {
+    fighters: gameState.fighters
+  });
+  
+  changeGameStage(GAME_STAGES.VICTORY_CEREMONY);
+}
+
+// End a round with a winner and loser
+function endRound(loserId) {
+  // Find the loser
+  const loser = gameState.fighters.find(f => f.id === loserId);
+  if (!loser) return;
+  
+  // Find the winner (the other fighter)
+  const winner = gameState.fighters.find(f => f.id !== loserId);
+  
+  // Announce the winner
+  io.emit('matchEnd', {
+    winnerId: winner ? winner.id : null,
+    loserId
+  });
+  
+  // Change to victory ceremony stage
+  changeGameStage(GAME_STAGES.VICTORY_CEREMONY);
+}
+
+// Reset fighters after a match
+function resetFighters() {
+  // Move fighters back to viewers
+  gameState.fighters.forEach(fighter => {
+    fighter.role = 'viewer';
+    fighter.position = { x: 0, y: 0, z: 0 };
+    fighter.ready = false;
+    gameState.viewers.push(fighter);
+  });
+  
+  // Clear fighters array
+  gameState.fighters = [];
+}
 
 // When a client connects
 io.on('connection', (socket) => {
@@ -32,21 +299,32 @@ io.on('connection', (socket) => {
     role: 'viewer', // Start as viewer
     emote: null,
     message: null,
+    ready: false, // For pre-match ritual
   };
   
   // Add to viewers initially
   gameState.viewers.push(player);
   
   // Send initial game state to the new player
-  socket.emit('gameState', gameState);
+  socket.emit('gameState', {
+    ...gameState,
+    currentStage: gameState.stage,
+    stageTimeRemaining: gameState.stageDuration > 0 ? 
+      gameState.stageDuration - (Date.now() - gameState.stageStartTime) : 0
+  });
   
   // Broadcast new player to everyone else
   socket.broadcast.emit('playerJoined', player);
   
+  // Check if we should start the game
+  if (gameState.stage === GAME_STAGES.WAITING_FOR_PLAYERS && gameState.viewers.length >= 2) {
+    changeGameStage(GAME_STAGES.FIGHTER_SELECTION);
+  }
+  
   // Handle player movement
   socket.on('move', (direction) => {
-    // Only fighters can move
-    if (player.role !== 'fighter') return;
+    // Only fighters can move during the match
+    if (player.role !== 'fighter' || gameState.stage !== GAME_STAGES.MATCH_IN_PROGRESS) return;
     
     const fighter = gameState.fighters.find(f => f.id === socket.id);
     if (!fighter) return;
@@ -64,6 +342,31 @@ io.on('connection', (socket) => {
     if (Math.abs(fighter.position.x) > gameState.ringRadius) {
       // Player fell out of the ring
       endRound(fighter.id);
+      return;
+    }
+    
+    // Check for collision with other fighter
+    const otherFighter = gameState.fighters.find(f => f.id !== socket.id);
+    if (otherFighter) {
+      const distance = Math.abs(fighter.position.x - otherFighter.position.x);
+      if (distance < 1.5) {
+        // Simple pushing mechanic
+        const pushDirection = fighter.position.x < otherFighter.position.x ? 1 : -1;
+        otherFighter.position.x += pushDirection * 0.15;
+        
+        // Check if pushed fighter is out of the ring
+        if (Math.abs(otherFighter.position.x) > gameState.ringRadius) {
+          endRound(otherFighter.id);
+          return;
+        }
+        
+        // Broadcast other fighter's position update
+        io.emit('playerMoved', {
+          id: otherFighter.id,
+          position: otherFighter.position,
+          rotation: otherFighter.rotation
+        });
+      }
     }
     
     // Broadcast updated position
@@ -72,6 +375,26 @@ io.on('connection', (socket) => {
       position: fighter.position,
       rotation: fighter.rotation
     });
+  });
+  
+  // Handle pre-match ritual ready signal
+  socket.on('ritualReady', () => {
+    if (player.role !== 'fighter' || gameState.stage !== GAME_STAGES.PRE_MATCH_CEREMONY) return;
+    
+    const fighter = gameState.fighters.find(f => f.id === socket.id);
+    if (fighter) {
+      fighter.ready = true;
+      
+      // Broadcast fighter ready
+      io.emit('fighterReady', { id: fighter.id });
+      
+      // Check if both fighters are ready
+      if (gameState.fighters.every(f => f.ready)) {
+        // Skip to match start if both fighters are ready
+        clearTimeout(gameState.stageTimer);
+        changeGameStage(GAME_STAGES.MATCH_IN_PROGRESS);
+      }
+    }
   });
   
   // Handle player emote
@@ -120,106 +443,55 @@ io.on('connection', (socket) => {
     // Remove player from appropriate array
     if (player.role === 'fighter') {
       gameState.fighters = gameState.fighters.filter(f => f.id !== socket.id);
-      // If a fighter leaves, end the round
-      if (gameState.fighters.length < 2) {
-        startNewRound();
+      
+      // If a fighter leaves during a match, end the round
+      if (gameState.stage === GAME_STAGES.MATCH_IN_PROGRESS && gameState.fighters.length < 2) {
+        // The remaining fighter wins
+        const remainingFighter = gameState.fighters[0];
+        if (remainingFighter) {
+          io.emit('matchEnd', {
+            winnerId: remainingFighter.id,
+            loserId: socket.id,
+            reason: 'disconnect'
+          });
+          
+          changeGameStage(GAME_STAGES.VICTORY_CEREMONY);
+        } else {
+          // No fighters left, go to post-match
+          changeGameStage(GAME_STAGES.POST_MATCH_COOLDOWN);
+        }
       }
     } else if (player.role === 'referee') {
       gameState.referee = null;
+      
       // Select new referee if needed
       if (gameState.viewers.length > 0) {
         const newRefereeIndex = Math.floor(Math.random() * gameState.viewers.length);
         gameState.referee = gameState.viewers[newRefereeIndex];
         gameState.viewers.splice(newRefereeIndex, 1);
         gameState.referee.role = 'referee';
+        
+        io.emit('newReferee', gameState.referee);
       }
     } else {
       gameState.viewers = gameState.viewers.filter(v => v.id !== socket.id);
     }
     
-    // Remove from queue if present
-    gameState.queue = gameState.queue.filter(id => id !== socket.id);
-    
     // Broadcast player left
     io.emit('playerLeft', socket.id);
     
-    // Check if we need to start a new round
-    if (gameState.fighters.length < 2 && gameState.viewers.length > 1) {
-      startNewRound();
+    // Check if we need to change stage due to lack of players
+    if (gameState.viewers.length + gameState.fighters.length < 2) {
+      changeGameStage(GAME_STAGES.WAITING_FOR_PLAYERS);
     }
   });
 });
 
-// Function to end a round
-function endRound(loserId) {
-  // Find the loser
-  const loser = gameState.fighters.find(f => f.id === loserId);
-  if (!loser) return;
-  
-  // Find the winner (the other fighter)
-  const winner = gameState.fighters.find(f => f.id !== loserId);
-  
-  // Announce the winner
-  io.emit('roundEnd', {
-    winnerId: winner ? winner.id : null,
-    loserId
-  });
-  
-  // Move fighters back to viewers
-  gameState.fighters.forEach(fighter => {
-    fighter.role = 'viewer';
-    fighter.position = { x: 0, y: 0, z: 0 };
-    gameState.viewers.push(fighter);
-  });
-  
-  // Clear fighters array
-  gameState.fighters = [];
-  
-  // Start a new round after a delay
-  setTimeout(startNewRound, 3000);
-}
-
-// Function to start a new round
-function startNewRound() {
-  // Need at least 2 viewers to start a round
-  if (gameState.viewers.length < 2) return;
-  
-  // Select 2 random viewers to be fighters
-  const fighter1Index = Math.floor(Math.random() * gameState.viewers.length);
-  const fighter1 = gameState.viewers[fighter1Index];
-  gameState.viewers.splice(fighter1Index, 1);
-  
-  const fighter2Index = Math.floor(Math.random() * gameState.viewers.length);
-  const fighter2 = gameState.viewers[fighter2Index];
-  gameState.viewers.splice(fighter2Index, 1);
-  
-  // Set their roles and positions
-  fighter1.role = 'fighter';
-  fighter1.position = { x: -2, y: 0, z: 0 };
-  fighter1.rotation = -Math.PI / 2; // Face right
-  
-  fighter2.role = 'fighter';
-  fighter2.position = { x: 2, y: 0, z: 0 };
-  fighter2.rotation = Math.PI / 2; // Face left
-  
-  // Add them to fighters array
-  gameState.fighters = [fighter1, fighter2];
-  
-  // If no referee, select one
-  if (!gameState.referee && gameState.viewers.length > 0) {
-    const refereeIndex = Math.floor(Math.random() * gameState.viewers.length);
-    gameState.referee = gameState.viewers[refereeIndex];
-    gameState.viewers.splice(refereeIndex, 1);
-    gameState.referee.role = 'referee';
-    gameState.referee.position = { x: 0, y: 0, z: 0 };
-  }
-  
-  // Announce new round
-  io.emit('roundStart', {
-    fighter1: fighter1,
-    fighter2: fighter2,
-    referee: gameState.referee
-  });
+// Initialize the game state
+function initGameState() {
+  gameState.stage = GAME_STAGES.WAITING_FOR_PLAYERS;
+  gameState.stageStartTime = Date.now();
+  gameState.stageDuration = STAGE_DURATIONS[GAME_STAGES.WAITING_FOR_PLAYERS];
 }
 
 // Start the server
@@ -227,6 +499,6 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   
-  // Start the first round after a delay
-  setTimeout(startNewRound, 5000);
+  // Initialize the game state
+  initGameState();
 }); 
