@@ -5,7 +5,7 @@ let textureLoader;
 let faceTextures = [];
 
 // Constants for scene dimensions
-const RING_RADIUS = 10; // Base measurement for the scene
+const RING_RADIUS = 7; // Base measurement for the scene
 const RING_HEIGHT = 0.5;
 const FLOOR_SIZE = RING_RADIUS * 5;
 const FIRST_ROW_DISTANCE = RING_RADIUS * 1.5;
@@ -24,8 +24,8 @@ function initScene(initialGameState) {
   scene.background = new THREE.Color(0x87CEEB); // Sky blue background
   
   // Create camera
-  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(-2, 10, 15);
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(-2, 15, 20);
   camera.lookAt(0, 0, 0);
   
   // Create renderer
@@ -194,7 +194,7 @@ function createRing() {
   // Add the floor around the ring
   const floorGeometry = new THREE.PlaneGeometry(FLOOR_SIZE, FLOOR_SIZE);
   const floorMaterial = new THREE.MeshLambertMaterial({ 
-    color: 0x333333,
+    color: 0xBF924A,
     side: THREE.DoubleSide
   });
   const floor = new THREE.Mesh(floorGeometry, floorMaterial);
@@ -203,120 +203,182 @@ function createRing() {
   scene.add(floor);
 }
 
-// Create audience areas
+// Update the audience seating with increasing seats per row
 function createAudienceAreas() {
-  // Create benches for the audience
-  const benchGeometry = new THREE.BoxGeometry(BENCH_WIDTH, BENCH_HEIGHT, BENCH_DEPTH);
-  const benchMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // Brown
+  // Create audience seating areas (benches)
+  // We'll create 3 rows on each of the 4 sides of the ring
   
-  // First row of benches - around the ring
-  const benchPositions = [];
+  // Constants for bench layout
+  const ELEVATED_HEIGHT = 0.5; // Height of the elevated third row
+  const SEATS_PER_FIRST_ROW = 12; // Number of seats in the first row
+
+  const BENCH_WIDTH = 2 * RING_RADIUS / SEATS_PER_FIRST_ROW;
+  const BENCH_HEIGHT = 0.1;
+  const BENCH_DEPTH = 2 * RING_RADIUS / SEATS_PER_FIRST_ROW;
+
+  const FIRST_ROW_DISTANCE = RING_RADIUS * 1.5;
+  const SECOND_ROW_DISTANCE = FIRST_ROW_DISTANCE + BENCH_DEPTH * 1.2;
+  const THIRD_ROW_DISTANCE = SECOND_ROW_DISTANCE + BENCH_DEPTH * 1.2;
   
-  // Generate bench positions for first row
-  for (let i = 0; i < 10; i++) {
-    // Left side benches
-    benchPositions.push({ x: -FIRST_ROW_DISTANCE, z: -4 + i * 2 });
-    // Right side benches
-    benchPositions.push({ x: FIRST_ROW_DISTANCE, z: -4 + i * 2 });
-    // Top side benches
-    benchPositions.push({ x: -4 + i * 2, z: -FIRST_ROW_DISTANCE });
-  }
+  // Materials
+  const benchMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // Brown wood
+  const matMaterial = new THREE.MeshLambertMaterial({ color: 0xAA0000 }); // Red mat
   
-  // Create first row of benches
-  benchPositions.forEach(pos => {
-    const bench = new THREE.Mesh(benchGeometry, benchMaterial);
-    bench.position.set(pos.x, BENCH_HEIGHT / 2, pos.z);
-    
-    // Rotate benches to face the ring
-    if (pos.x === -FIRST_ROW_DISTANCE) {
-      bench.rotation.y = 0; // Left side benches face right
-    } else if (pos.x === FIRST_ROW_DISTANCE) {
-      bench.rotation.y = Math.PI; // Right side benches face left
-    } else {
-      bench.rotation.y = Math.PI / 2; // Top side benches face down
-    }
-    
-    scene.add(bench);
+  // Create benches for each side (North, East, South, West)
+  const sides = [
+    { name: 'North', rotation: 0, z: -1 },
+    { name: 'East', rotation: Math.PI / 2, x: 1 },
+    { name: 'South', rotation: Math.PI, z: 1 },
+    { name: 'West', rotation: -Math.PI / 2, x: -1 }
+  ];
+  
+  // For each side
+  sides.forEach(side => {
+    // For each row
+    [
+      { distance: FIRST_ROW_DISTANCE, elevated: false, seats: SEATS_PER_FIRST_ROW },
+      { distance: SECOND_ROW_DISTANCE, elevated: false, seats: SEATS_PER_FIRST_ROW + 2 },
+      { distance: THIRD_ROW_DISTANCE, elevated: true, seats: SEATS_PER_FIRST_ROW + 4 }
+    ].forEach((row, rowIndex) => {
+      // Create the row base (for elevated rows)
+      if (row.elevated) {
+        const platformGeometry = new THREE.BoxGeometry(
+          side.z ? BENCH_WIDTH * row.seats : BENCH_DEPTH,
+          ELEVATED_HEIGHT,
+          side.x ? BENCH_WIDTH * row.seats : BENCH_DEPTH
+        );
+        
+        const platform = new THREE.Mesh(platformGeometry, benchMaterial);
+        
+        // Position the platform
+        if (side.x) {
+          platform.position.set(
+            side.x * row.distance,
+            ELEVATED_HEIGHT / 2,
+            0
+          );
+        } else {
+          platform.position.set(
+            0,
+            ELEVATED_HEIGHT / 2,
+            side.z * row.distance
+          );
+        }
+        
+        scene.add(platform);
+      }
+      
+      // Create individual seats with mats for this row
+      for (let i = 0; i < row.seats; i++) {
+        // Calculate offset from center
+        const offset = (i - (row.seats - 1) / 2) * BENCH_WIDTH;
+        
+        // Create mat
+        const matGeometry = new THREE.BoxGeometry(BENCH_WIDTH * 0.8, 0.05, BENCH_DEPTH * 0.8);
+        const mat = new THREE.Mesh(matGeometry, matMaterial);
+        mat.position.y = BENCH_HEIGHT / 2 + 0.025; // Place on top of bench
+        
+        // Position based on side
+        let x = 0, y = BENCH_HEIGHT / 2, z = 0;
+        
+        if (row.elevated) {
+          y += ELEVATED_HEIGHT;
+        }
+        
+        if (side.x) {
+          x = side.x * row.distance;
+          z = offset;
+        } else {
+          x = offset;
+          z = side.z * row.distance;
+        }
+        
+        mat.position.set(x, y, z);
+        mat.rotation.y = side.rotation;
+        
+        // Add to scene
+        scene.add(mat);
+      }
+    });
   });
-  
-  // Second row of benches - elevated and further back
-  const secondRowBenchPositions = [];
-  
-  // Generate bench positions for second row
-  for (let i = 0; i < 10; i++) {
-    // Left side benches
-    secondRowBenchPositions.push({ x: -SECOND_ROW_DISTANCE, z: -4 + i * 2 });
-    // Right side benches
-    secondRowBenchPositions.push({ x: SECOND_ROW_DISTANCE, z: -4 + i * 2 });
-    // Top side benches
-    secondRowBenchPositions.push({ x: -4 + i * 2, z: -SECOND_ROW_DISTANCE });
-  }
-  
-  // Create second row of benches (elevated)
-  secondRowBenchPositions.forEach(pos => {
-    const bench = new THREE.Mesh(benchGeometry, benchMaterial);
-    bench.position.set(pos.x, PLATFORM_HEIGHT + BENCH_HEIGHT / 2, pos.z);
-    
-    // Rotate benches to face the ring
-    if (pos.x === -SECOND_ROW_DISTANCE) {
-      bench.rotation.y = 0; // Left side benches face right
-    } else if (pos.x === SECOND_ROW_DISTANCE) {
-      bench.rotation.y = Math.PI; // Right side benches face left
-    } else {
-      bench.rotation.y = Math.PI / 2; // Top side benches face down
-    }
-    
-    scene.add(bench);
-  });
-  
-  // Add platforms for the second row
-  const platformGeometry = new THREE.BoxGeometry(PLATFORM_WIDTH, PLATFORM_HEIGHT, PLATFORM_DEPTH);
-  const platformMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 }); // Dark gray
-  
-  // Left platform
-  const leftPlatform = new THREE.Mesh(platformGeometry, platformMaterial);
-  leftPlatform.position.set(-SECOND_ROW_DISTANCE, PLATFORM_HEIGHT / 2, 1);
-  scene.add(leftPlatform);
-  
-  // Right platform
-  const rightPlatform = new THREE.Mesh(platformGeometry, platformMaterial);
-  rightPlatform.position.set(SECOND_ROW_DISTANCE, PLATFORM_HEIGHT / 2, 1);
-  scene.add(rightPlatform);
-  
-  // Top platform
-  const topPlatform = new THREE.Mesh(platformGeometry, platformMaterial);
-  topPlatform.rotation.y = Math.PI / 2; // Rotate to align with top benches
-  topPlatform.position.set(1, PLATFORM_HEIGHT / 2, -SECOND_ROW_DISTANCE);
-  scene.add(topPlatform);
 }
 
-// Position viewers based on their index
+// Update the positionViewer function to match the new layout
 function positionViewer(model, viewerIndex) {
-  if (viewerIndex < 10) {
-    // Left side - first row
-    model.position.set(-FIRST_ROW_DISTANCE, BENCH_HEIGHT + 0.5, -4 + viewerIndex * 2);
-    model.rotation.y = 0; // Face right
-  } else if (viewerIndex < 20) {
-    // Right side - first row
-    model.position.set(FIRST_ROW_DISTANCE, BENCH_HEIGHT + 0.5, -4 + (viewerIndex - 10) * 2);
-    model.rotation.y = Math.PI; // Face left
-  } else if (viewerIndex < 30) {
-    // Top side - first row
-    model.position.set(-4 + (viewerIndex - 20) * 2, BENCH_HEIGHT + 0.5, -FIRST_ROW_DISTANCE);
-    model.rotation.y = Math.PI / 2; // Face down
-  } else if (viewerIndex < 40) {
-    // Left side - second row (elevated)
-    model.position.set(-SECOND_ROW_DISTANCE, PLATFORM_HEIGHT + BENCH_HEIGHT + 0.5, -4 + (viewerIndex - 30) * 2);
-    model.rotation.y = 0; // Face right
-  } else if (viewerIndex < 50) {
-    // Right side - second row (elevated)
-    model.position.set(SECOND_ROW_DISTANCE, PLATFORM_HEIGHT + BENCH_HEIGHT + 0.5, -4 + (viewerIndex - 40) * 2);
-    model.rotation.y = Math.PI; // Face left
+  // Constants for viewer positioning
+  const FIRST_ROW_DISTANCE = RING_RADIUS * 1.5;
+  const SECOND_ROW_DISTANCE = RING_RADIUS * 2.0;
+  const THIRD_ROW_DISTANCE = RING_RADIUS * 2.5;
+  
+  const BENCH_HEIGHT = 0.1;
+  const ELEVATED_HEIGHT = 0.5;
+  const SEATS_PER_FIRST_ROW = 5;
+  
+  // Calculate total seats per side
+  const SEATS_PER_SIDE = SEATS_PER_FIRST_ROW + (SEATS_PER_FIRST_ROW + 2) + (SEATS_PER_FIRST_ROW + 4);
+  
+  // Determine which side and seat
+  const side = Math.floor(viewerIndex / SEATS_PER_SIDE) % 3; // 0=North, 1=East, 2=West (no South)
+  const seatInSide = viewerIndex % SEATS_PER_SIDE;
+  
+  // Determine which row and seat in row
+  let row, seatInRow;
+  if (seatInSide < SEATS_PER_FIRST_ROW) {
+    row = 0;
+    seatInRow = seatInSide;
+  } else if (seatInSide < SEATS_PER_FIRST_ROW + (SEATS_PER_FIRST_ROW + 2)) {
+    row = 1;
+    seatInRow = seatInSide - SEATS_PER_FIRST_ROW;
   } else {
-    // Top side - second row (elevated)
-    model.position.set(-4 + (viewerIndex - 50) * 2, PLATFORM_HEIGHT + BENCH_HEIGHT + 0.5, -SECOND_ROW_DISTANCE);
-    model.rotation.y = Math.PI / 2; // Face down
+    row = 2;
+    seatInRow = seatInSide - (SEATS_PER_FIRST_ROW + (SEATS_PER_FIRST_ROW + 2));
   }
+  
+  // Calculate position
+  let x = 0, y = 0, z = 0;
+  let rotation = 0;
+  
+  // Determine row distance
+  const rowDistances = [FIRST_ROW_DISTANCE, SECOND_ROW_DISTANCE, THIRD_ROW_DISTANCE];
+  const distance = rowDistances[row];
+  
+  // Determine height (elevated for third row)
+  y = BENCH_HEIGHT + 0.5; // Half height of sumo model + bench height
+  if (row === 2) { // Third row is elevated
+    y += ELEVATED_HEIGHT;
+  }
+  
+  // Determine number of seats in this row
+  const seatsInRow = SEATS_PER_FIRST_ROW + (row * 2);
+  
+  // Calculate offset from center of row
+  const offset = (seatInRow - (seatsInRow - 1) / 2) * BENCH_WIDTH;
+  
+  // Position based on side (adjusted for no South side)
+  const sideMap = [0, 1, 3]; // Map to North, East, West (skipping South)
+  const mappedSide = sideMap[side];
+  
+  switch (mappedSide) {
+    case 0: // North
+      x = offset;
+      z = -distance;
+      rotation = Math.PI;
+      break;
+    case 1: // East
+      x = distance;
+      z = offset;
+      rotation = -Math.PI / 2;
+      break;
+    case 3: // West
+      x = -distance;
+      z = offset;
+      rotation = Math.PI / 2;
+      break;
+  }
+  
+  // Set position and rotation
+  model.position.set(x, y, z);
+  model.rotation.y = rotation;
 }
 
 // Create a sumo wrestler model
