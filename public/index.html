@@ -4,11 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SumoSumo!</title>
+    <!-- Add Sawarabi Mincho font from Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Sawarabi+Mincho&display=swap" rel="stylesheet">
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            font-family: Arial, sans-serif;
+            font-family: 'Sawarabi Mincho', serif;
         }
         #game-container {
             position: relative;
@@ -20,36 +22,91 @@
             top: 10px;
             left: 10px;
             color: white;
-            background-color: rgba(0, 0, 0, 0.5);
+            background-color: rgba(0, 0, 0, 0.7);
             padding: 10px;
             border-radius: 5px;
             z-index: 10;
+            font-family: 'Sawarabi Mincho', serif;
+        }
+        #stage-display {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 10;
+            font-family: 'Sawarabi Mincho', serif;
+            text-align: right;
+        }
+        #stage-timer {
+            font-size: 1.2em;
+            margin-top: 5px;
         }
         #emote-buttons {
             position: absolute;
             bottom: 10px;
             left: 10px;
             z-index: 10;
+            font-family: 'Sawarabi Mincho', serif;
         }
         #emote-buttons button {
             margin: 5px;
             padding: 10px;
             font-size: 16px;
             cursor: pointer;
+            font-family: 'Sawarabi Mincho', serif;
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #333;
+            border-radius: 5px;
         }
         #message-input {
             position: absolute;
             bottom: 10px;
             right: 10px;
             z-index: 10;
+            font-family: 'Sawarabi Mincho', serif;
         }
         #message-input input {
             padding: 8px;
             width: 200px;
+            font-family: 'Sawarabi Mincho', serif;
         }
         #message-input button {
             padding: 8px 12px;
             cursor: pointer;
+            font-family: 'Sawarabi Mincho', serif;
+        }
+        #ritual-ready-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 15px 30px;
+            font-size: 18px;
+            background-color: #ff4500;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            display: none;
+            font-family: 'Sawarabi Mincho', serif;
+            z-index: 20;
+        }
+        #sponsor-banner {
+            position: absolute;
+            bottom: 20%;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 0;
+            font-size: 24px;
+            display: none;
+            font-family: 'Sawarabi Mincho', serif;
+            z-index: 15;
         }
     </style>
 </head>
@@ -59,6 +116,10 @@
             <h2>SumoSumo!</h2>
             <p id="role-display">Loading...</p>
             <p id="players-count">Players: 0</p>
+        </div>
+        <div id="stage-display">
+            <h3 id="stage-name">Waiting for players</h3>
+            <div id="stage-timer"></div>
         </div>
         <div id="emote-buttons">
             <button onclick="sendEmote('cheer')">👏 Cheer</button>
@@ -70,6 +131,8 @@
             <input type="text" id="message-text" placeholder="Type a message..." maxlength="50">
             <button onclick="sendMessage()">Send</button>
         </div>
+        <button id="ritual-ready-button" onclick="sendRitualReady()">I'm Ready!</button>
+        <div id="sponsor-banner"></div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>

@@ -83,55 +83,138 @@ function initScene(initialGameState) {
 
 // Create the sumo ring
 function createRing() {
-  const ringGeometry = new THREE.CylinderGeometry(5, 5, 0.5, 32);
-  const ringMaterial = new THREE.MeshStandardMaterial({ color: 0xD2B48C }); // Tan color
+  // Create the sumo ring (dohyo)
+  const ringGeometry = new THREE.CylinderGeometry(10, 10, 0.5, 32); // Updated radius to 10
+  const ringMaterial = new THREE.MeshLambertMaterial({ color: 0xD2B48C }); // Tan color
   ring = new THREE.Mesh(ringGeometry, ringMaterial);
-  ring.position.y = -0.25; // Half of the height
+  ring.position.y = 0.25; // Half of the height
   scene.add(ring);
   
-  // Add ring border
-  const borderGeometry = new THREE.TorusGeometry(5, 0.2, 16, 100);
-  const borderMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Brown color
+  // Add a ring border
+  const borderGeometry = new THREE.RingGeometry(10, 10.5, 32); // Updated radius to match
+  const borderMaterial = new THREE.MeshLambertMaterial({ 
+    color: 0x8B4513,
+    side: THREE.DoubleSide
+  });
   const border = new THREE.Mesh(borderGeometry, borderMaterial);
-  border.position.y = 0;
-  border.rotation.x = Math.PI / 2;
+  border.rotation.x = Math.PI / 2; // Lay flat
+  border.position.y = 0.51; // Just above the ring
   scene.add(border);
   
-  // Add ring markings
-  const markingsGeometry = new THREE.CircleGeometry(4, 32);
-  const markingsMaterial = new THREE.MeshStandardMaterial({ 
+  // Add ring markings (lines)
+  const markingsGeometry = new THREE.CircleGeometry(8, 32); // Inner circle
+  const markingsMaterial = new THREE.MeshBasicMaterial({ 
     color: 0xFFFFFF,
     transparent: true,
-    opacity: 0.3
+    opacity: 0.3,
+    side: THREE.DoubleSide
   });
   const markings = new THREE.Mesh(markingsGeometry, markingsMaterial);
-  markings.position.y = 0.01;
-  markings.rotation.x = -Math.PI / 2;
+  markings.rotation.x = Math.PI / 2; // Lay flat
+  markings.position.y = 0.52; // Just above the ring
   scene.add(markings);
+  
+  // Add the floor around the ring
+  const floorGeometry = new THREE.PlaneGeometry(50, 50);
+  const floorMaterial = new THREE.MeshLambertMaterial({ 
+    color: 0x333333,
+    side: THREE.DoubleSide
+  });
+  const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+  floor.rotation.x = Math.PI / 2; // Lay flat
+  floor.position.y = 0; // At the bottom
+  scene.add(floor);
 }
 
 // Create audience areas
 function createAudienceAreas() {
-  // Left audience area
-  const leftAreaGeometry = new THREE.BoxGeometry(2, 0.5, 10);
-  const leftAreaMaterial = new THREE.MeshStandardMaterial({ color: 0x4682B4 }); // Steel blue
-  const leftArea = new THREE.Mesh(leftAreaGeometry, leftAreaMaterial);
-  leftArea.position.set(-8, -0.25, 0);
-  scene.add(leftArea);
+  // Create benches for the audience
+  const benchGeometry = new THREE.BoxGeometry(2, 0.5, 1);
+  const benchMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // Brown
   
-  // Right audience area
-  const rightAreaGeometry = new THREE.BoxGeometry(2, 0.5, 10);
-  const rightAreaMaterial = new THREE.MeshStandardMaterial({ color: 0x4682B4 });
-  const rightArea = new THREE.Mesh(rightAreaGeometry, rightAreaMaterial);
-  rightArea.position.set(8, -0.25, 0);
-  scene.add(rightArea);
+  // First row of benches - around the ring
+  const benchPositions = [
+    // Left side (10 benches)
+    { x: -15, z: -4 }, { x: -15, z: -2 }, { x: -15, z: 0 }, { x: -15, z: 2 }, { x: -15, z: 4 },
+    { x: -15, z: -6 }, { x: -15, z: -8 }, { x: -15, z: 6 }, { x: -15, z: 8 }, { x: -15, z: 10 },
+    
+    // Right side (10 benches)
+    { x: 15, z: -4 }, { x: 15, z: -2 }, { x: 15, z: 0 }, { x: 15, z: 2 }, { x: 15, z: 4 },
+    { x: 15, z: -6 }, { x: 15, z: -8 }, { x: 15, z: 6 }, { x: 15, z: 8 }, { x: 15, z: 10 },
+    
+    // Top side (10 benches)
+    { x: -4, z: -15 }, { x: -2, z: -15 }, { x: 0, z: -15 }, { x: 2, z: -15 }, { x: 4, z: -15 },
+    { x: -6, z: -15 }, { x: -8, z: -15 }, { x: 6, z: -15 }, { x: 8, z: -15 }, { x: 10, z: -15 }
+  ];
   
-  // Top audience area
-  const topAreaGeometry = new THREE.BoxGeometry(10, 0.5, 2);
-  const topAreaMaterial = new THREE.MeshStandardMaterial({ color: 0x4682B4 });
-  const topArea = new THREE.Mesh(topAreaGeometry, topAreaMaterial);
-  topArea.position.set(0, -0.25, -8);
-  scene.add(topArea);
+  // Create first row of benches
+  benchPositions.forEach(pos => {
+    const bench = new THREE.Mesh(benchGeometry, benchMaterial);
+    bench.position.set(pos.x, 0.25, pos.z); // Half the height of the bench
+    
+    // Rotate benches to face the ring
+    if (pos.x === -15) {
+      bench.rotation.y = 0; // Left side benches face right
+    } else if (pos.x === 15) {
+      bench.rotation.y = Math.PI; // Right side benches face left
+    } else {
+      bench.rotation.y = Math.PI / 2; // Top side benches face down
+    }
+    
+    scene.add(bench);
+  });
+  
+  // Second row of benches - elevated and further back
+  const secondRowBenchPositions = [
+    // Left side (10 benches)
+    { x: -18, z: -4 }, { x: -18, z: -2 }, { x: -18, z: 0 }, { x: -18, z: 2 }, { x: -18, z: 4 },
+    { x: -18, z: -6 }, { x: -18, z: -8 }, { x: -18, z: 6 }, { x: -18, z: 8 }, { x: -18, z: 10 },
+    
+    // Right side (10 benches)
+    { x: 18, z: -4 }, { x: 18, z: -2 }, { x: 18, z: 0 }, { x: 18, z: 2 }, { x: 18, z: 4 },
+    { x: 18, z: -6 }, { x: 18, z: -8 }, { x: 18, z: 6 }, { x: 18, z: 8 }, { x: 18, z: 10 },
+    
+    // Top side (10 benches)
+    { x: -4, z: -18 }, { x: -2, z: -18 }, { x: 0, z: -18 }, { x: 2, z: -18 }, { x: 4, z: -18 },
+    { x: -6, z: -18 }, { x: -8, z: -18 }, { x: 6, z: -18 }, { x: 8, z: -18 }, { x: 10, z: -18 }
+  ];
+  
+  // Create second row of benches (elevated)
+  secondRowBenchPositions.forEach(pos => {
+    const bench = new THREE.Mesh(benchGeometry, benchMaterial);
+    bench.position.set(pos.x, 1.5, pos.z); // Elevated position
+    
+    // Rotate benches to face the ring
+    if (pos.x === -18) {
+      bench.rotation.y = 0; // Left side benches face right
+    } else if (pos.x === 18) {
+      bench.rotation.y = Math.PI; // Right side benches face left
+    } else {
+      bench.rotation.y = Math.PI / 2; // Top side benches face down
+    }
+    
+    scene.add(bench);
+  });
+  
+  // Add platforms for the second row
+  const platformGeometry = new THREE.BoxGeometry(3, 1, 20);
+  const platformMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 }); // Dark gray
+  
+  // Left platform
+  const leftPlatform = new THREE.Mesh(platformGeometry, platformMaterial);
+  leftPlatform.position.set(-18, 0.5, 1); // Position under the left benches
+  scene.add(leftPlatform);
+  
+  // Right platform
+  const rightPlatform = new THREE.Mesh(platformGeometry, platformMaterial);
+  rightPlatform.position.set(18, 0.5, 1); // Position under the right benches
+  scene.add(rightPlatform);
+  
+  // Top platform
+  const topPlatform = new THREE.Mesh(platformGeometry, platformMaterial);
+  topPlatform.rotation.y = Math.PI / 2; // Rotate to align with top benches
+  topPlatform.position.set(1, 0.5, -18); // Position under the top benches
+  scene.add(topPlatform);
 }
 
 // Create a sumo wrestler model
@@ -246,7 +329,7 @@ function createSumoModel(player) {
 function addPlayerToScene(player) {
   const model = createSumoModel(player);
   
-  // Position based on role
+  // Position the player based on their role
   if (player.role === 'fighter') {
     // Fighters are on the ring
     model.position.set(player.position.x, 0, player.position.z);
@@ -256,23 +339,34 @@ function addPlayerToScene(player) {
     // Make referee smaller
     model.scale.set(0.8, 0.8, 0.8);
   } else {
-    // Viewers are positioned around the ring
-    const viewerCount = gameState.viewers.length;
+    // Viewer positioning - now with two rows
     const viewerIndex = gameState.viewers.findIndex(v => v.id === player.id);
     
     if (viewerIndex !== -1) {
-      // Position viewers in a circle around the ring
+      // First 30 viewers go in the first row
       if (viewerIndex < 10) {
-        // Left side
-        model.position.set(-8, 0, -4 + viewerIndex);
+        // Left side - first row
+        model.position.set(-15, 1, -4 + viewerIndex);
         model.rotation.y = 0; // Face right
       } else if (viewerIndex < 20) {
-        // Right side
-        model.position.set(8, 0, -4 + (viewerIndex - 10));
+        // Right side - first row
+        model.position.set(15, 1, -4 + (viewerIndex - 10));
+        model.rotation.y = Math.PI; // Face left
+      } else if (viewerIndex < 30) {
+        // Top side - first row
+        model.position.set(-4 + (viewerIndex - 20), 1, -15);
+        model.rotation.y = Math.PI / 2; // Face down
+      } else if (viewerIndex < 40) {
+        // Left side - second row (elevated)
+        model.position.set(-18, 2.25, -4 + (viewerIndex - 30));
+        model.rotation.y = 0; // Face right
+      } else if (viewerIndex < 50) {
+        // Right side - second row (elevated)
+        model.position.set(18, 2.25, -4 + (viewerIndex - 40));
         model.rotation.y = Math.PI; // Face left
       } else {
-        // Top side
-        model.position.set(-4 + (viewerIndex - 20), 0, -8);
+        // Top side - second row (elevated)
+        model.position.set(-4 + (viewerIndex - 50), 2.25, -18);
         model.rotation.y = Math.PI / 2; // Face down
       }
     }
@@ -310,30 +404,71 @@ function showPlayerEmote(playerId, emoteType) {
   const model = playerModels[playerId];
   if (!model) return;
   
-  const emoteBubble = model.getObjectByName('emoteBubble');
-  if (!emoteBubble) return;
+  // Find or create an emote bubble for this player
+  let emoteBubble = model.getObjectByName('emoteBubble');
+  
+  if (!emoteBubble) {
+    // Create a new emote bubble
+    const bubbleGeometry = new THREE.PlaneGeometry(1, 1);
+    const bubbleMaterial = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0.9,
+      side: THREE.DoubleSide
+    });
+    
+    emoteBubble = new THREE.Mesh(bubbleGeometry, bubbleMaterial);
+    emoteBubble.position.set(0, 2, 0);
+    emoteBubble.name = 'emoteBubble';
+    emoteBubble.visible = false;
+    model.add(emoteBubble);
+  }
   
   if (emoteType) {
     emoteBubble.visible = true;
     
-    // Change color based on emote type
-    const material = emoteBubble.material;
+    // Create a canvas texture for the emote
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    
+    // Draw bubble background
+    ctx.fillStyle = 'white';
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(64, 64, 60, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    
+    // Draw emote
+    ctx.fillStyle = 'black';
+    ctx.font = '60px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    let emoteSymbol = '👍';
     switch (emoteType) {
       case 'cheer':
-        material.color.set(0xFFFF00); // Yellow
+        emoteSymbol = '👏';
         break;
       case 'laugh':
-        material.color.set(0x00FF00); // Green
+        emoteSymbol = '😂';
         break;
       case 'surprise':
-        material.color.set(0xFF00FF); // Purple
+        emoteSymbol = '😮';
         break;
       case 'angry':
-        material.color.set(0xFF0000); // Red
+        emoteSymbol = '😠';
         break;
-      default:
-        material.color.set(0xFFFFFF); // White
     }
+    
+    ctx.fillText(emoteSymbol, 64, 64);
+    
+    // Update the texture
+    const texture = new THREE.CanvasTexture(canvas);
+    emoteBubble.material.map = texture;
+    emoteBubble.material.needsUpdate = true;
   } else {
     emoteBubble.visible = false;
   }
@@ -344,8 +479,24 @@ function showPlayerMessage(playerId, message) {
   const model = playerModels[playerId];
   if (!model) return;
   
-  const textBubble = model.getObjectByName('textBubble');
-  if (!textBubble) return;
+  // Find or create a text bubble for this player
+  let textBubble = model.getObjectByName('textBubble');
+  
+  if (!textBubble) {
+    // Create a new text bubble
+    const bubbleGeometry = new THREE.PlaneGeometry(2, 1);
+    const bubbleMaterial = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0.9,
+      side: THREE.DoubleSide
+    });
+    
+    textBubble = new THREE.Mesh(bubbleGeometry, bubbleMaterial);
+    textBubble.position.set(0, 2.5, 0);
+    textBubble.name = 'textBubble';
+    textBubble.visible = false;
+    model.add(textBubble);
+  }
   
   if (message) {
     textBubble.visible = true;
@@ -364,33 +515,48 @@ function showPlayerMessage(playerId, message) {
     
     // Draw text
     ctx.fillStyle = 'black';
-    ctx.font = '20px Arial';
+    ctx.font = '20px "Sawarabi Mincho", serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
-    // Word wrap the text
+    // Word wrap the message
     const words = message.split(' ');
     let line = '';
-    let y = 40;
-    const maxWidth = 230;
+    let y = 64;
     const lineHeight = 24;
+    const maxWidth = 230;
     
-    for (let i = 0; i < words.length; i++) {
-      const testLine = line + words[i] + ' ';
-      const metrics = ctx.measureText(testLine);
-      const testWidth = metrics.width;
+    if (words.length === 1) {
+      // Single word, just center it
+      ctx.fillText(message, 128, 64);
+    } else {
+      // Multiple words, do word wrapping
+      let lines = [];
+      let currentLine = '';
       
-      if (testWidth > maxWidth && i > 0) {
-        ctx.fillText(line, 128, y);
-        line = words[i] + ' ';
-        y += lineHeight;
-      } else {
-        line = testLine;
+      for (let i = 0; i < words.length; i++) {
+        const testLine = currentLine + words[i] + ' ';
+        const metrics = ctx.measureText(testLine);
+        
+        if (metrics.width > maxWidth && i > 0) {
+          lines.push(currentLine);
+          currentLine = words[i] + ' ';
+        } else {
+          currentLine = testLine;
+        }
+      }
+      lines.push(currentLine);
+      
+      // Calculate starting Y based on number of lines
+      const startY = 64 - ((lines.length - 1) * lineHeight / 2);
+      
+      // Draw each line
+      for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i], 128, startY + (i * lineHeight));
       }
     }
-    ctx.fillText(line, 128, y);
     
-    // Apply the canvas as a texture
+    // Update the texture
     const texture = new THREE.CanvasTexture(canvas);
     textBubble.material.map = texture;
     textBubble.material.needsUpdate = true;
@@ -569,4 +735,200 @@ function animate() {
   });
   
   renderer.render(scene, camera);
+}
+
+// Update fighter ready state
+function updateFighterReadyState(fighterId, isReady) {
+  const model = playerModels[fighterId];
+  if (!model) return;
+  
+  // Add a visual indicator that the fighter is ready
+  if (isReady) {
+    // Create a ready indicator (e.g., a glowing aura)
+    const readyGeometry = new THREE.RingGeometry(1.5, 1.7, 32);
+    const readyMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0x00FF00,
+      transparent: true,
+      opacity: 0.7
+    });
+    const readyIndicator = new THREE.Mesh(readyGeometry, readyMaterial);
+    readyIndicator.rotation.x = Math.PI / 2; // Lay flat
+    readyIndicator.position.y = 0.1; // Just above the ground
+    readyIndicator.name = 'readyIndicator';
+    model.add(readyIndicator);
+  } else {
+    // Remove the ready indicator if it exists
+    const readyIndicator = model.getObjectByName('readyIndicator');
+    if (readyIndicator) {
+      model.remove(readyIndicator);
+    }
+  }
+}
+
+// Show match start animation
+function showMatchStartAnimation() {
+  // Create a text overlay
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  
+  // Draw background
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(0, 0, 512, 256);
+  
+  // Draw text
+  ctx.fillStyle = 'white';
+  ctx.font = 'bold 40px "Sawarabi Mincho", serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('FIGHT!', 256, 80);
+  
+  // Create a plane to display the text
+  const geometry = new THREE.PlaneGeometry(10, 5);
+  const texture = new THREE.CanvasTexture(canvas);
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    opacity: 1
+  });
+  
+  const matchStartPlane = new THREE.Mesh(geometry, material);
+  matchStartPlane.position.set(0, 5, 0);
+  matchStartPlane.name = 'matchStartPlane';
+  scene.add(matchStartPlane);
+  
+  // Animate the plane
+  let scale = 1;
+  const animateInterval = setInterval(() => {
+    scale += 0.05;
+    matchStartPlane.scale.set(scale, scale, scale);
+    matchStartPlane.material.opacity -= 0.02;
+    
+    if (matchStartPlane.material.opacity <= 0) {
+      clearInterval(animateInterval);
+      scene.remove(matchStartPlane);
+    }
+  }, 50);
+  
+  // Remove after a few seconds
+  setTimeout(() => {
+    clearInterval(animateInterval);
+    scene.remove(matchStartPlane);
+  }, 3000);
+}
+
+// Show match end animation
+function showMatchEndAnimation(winnerId, loserId, reason) {
+  // Create a text overlay
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  
+  // Draw background
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(0, 0, 512, 256);
+  
+  // Draw text
+  ctx.fillStyle = 'white';
+  ctx.font = 'bold 40px "Sawarabi Mincho", serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('MATCH OVER!', 256, 80);
+  
+  ctx.font = '30px "Sawarabi Mincho", serif';
+  if (winnerId) {
+    const winnerName = winnerId.substring(0, 6);
+    ctx.fillText(`Winner: ${winnerName}`, 256, 150);
+    
+    if (reason === 'disconnect') {
+      ctx.font = '20px "Sawarabi Mincho", serif';
+      ctx.fillText('(Opponent disconnected)', 256, 190);
+    }
+  } else {
+    ctx.fillText('No winner', 256, 150);
+  }
+  
+  // Create a plane to display the text
+  const geometry = new THREE.PlaneGeometry(10, 5);
+  const texture = new THREE.CanvasTexture(canvas);
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    opacity: 1
+  });
+  
+  const matchEndPlane = new THREE.Mesh(geometry, material);
+  matchEndPlane.position.set(0, 5, 0);
+  matchEndPlane.name = 'matchEndPlane';
+  scene.add(matchEndPlane);
+  
+  // Remove after a few seconds
+  setTimeout(() => {
+    scene.remove(matchEndPlane);
+  }, 5000);
+  
+  // If I'm the winner, add a crown to my model
+  if (winnerId === gameState.myId) {
+    const myModel = playerModels[gameState.myId];
+    if (myModel) {
+      const crownGeometry = new THREE.ConeGeometry(0.3, 0.5, 4);
+      const crownMaterial = new THREE.MeshBasicMaterial({ color: 0xFFD700 });
+      const crown = new THREE.Mesh(crownGeometry, crownMaterial);
+      crown.position.y = 1.8;
+      crown.name = 'victoryCrown';
+      myModel.add(crown);
+      
+      // Remove the crown after the victory ceremony
+      setTimeout(() => {
+        const crown = myModel.getObjectByName('victoryCrown');
+        if (crown) {
+          myModel.remove(crown);
+        }
+      }, 8000);
+    }
+  }
+}
+
+// Show match draw animation
+function showMatchDrawAnimation() {
+  // Create a text overlay
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  
+  // Draw background
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(0, 0, 512, 256);
+  
+  // Draw text
+  ctx.fillStyle = 'white';
+  ctx.font = 'bold 40px "Sawarabi Mincho", serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('TIME UP!', 256, 80);
+  
+  ctx.font = '30px "Sawarabi Mincho", serif';
+  ctx.fillText('Match ended in a draw', 256, 150);
+  
+  // Create a plane to display the text
+  const geometry = new THREE.PlaneGeometry(10, 5);
+  const texture = new THREE.CanvasTexture(canvas);
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    opacity: 1
+  });
+  
+  const drawPlane = new THREE.Mesh(geometry, material);
+  drawPlane.position.set(0, 5, 0);
+  drawPlane.name = 'drawPlane';
+  scene.add(drawPlane);
+  
+  // Remove after a few seconds
+  setTimeout(() => {
+    scene.remove(drawPlane);
+  }, 5000);
 } 
