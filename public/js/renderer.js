@@ -446,12 +446,15 @@ function addPlayerToScene(player) {
     model.position.set(0, RING_HEIGHT + 0.5, 0);
     model.scale.set(0.8, 0.8, 0.8);
   } else {
-    // Viewer positioning - now with two rows
-    const viewerIndex = gameState.viewers.findIndex(v => v.id === player.id);
+    // Viewer positioning - use a deterministic approach based on player ID
+    // This ensures the same player always gets the same seat
     
-    if (viewerIndex !== -1) {
-      positionViewer(model, viewerIndex);
-    }
+    // Convert player ID to a number for consistent seating
+    // We'll use the first 8 characters of the socket ID as a hex number
+    const idNumber = parseInt(player.id.substring(0, 8), 16);
+    const viewerIndex = idNumber % 60; // Limit to 60 seats (our bench capacity)
+    
+    positionViewer(model, viewerIndex);
   }
   
   // Add to scene and store in playerModels
