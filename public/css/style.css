@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Sawarabi+Mincho&display=swap');
-
 * {
     margin: 0;
     padding: 0;
@@ -7,34 +5,44 @@
 }
 
 body {
-    font-family: 'Sawarabi Mincho', serif;
+    font-family: 'Arial', sans-serif;
+    background-color: #f0f0f0;
     overflow: hidden;
-    background-color: #222;
 }
 
 #game-container {
-    position: relative;
     width: 100vw;
     height: 100vh;
+    position: relative;
 }
 
-#loading {
+#game-canvas {
+    width: 100%;
+    height: 100%;
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: white;
-    font-size: 24px;
+    top: 0;
+    left: 0;
+}
+
+#ui-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 20px;
+    pointer-events: none;
+    z-index: 100;
 }
 
 #game-info {
-    position: absolute;
-    top: 20px;
-    left: 20px;
     color: white;
-    background-color: rgba(0, 0, 0, 0.5);
-    padding: 10px;
-    border-radius: 5px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    margin-bottom: 20px;
+}
+
+#round-info {
+    font-size: 1.2em;
+    margin-top: 10px;
 }
 
 #emote-panel {
@@ -44,134 +52,37 @@ body {
     transform: translateX(-50%);
     display: flex;
     gap: 10px;
-    background-color: rgba(0, 0, 0, 0.5);
-    padding: 10px;
-    border-radius: 5px;
+    pointer-events: auto;
 }
 
 .emote-btn {
-    font-size: 24px;
     width: 50px;
     height: 50px;
-    border: none;
+    font-size: 24px;
     border-radius: 50%;
-    background-color: #444;
+    border: none;
+    background-color: white;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     cursor: pointer;
-    transition: transform 0.1s;
+    transition: transform 0.2s;
 }
 
 .emote-btn:hover {
     transform: scale(1.1);
-    background-color: #555;
-}
-
-.hidden {
-    display: none;
 }
 
 .emote-bubble {
     position: absolute;
     background-color: white;
-    border-radius: 15px;
-    padding: 5px 10px;
-    font-size: 20px;
-    white-space: nowrap;
-    animation: bubble-fade 2s forwards;
-    pointer-events: none;
+    border-radius: 20px;
+    padding: 10px 15px;
+    font-size: 24px;
+    animation: fadeOut 2s forwards;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-@keyframes bubble-fade {
-    0% { opacity: 0; transform: translateY(0); }
-    10% { opacity: 1; }
-    80% { opacity: 1; }
-    100% { opacity: 0; transform: translateY(-20px); }
-}
-
-#chat-input-container {
-    position: absolute;
-    bottom: 80px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 5px;
-    background-color: rgba(0, 0, 0, 0.5);
-    padding: 10px;
-    border-radius: 5px;
-    width: 300px;
-}
-
-#chat-input {
-    flex-grow: 1;
-    padding: 8px;
-    border: none;
-    border-radius: 3px;
-    background-color: #333;
-    color: white;
-}
-
-#chat-input:focus {
-    outline: none;
-    background-color: #444;
-}
-
-#chat-send-btn {
-    padding: 8px 15px;
-    border: none;
-    border-radius: 3px;
-    background-color: #4CAF50;
-    color: white;
-    cursor: pointer;
-}
-
-#chat-send-btn:hover {
-    background-color: #45a049;
-}
-
-.chat-bubble {
-    position: absolute;
-    background-color: white;
-    border-radius: 15px;
-    padding: 8px 15px;
-    font-size: 16px;
-    white-space: nowrap;
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    animation: bubble-fade 4s forwards;
-    pointer-events: none;
-    z-index: 10;
-}
-
-@keyframes bubble-fade {
-    0% { opacity: 0; transform: translateY(0); }
-    10% { opacity: 1; }
-    80% { opacity: 1; }
-    100% { opacity: 0; transform: translateY(-20px); }
-}
-
-.technique-instructions {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
-    padding: 15px;
-    border-radius: 5px;
-    font-family: Arial, sans-serif;
-    z-index: 100;
-    max-width: 300px;
-}
-
-.technique-instructions h3 {
-    margin-top: 0;
-    color: #FFD700;
-}
-
-.technique-instructions ul {
-    padding-left: 20px;
-    margin-bottom: 0;
-}
-
-.technique-instructions li {
-    margin-bottom: 5px;
+@keyframes fadeOut {
+    0% { opacity: 1; }
+    70% { opacity: 1; }
+    100% { opacity: 0; }
 } 

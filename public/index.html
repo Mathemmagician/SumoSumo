@@ -8,32 +8,27 @@
 </head>
 <body>
     <div id="game-container">
-        <div id="loading">Loading SumoSumo...</div>
-        <div id="emote-panel" class="hidden">
-            <button class="emote-btn" data-emote="cheer">🎉</button>
-            <button class="emote-btn" data-emote="laugh">😂</button>
-            <button class="emote-btn" data-emote="wow">😮</button>
-            <button class="emote-btn" data-emote="clap">👏</button>
-            <button class="emote-btn" data-emote="heart">❤️</button>
-        </div>
-        <div id="chat-input-container" class="hidden">
-            <input type="text" id="chat-input" placeholder="Type a message..." maxlength="30">
-            <button id="chat-send-btn">Send</button>
-        </div>
-        <div id="game-info" class="hidden">
-            <div id="status">Waiting for players...</div>
+        <div id="game-canvas"></div>
+        <div id="ui-container">
+            <div id="game-info">
+                <h1>SumoSumo</h1>
+                <div id="round-info">Waiting for players...</div>
+            </div>
+            <div id="emote-panel">
+                <button class="emote-btn" data-emote="cheer">🎉</button>
+                <button class="emote-btn" data-emote="laugh">😂</button>
+                <button class="emote-btn" data-emote="wow">😮</button>
+                <button class="emote-btn" data-emote="sad">😢</button>
+            </div>
         </div>
     </div>
 
-    <!-- Libraries -->
-    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.137.0/build/three.min.js"></script>
-    
-    <!-- Game scripts -->
-    <script src="js/utils.js"></script>
-    <script src="js/sumoFighter.js"></script>
-    <script src="js/referee.js"></script>
-    <script src="js/viewer.js"></script>
+    <!-- Scripts -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/socket-client.js"></script>
+    <script src="js/ui.js"></script>
     <script src="js/game.js"></script>
 </body>
 </html> 
