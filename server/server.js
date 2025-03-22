@@ -141,6 +141,7 @@ function progressToNextStage(currentStage) {
 function selectFighters() {
   // Need at least 2 viewers to start a round
   if (gameState.viewers.length < 2) {
+    console.log("Not enough viewers to select fighters");
     changeGameStage(GAME_STAGES.WAITING_FOR_PLAYERS);
     return;
   }
@@ -187,15 +188,27 @@ function selectFighters() {
 
 // Start pre-match ceremony
 function startPreMatchCeremony() {
+  // Check if we have enough fighters
+  if (gameState.fighters.length < 2) {
+    console.log("Not enough fighters for ceremony, returning to fighter selection");
+    changeGameStage(GAME_STAGES.FIGHTER_SELECTION);
+    return;
+  }
+  
   // Broadcast pre-match ceremony start
   io.emit('preCeremonyStart', {
-    fighters: gameState.fighters,
-    referee: gameState.referee
+    fighters: sanitizeForSocketIO(gameState.fighters),
+    referee: sanitizeForSocketIO(gameState.referee)
   });
   
   // Move fighters to ceremony positions
-  gameState.fighters[0].position = { x: -5, y: 0, z: 0 };
-  gameState.fighters[1].position = { x: 5, y: 0, z: 0 };
+  if (gameState.fighters[0]) {
+    gameState.fighters[0].position = { x: -5, y: 0, z: 0 };
+  }
+  
+  if (gameState.fighters[1]) {
+    gameState.fighters[1].position = { x: 5, y: 0, z: 0 };
+  }
   
   // Broadcast updated positions
   gameState.fighters.forEach(fighter => {
@@ -224,9 +237,26 @@ function startPreMatchCeremony() {
 
 // Start the actual match
 function startMatch() {
-  // Move fighters to starting positions
-  gameState.fighters[0].position = { x: -3, y: 0, z: 0 };
-  gameState.fighters[1].position = { x: 3, y: 0, z: 0 };
+  // Check if we have enough fighters
+  if (gameState.fighters.length < 2) {
+    console.log("Not enough fighters for match, returning to fighter selection");
+    changeGameStage(GAME_STAGES.FIGHTER_SELECTION);
+    return;
+  }
+  
+  // Reset fighter positions
+  if (gameState.fighters[0]) {
+    gameState.fighters[0].position = { x: -3, y: 0, z: 0 };
+  }
+  
+  if (gameState.fighters[1]) {
+    gameState.fighters[1].position = { x: 3, y: 0, z: 0 };
+  }
+  
+  // Broadcast match start
+  io.emit('matchStart', {
+    fighters: sanitizeForSocketIO(gameState.fighters)
+  });
   
   // Broadcast updated positions
   gameState.fighters.forEach(fighter => {
@@ -235,12 +265,6 @@ function startMatch() {
       position: fighter.position,
       rotation: fighter.rotation
     });
-  });
-  
-  // Announce match start
-  io.emit('matchStart', {
-    fighters: gameState.fighters,
-    referee: gameState.referee
   });
 }
 
@@ -286,6 +310,24 @@ function resetFighters() {
   gameState.fighters = [];
 }
 
+// Add this function to the server.js file
+function sanitizeForSocketIO(obj) {
+  // Create a new object with only the properties we need
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeForSocketIO(item));
+  } else if (obj && typeof obj === 'object') {
+    const newObj = {};
+    for (const key in obj) {
+      // Skip functions and circular references
+      if (typeof obj[key] !== 'function' && key !== 'socket') {
+        newObj[key] = sanitizeForSocketIO(obj[key]);
+      }
+    }
+    return newObj;
+  }
+  return obj;
+}
+
 // When a client connects
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
@@ -307,7 +349,9 @@ io.on('connection', (socket) => {
   
   // Send initial game state to the new player
   socket.emit('gameState', {
-    ...gameState,
+    fighters: sanitizeForSocketIO(gameState.fighters),
+    referee: sanitizeForSocketIO(gameState.referee),
+    viewers: sanitizeForSocketIO(gameState.viewers),
     currentStage: gameState.stage,
     stageTimeRemaining: gameState.stageDuration > 0 ? 
       gameState.stageDuration - (Date.now() - gameState.stageStartTime) : 0

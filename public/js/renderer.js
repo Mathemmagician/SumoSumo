@@ -24,8 +24,8 @@ function initScene(initialGameState) {
   scene.background = new THREE.Color(0x87CEEB); // Sky blue background
   
   // Create camera
-  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(-2, 5, 15);
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(-2, 10, 15);
   camera.lookAt(0, 0, 0);
   
   // Create renderer
