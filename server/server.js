@@ -66,7 +66,8 @@ function changeGameStage(newStage) {
   // Handle stage-specific logic
   switch (newStage) {
     case GAME_STAGES.WAITING_FOR_PLAYERS:
-      // Nothing to do, just wait for players
+      // Reset game state when waiting for players
+      resetGameState();
       break;
       
     case GAME_STAGES.FIGHTER_SELECTION:
@@ -139,6 +140,9 @@ function progressToNextStage(currentStage) {
 
 // Select fighters from viewers
 function selectFighters() {
+  // Always start with empty fighters array
+  gameState.fighters = [];
+  
   // Need at least 2 viewers to start a round
   if (gameState.viewers.length < 2) {
     console.log("Not enough viewers to select fighters");
@@ -148,12 +152,10 @@ function selectFighters() {
   
   // Select 2 random viewers to be fighters
   const fighter1Index = Math.floor(Math.random() * gameState.viewers.length);
-  const fighter1 = gameState.viewers[fighter1Index];
-  gameState.viewers.splice(fighter1Index, 1);
+  const fighter1 = gameState.viewers.splice(fighter1Index, 1)[0]; // Remove and get the viewer
   
   const fighter2Index = Math.floor(Math.random() * gameState.viewers.length);
-  const fighter2 = gameState.viewers[fighter2Index];
-  gameState.viewers.splice(fighter2Index, 1);
+  const fighter2 = gameState.viewers.splice(fighter2Index, 1)[0]; // Remove and get the viewer
   
   // Set their roles and positions
   fighter1.role = 'fighter';
@@ -167,22 +169,22 @@ function selectFighters() {
   fighter2.ready = false; // For pre-match ritual
   
   // Add them to fighters array
-  gameState.fighters = [fighter1, fighter2];
+  gameState.fighters.push(fighter1);
+  gameState.fighters.push(fighter2);
   
   // If no referee, select one
   if (!gameState.referee && gameState.viewers.length > 0) {
     const refereeIndex = Math.floor(Math.random() * gameState.viewers.length);
-    gameState.referee = gameState.viewers[refereeIndex];
-    gameState.viewers.splice(refereeIndex, 1);
+    gameState.referee = gameState.viewers.splice(refereeIndex, 1)[0]; // Remove and get the viewer
     gameState.referee.role = 'referee';
     gameState.referee.position = { x: 0, y: 0, z: 0 };
   }
   
   // Announce fighter selection
   io.emit('fightersSelected', {
-    fighter1: fighter1,
-    fighter2: fighter2,
-    referee: gameState.referee
+    fighter1: sanitizeForSocketIO(fighter1),
+    fighter2: sanitizeForSocketIO(fighter2),
+    referee: sanitizeForSocketIO(gameState.referee)
   });
 }
 
@@ -298,16 +300,23 @@ function endRound(loserId) {
 
 // Reset fighters after a match
 function resetFighters() {
-  // Move fighters back to viewers
+  // Move all current fighters to viewers
   gameState.fighters.forEach(fighter => {
     fighter.role = 'viewer';
-    fighter.position = { x: 0, y: 0, z: 0 };
-    fighter.ready = false;
     gameState.viewers.push(fighter);
+    
+    // Broadcast role change
+    io.emit('playerRoleChanged', {
+      id: fighter.id,
+      role: 'viewer'
+    });
   });
   
-  // Clear fighters array
+  // Clear the fighters array
   gameState.fighters = [];
+  
+  // Broadcast that the fighters have been reset
+  io.emit('fightersReset');
 }
 
 // Add this function to the server.js file
@@ -335,17 +344,17 @@ io.on('connection', (socket) => {
   // Create a new player
   const player = {
     id: socket.id,
+    role: 'viewer',
     position: { x: 0, y: 0, z: 0 },
     rotation: 0,
-    faceTexture: Math.floor(Math.random() * 10), // Random face texture (0-9)
-    role: 'viewer', // Start as viewer
-    emote: null,
-    message: null,
-    ready: false, // For pre-match ritual
+    ready: false
   };
   
-  // Add to viewers initially
+  // Add to viewers
   gameState.viewers.push(player);
+  
+  // Log current player counts for debugging
+  console.log(`Server player counts - Fighters: ${gameState.fighters.length}, Viewers: ${gameState.viewers.length}, Referee: ${gameState.referee ? 1 : 0}`);
   
   // Send initial game state to the new player
   socket.emit('gameState', {
@@ -358,7 +367,7 @@ io.on('connection', (socket) => {
   });
   
   // Broadcast new player to everyone else
-  socket.broadcast.emit('playerJoined', player);
+  socket.broadcast.emit('playerJoined', sanitizeForSocketIO(player));
   
   // Check if we should start the game
   if (gameState.stage === GAME_STAGES.WAITING_FOR_PLAYERS && gameState.viewers.length >= 2) {
@@ -484,8 +493,23 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
     
+    let wasPlayer = false;
+    let playerRole = null;
+    
+    // Determine the player's role before removing them
+    if (gameState.fighters.some(f => f.id === socket.id)) {
+      wasPlayer = true;
+      playerRole = 'fighter';
+    } else if (gameState.referee && gameState.referee.id === socket.id) {
+      wasPlayer = true;
+      playerRole = 'referee';
+    } else if (gameState.viewers.some(v => v.id === socket.id)) {
+      wasPlayer = true;
+      playerRole = 'viewer';
+    }
+    
     // Remove player from appropriate array
-    if (player.role === 'fighter') {
+    if (playerRole === 'fighter') {
       gameState.fighters = gameState.fighters.filter(f => f.id !== socket.id);
       
       // If a fighter leaves during a match, end the round
@@ -505,19 +529,18 @@ io.on('connection', (socket) => {
           changeGameStage(GAME_STAGES.POST_MATCH_COOLDOWN);
         }
       }
-    } else if (player.role === 'referee') {
+    } else if (playerRole === 'referee') {
       gameState.referee = null;
       
       // Select new referee if needed
       if (gameState.viewers.length > 0) {
         const newRefereeIndex = Math.floor(Math.random() * gameState.viewers.length);
-        gameState.referee = gameState.viewers[newRefereeIndex];
-        gameState.viewers.splice(newRefereeIndex, 1);
+        gameState.referee = gameState.viewers.splice(newRefereeIndex, 1)[0];
         gameState.referee.role = 'referee';
         
-        io.emit('newReferee', gameState.referee);
+        io.emit('newReferee', sanitizeForSocketIO(gameState.referee));
       }
-    } else {
+    } else if (playerRole === 'viewer') {
       gameState.viewers = gameState.viewers.filter(v => v.id !== socket.id);
     }
     
@@ -525,7 +548,7 @@ io.on('connection', (socket) => {
     io.emit('playerLeft', socket.id);
     
     // Check if we need to change stage due to lack of players
-    if (gameState.viewers.length + gameState.fighters.length < 2) {
+    if (wasPlayer && (gameState.viewers.length + gameState.fighters.length < 2)) {
       changeGameStage(GAME_STAGES.WAITING_FOR_PLAYERS);
     }
   });
@@ -536,6 +559,40 @@ function initGameState() {
   gameState.stage = GAME_STAGES.WAITING_FOR_PLAYERS;
   gameState.stageStartTime = Date.now();
   gameState.stageDuration = STAGE_DURATIONS[GAME_STAGES.WAITING_FOR_PLAYERS];
+}
+
+// Add a function to completely reset the game state
+function resetGameState() {
+  // First, move all fighters to viewers
+  gameState.fighters.forEach(fighter => {
+    fighter.role = 'viewer';
+    gameState.viewers.push(fighter);
+    
+    // Broadcast role change
+    io.emit('playerRoleChanged', {
+      id: fighter.id,
+      role: 'viewer'
+    });
+  });
+  
+  // Move referee to viewers if exists
+  if (gameState.referee) {
+    gameState.referee.role = 'viewer';
+    gameState.viewers.push(gameState.referee);
+    
+    // Broadcast role change
+    io.emit('playerRoleChanged', {
+      id: gameState.referee.id,
+      role: 'viewer'
+    });
+  }
+  
+  // Clear arrays AFTER moving players
+  gameState.fighters = [];
+  gameState.referee = null;
+  
+  // Broadcast the reset
+  io.emit('gameStateReset');
 }
 
 // Start the server

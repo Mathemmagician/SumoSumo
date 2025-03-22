@@ -321,20 +321,27 @@ function positionViewer(model, viewerIndex) {
 
 // Create a sumo wrestler model
 function createSumoModel(player) {
-  const group = new THREE.Group();
+  // Create the sumo model
+  const model = new THREE.Group();
+  
+  // Store the player's role in userData for future reference
+  model.userData = {
+    id: player.id,
+    role: player.role
+  };
   
   // Body (sphere)
   const bodyGeometry = new THREE.SphereGeometry(1, 32, 32);
   const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700 }); // Gold color for the sumo mawashi
   const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-  group.add(body);
+  model.add(body);
   
   // Head (smaller sphere)
   const headGeometry = new THREE.SphereGeometry(0.5, 32, 32);
   const headMaterial = new THREE.MeshStandardMaterial({ color: 0xFFE4C4 }); // Bisque color
   const head = new THREE.Mesh(headGeometry, headMaterial);
   head.position.y = 1;
-  group.add(head);
+  model.add(head);
   
   // Face (use texture)
   const faceGeometry = new THREE.PlaneGeometry(0.5, 0.5);
@@ -344,7 +351,7 @@ function createSumoModel(player) {
   });
   const face = new THREE.Mesh(faceGeometry, faceMaterial);
   face.position.set(0, 1, 0.51); // Slightly in front of the head
-  group.add(face);
+  model.add(face);
   
   // Arms
   const armGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.8, 16);
@@ -353,12 +360,12 @@ function createSumoModel(player) {
   const leftArm = new THREE.Mesh(armGeometry, armMaterial);
   leftArm.position.set(-0.8, 0.2, 0);
   leftArm.rotation.z = Math.PI / 4;
-  group.add(leftArm);
+  model.add(leftArm);
   
   const rightArm = new THREE.Mesh(armGeometry, armMaterial);
   rightArm.position.set(0.8, 0.2, 0);
   rightArm.rotation.z = -Math.PI / 4;
-  group.add(rightArm);
+  model.add(rightArm);
   
   // Legs
   const legGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.6, 16);
@@ -366,11 +373,11 @@ function createSumoModel(player) {
   
   const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
   leftLeg.position.set(-0.4, -0.8, 0);
-  group.add(leftLeg);
+  model.add(leftLeg);
   
   const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
   rightLeg.position.set(0.4, -0.8, 0);
-  group.add(rightLeg);
+  model.add(rightLeg);
   
   // Add emote bubble (hidden by default)
   const bubbleGeometry = new THREE.SphereGeometry(0.4, 16, 16);
@@ -383,7 +390,7 @@ function createSumoModel(player) {
   emoteBubble.position.set(0, 2, 0);
   emoteBubble.visible = false;
   emoteBubble.name = 'emoteBubble';
-  group.add(emoteBubble);
+  model.add(emoteBubble);
   
   // Add text bubble (hidden by default)
   const textBubbleGeometry = new THREE.PlaneGeometry(2, 0.8);
@@ -396,15 +403,15 @@ function createSumoModel(player) {
   textBubble.position.set(0, 2.2, 0);
   textBubble.visible = false;
   textBubble.name = 'textBubble';
-  group.add(textBubble);
+  model.add(textBubble);
   
   // Set initial position and rotation
-  group.position.set(
+  model.position.set(
     player.position.x,
     player.position.y,
     player.position.z
   );
-  group.rotation.y = player.rotation || 0;
+  model.rotation.y = player.rotation || 0;
   
   // Add role indicator
   let roleMaterial;
@@ -422,9 +429,9 @@ function createSumoModel(player) {
   );
   roleIndicator.position.y = 2;
   roleIndicator.name = 'roleIndicator';
-  group.add(roleIndicator);
+  model.add(roleIndicator);
   
-  return group;
+  return model;
 }
 
 // Add a player to the scene
@@ -447,10 +454,6 @@ function addPlayerToScene(player) {
     model.scale.set(0.8, 0.8, 0.8);
   } else {
     // Viewer positioning - use a deterministic approach based on player ID
-    // This ensures the same player always gets the same seat
-    
-    // Convert player ID to a number for consistent seating
-    // We'll use the first 8 characters of the socket ID as a hex number
     const idNumber = parseInt(player.id.substring(0, 8), 16);
     const viewerIndex = idNumber % 60; // Limit to 60 seats (our bench capacity)
     

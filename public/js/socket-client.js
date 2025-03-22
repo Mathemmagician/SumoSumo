@@ -35,9 +35,11 @@ function connectToServer() {
   // Receive initial game state
   socket.on('gameState', (state) => {
     console.log('Received game state:', state);
-    gameState.fighters = state.fighters;
-    gameState.referee = state.referee;
-    gameState.viewers = state.viewers;
+    
+    // Replace our local state with the server state
+    gameState.fighters = state.fighters || [];
+    gameState.viewers = state.viewers || [];
+    gameState.referee = state.referee || null;
     gameState.stage = state.currentStage;
     gameState.stageTimeRemaining = state.stageTimeRemaining;
     
@@ -53,6 +55,9 @@ function connectToServer() {
     if (gameState.stageTimeRemaining > 0) {
       startStageTimer(gameState.stageTimeRemaining);
     }
+    
+    // Debug log
+    logPlayerCounts("After gameState event");
   });
   
   // Handle stage change
@@ -82,24 +87,40 @@ function connectToServer() {
   socket.on('playerJoined', (player) => {
     console.log('Player joined:', player);
     
+    // Don't add myself again (I'm already in the gameState from the initial state)
+    if (player.id === gameState.myId) {
+      console.log('Ignoring playerJoined for myself');
+      return;
+    }
+    
+    // Add to the appropriate array based on role
     if (player.role === 'fighter') {
-      gameState.fighters.push(player);
+      // Make sure not already in fighters array
+      if (!gameState.fighters.some(f => f.id === player.id)) {
+        gameState.fighters.push(player);
+      }
     } else if (player.role === 'referee') {
       gameState.referee = player;
     } else {
-      gameState.viewers.push(player);
+      // Make sure not already in viewers array
+      if (!gameState.viewers.some(v => v.id === player.id)) {
+        gameState.viewers.push(player);
+      }
     }
     
-    // Add the player to the scene
+    // Add to scene
     addPlayerToScene(player);
     updateUI();
+    
+    // Debug log
+    logPlayerCounts("After playerJoined event");
   });
   
   // Player left
   socket.on('playerLeft', (playerId) => {
     console.log('Player left:', playerId);
     
-    // Remove from appropriate array
+    // Remove from all arrays
     gameState.fighters = gameState.fighters.filter(f => f.id !== playerId);
     if (gameState.referee && gameState.referee.id === playerId) {
       gameState.referee = null;
@@ -109,6 +130,9 @@ function connectToServer() {
     // Remove from scene
     removePlayerFromScene(playerId);
     updateUI();
+    
+    // Debug log
+    logPlayerCounts("After playerLeft event");
   });
   
   // Player moved
@@ -213,6 +237,117 @@ function connectToServer() {
     updateScene();
     updateUI();
   });
+  
+  // Handle game state reset
+  socket.on('gameStateReset', () => {
+    console.log('Game state reset received');
+    
+    // Keep track of all players
+    const allPlayers = [
+      ...gameState.fighters,
+      ...gameState.viewers
+    ];
+    
+    if (gameState.referee) {
+      allPlayers.push(gameState.referee);
+    }
+    
+    // Reset arrays
+    gameState.fighters = [];
+    gameState.referee = null;
+    
+    // All players become viewers
+    gameState.viewers = allPlayers.map(player => {
+      player.role = 'viewer';
+      return player;
+    });
+    
+    // Update my role
+    gameState.myRole = 'viewer';
+    
+    // Update UI and scene
+    updateUI();
+    updateStageDisplay();
+    updateScene();
+  });
+  
+  // Update the fightersReset handler
+  socket.on('fightersReset', () => {
+    console.log('Fighters reset');
+    
+    // Update our local game state
+    gameState.fighters = [];
+    
+    // If I was a fighter, I'm now a viewer
+    if (gameState.myRole === 'fighter') {
+      gameState.myRole = 'viewer';
+    }
+    
+    // Update UI
+    updateUI();
+  });
+
+  // Add a playerRoleChanged event handler
+  socket.on('playerRoleChanged', (data) => {
+    console.log('Player role changed:', data);
+    
+    const { id, role } = data;
+    
+    // Update local game state based on role change
+    if (role === 'fighter') {
+      // Remove from other arrays if present
+      gameState.viewers = gameState.viewers.filter(v => v.id !== id);
+      if (gameState.referee && gameState.referee.id === id) {
+        gameState.referee = null;
+      }
+      
+      // Check if already in fighters array
+      if (!gameState.fighters.some(f => f.id === id)) {
+        // Find the player in our local state
+        const player = findPlayerInGameState(id);
+        if (player) {
+          player.role = 'fighter';
+          gameState.fighters.push(player);
+        }
+      }
+    } else if (role === 'referee') {
+      // Remove from other arrays if present
+      gameState.fighters = gameState.fighters.filter(f => f.id !== id);
+      gameState.viewers = gameState.viewers.filter(v => v.id !== id);
+      
+      // Find the player in our local state
+      const player = findPlayerInGameState(id);
+      if (player) {
+        player.role = 'referee';
+        gameState.referee = player;
+      }
+    } else if (role === 'viewer') {
+      // Remove from other arrays if present
+      gameState.fighters = gameState.fighters.filter(f => f.id !== id);
+      if (gameState.referee && gameState.referee.id === id) {
+        gameState.referee = null;
+      }
+      
+      // Check if already in viewers array
+      if (!gameState.viewers.some(v => v.id === id)) {
+        // Find the player in our local state
+        const player = findPlayerInGameState(id);
+        if (player) {
+          player.role = 'viewer';
+          gameState.viewers.push(player);
+        }
+      }
+    }
+    
+    // If this is me, update my role
+    if (id === gameState.myId) {
+      gameState.myRole = role;
+    }
+    
+    // Update UI and scene
+    updateUI();
+    updateScene();
+  });
 }
 
 // Determine my role based on the game state
@@ -230,18 +365,44 @@ function determineMyRole() {
 
 // Update the UI based on the current game state
 function updateUI() {
+  // Update role display
   const roleDisplay = document.getElementById('role-display');
-  const playersCount = document.getElementById('players-count');
-  
   if (roleDisplay) {
-    roleDisplay.textContent = `Your role: ${gameState.myRole.toUpperCase()}`;
+    roleDisplay.textContent = `Your Role: ${gameState.myRole.charAt(0).toUpperCase() + gameState.myRole.slice(1)}`;
   }
   
+  // Update player count - ensure we don't double-count players
+  const playersCount = document.getElementById('players-count');
   if (playersCount) {
-    const totalPlayers = gameState.fighters.length + 
-                         (gameState.referee ? 1 : 0) + 
-                         gameState.viewers.length;
+    // Get unique player IDs to avoid counting duplicates
+    const playerIds = new Set();
+    
+    // Add fighter IDs
+    gameState.fighters.forEach(fighter => playerIds.add(fighter.id));
+    
+    // Add referee ID if exists
+    if (gameState.referee) {
+      playerIds.add(gameState.referee.id);
+    }
+    
+    // Add viewer IDs
+    gameState.viewers.forEach(viewer => playerIds.add(viewer.id));
+    
+    // Count unique players
+    const totalPlayers = playerIds.size;
+    
+    // Log for debugging
+    console.log("Unique player IDs:", Array.from(playerIds));
+    console.log("Total unique players:", totalPlayers);
+    
     playersCount.textContent = `Players: ${totalPlayers}`;
+  }
+  
+  // Show/hide ritual ready button
+  const ritualReadyButton = document.getElementById('ritual-ready-button');
+  if (ritualReadyButton) {
+    ritualReadyButton.style.display = 
+      (gameState.myRole === 'fighter' && gameState.stage === 'PRE_MATCH_CEREMONY') ? 'block' : 'none';
   }
 }
 
@@ -362,6 +523,67 @@ function showMatchDraw() {
   }
 }
 
+// Helper function to find a player in any array
+function findPlayerInGameState(id) {
+  // Check fighters
+  const fighter = gameState.fighters.find(f => f.id === id);
+  if (fighter) return fighter;
+  
+  // Check referee
+  if (gameState.referee && gameState.referee.id === id) {
+    return gameState.referee;
+  }
+  
+  // Check viewers
+  const viewer = gameState.viewers.find(v => v.id === id);
+  if (viewer) return viewer;
+  
+  return null;
+}
+
+// Add a function to update the scene based on current game state
+function updateScene() {
+  // Update all player positions and roles in the scene
+  [...gameState.fighters, ...gameState.viewers].forEach(player => {
+    updatePlayerInScene(player);
+  });
+  
+  if (gameState.referee) {
+    updatePlayerInScene(gameState.referee);
+  }
+}
+
+// Update a player in the scene
+function updatePlayerInScene(player) {
+  // If player already exists in scene, update it
+  if (playerModels[player.id]) {
+    // Update position and role
+    updatePlayerPosition(player.id, player.position, player.rotation);
+    
+    // If role changed, we need to reposition
+    const model = playerModels[player.id];
+    if (model.userData.role !== player.role) {
+      model.userData.role = player.role;
+      
+      // Reposition based on new role
+      if (player.role === 'fighter') {
+        // Fighter position is already handled by server
+      } else if (player.role === 'referee') {
+        model.position.set(0, RING_HEIGHT + 0.5, 0);
+        model.scale.set(0.8, 0.8, 0.8);
+      } else {
+        // Viewer - use deterministic positioning
+        const idNumber = parseInt(player.id.substring(0, 8), 16);
+        const viewerIndex = idNumber % 60;
+        positionViewer(model, viewerIndex);
+      }
+    }
+  } else {
+    // Player doesn't exist in scene, add it
+    addPlayerToScene(player);
+  }
+}
+
 // Initialize the connection when the page loads
 window.addEventListener('load', connectToServer);
 
@@ -374,4 +596,16 @@ window.addEventListener('keydown', (e) => {
   } else if (e.key === 'ArrowRight' || e.key === 'd') {
     sendMovement('right');
   }
-}); 
+});
+
+// Add a helper function for debugging
+function logPlayerCounts(context) {
+  const totalPlayers = gameState.fighters.length + gameState.viewers.length + (gameState.referee ? 1 : 0);
+  console.log(`${context} - Total players: ${totalPlayers}`);
+  console.log(`Fighters: ${gameState.fighters.length}, Viewers: ${gameState.viewers.length}, Referee: ${gameState.referee ? 1 : 0}`);
+  
+  // Log all player IDs for debugging
+  console.log("Fighter IDs:", gameState.fighters.map(f => f.id));
+  console.log("Viewer IDs:", gameState.viewers.map(v => v.id));
+  console.log("Referee ID:", gameState.referee ? gameState.referee.id : "none");
+} 
