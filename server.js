@@ -24,14 +24,222 @@ const gameState = {
   currentFight: null
 };
 
+// Add these variables at the top of the file with other game state variables
+const viewerPositions = {
+  grid: [],
+  gridSize: 1.8, // Increased size to ensure no overlaps (larger than viewer diameter)
+  ringRadius: 5,  // Should match the ring radius
+  minDistance: 2.0, // Minimum distance between viewers (increased)
+  occupiedPositions: [] // Track actual world positions that are occupied
+};
+
+// Initialize the grid
+function initViewerGrid() {
+  viewerPositions.grid = [];
+  viewerPositions.occupiedPositions = [];
+  
+  // Calculate grid dimensions based on ring size
+  const gridWidth = Math.ceil((viewerPositions.ringRadius * 3) / viewerPositions.gridSize);
+  const gridHeight = Math.ceil((viewerPositions.ringRadius * 3) / viewerPositions.gridSize);
+  
+  // Initialize empty grid
+  for (let x = 0; x < gridWidth; x++) {
+    viewerPositions.grid[x] = [];
+    for (let y = 0; y < gridHeight; y++) {
+      viewerPositions.grid[x][y] = false; // false means position is available
+    }
+  }
+  
+  // Mark center area (the ring) as unavailable
+  const centerX = Math.floor(gridWidth / 2);
+  const centerY = Math.floor(gridHeight / 2);
+  const ringCells = Math.ceil(viewerPositions.ringRadius / viewerPositions.gridSize) + 1; // Add buffer
+  
+  for (let x = centerX - ringCells; x <= centerX + ringCells; x++) {
+    for (let y = centerY - ringCells; y <= centerY + ringCells; y++) {
+      if (x >= 0 && x < gridWidth && y >= 0 && y < gridHeight) {
+        viewerPositions.grid[x][y] = true; // Mark as occupied
+      }
+    }
+  }
+  
+  // Mark positions below the ring bottom line as unavailable
+  // Convert world y = -5 to grid coordinates
+  const bottomLineGridY = Math.floor((-5 / viewerPositions.gridSize) + centerY);
+  for (let x = 0; x < gridWidth; x++) {
+    for (let y = 0; y < gridHeight; y++) {
+      // Mark positions below the bottom line as unavailable
+      if (y < bottomLineGridY) {
+        viewerPositions.grid[x][y] = true;
+      }
+      
+      // Mark positions too far up as unavailable
+      // Convert world y = 8 to grid coordinates
+      const topLineGridY = Math.floor((8 / viewerPositions.gridSize) + centerY);
+      if (y > topLineGridY) {
+        viewerPositions.grid[x][y] = true;
+      }
+    }
+  }
+  
+  console.log(`Initialized viewer grid: ${gridWidth}x${gridHeight}, ring cells: ${ringCells}`);
+  console.log(`Vertical constraints: bottom line at grid y=${bottomLineGridY}, top line at grid y=${Math.floor((8 / viewerPositions.gridSize) + centerY)}`);
+}
+
+// Get a free position for a new viewer
+function getRandomViewerPosition() {
+  // Initialize grid if not already done
+  if (viewerPositions.grid.length === 0) {
+    initViewerGrid();
+  }
+  
+  const gridWidth = viewerPositions.grid.length;
+  const gridHeight = viewerPositions.grid[0].length;
+  
+  // Find all available positions with vertical constraints
+  const availablePositions = [];
+  for (let x = 0; x < gridWidth; x++) {
+    for (let y = 0; y < gridHeight; y++) {
+      if (!viewerPositions.grid[x][y]) {
+        // Convert to world coordinates to check vertical constraints
+        const worldX = (x - Math.floor(gridWidth / 2)) * viewerPositions.gridSize;
+        const worldY = (y - Math.floor(gridHeight / 2)) * viewerPositions.gridSize;
+        
+        // Don't allow positions below the ring bottom line (y < -5)
+        // Don't allow positions too far up (y > 8)
+        if (worldY >= -5 && worldY <= 8) {
+          availablePositions.push({ x, y, worldX, worldY });
+        }
+      }
+    }
+  }
+  
+  // If no positions available, expand the grid
+  if (availablePositions.length === 0) {
+    expandViewerGrid();
+    return getRandomViewerPosition();
+  }
+  
+  // Select a random available position
+  const randomIndex = Math.floor(Math.random() * availablePositions.length);
+  const gridPos = availablePositions[randomIndex];
+  
+  // Mark as occupied
+  viewerPositions.grid[gridPos.x][gridPos.y] = true;
+  
+  // Use the pre-calculated world coordinates
+  const worldX = gridPos.worldX;
+  const worldY = gridPos.worldY;
+  
+  // Add some small random offset within the cell to avoid perfect grid alignment
+  const offsetX = (Math.random() * 0.4 - 0.2) * viewerPositions.gridSize;
+  const offsetY = (Math.random() * 0.4 - 0.2) * viewerPositions.gridSize;
+  
+  const position = { 
+    x: worldX + offsetX, 
+    y: worldY + offsetY, 
+    z: 0,
+    gridX: gridPos.x,
+    gridY: gridPos.y
+  };
+  
+  // Store the occupied position
+  viewerPositions.occupiedPositions.push(position);
+  
+  console.log(`Assigned viewer position: (${position.x.toFixed(2)}, ${position.y.toFixed(2)}) at grid (${gridPos.x}, ${gridPos.y})`);
+  
+  return position;
+}
+
+// Expand the grid when needed
+function expandViewerGrid() {
+  console.log("Expanding viewer grid...");
+  
+  const oldGrid = viewerPositions.grid;
+  const oldWidth = oldGrid.length;
+  const oldHeight = oldGrid[0].length;
+  
+  // Create a new larger grid
+  const newWidth = oldWidth + 6; // Add 3 cells on each side
+  const newHeight = oldHeight + 6; // Add 3 cells on each side
+  
+  viewerPositions.grid = [];
+  for (let x = 0; x < newWidth; x++) {
+    viewerPositions.grid[x] = [];
+    for (let y = 0; y < newHeight; y++) {
+      viewerPositions.grid[x][y] = false; // Initialize as available
+    }
+  }
+  
+  // Copy old grid values to the center of the new grid
+  const offsetX = 3;
+  const offsetY = 3;
+  for (let x = 0; x < oldWidth; x++) {
+    for (let y = 0; y < oldHeight; y++) {
+      viewerPositions.grid[x + offsetX][y + offsetY] = oldGrid[x][y];
+    }
+  }
+  
+  // Update stored positions with new grid coordinates
+  viewerPositions.occupiedPositions.forEach(pos => {
+    if (pos.gridX !== undefined && pos.gridY !== undefined) {
+      pos.gridX += offsetX;
+      pos.gridY += offsetY;
+    }
+  });
+  
+  console.log(`Grid expanded from ${oldWidth}x${oldHeight} to ${newWidth}x${newHeight}`);
+}
+
+// Free up a position when a viewer leaves
+function freeViewerPosition(position) {
+  // Remove from occupied positions list
+  const posIndex = viewerPositions.occupiedPositions.findIndex(
+    pos => Math.abs(pos.x - position.x) < 0.1 && Math.abs(pos.y - position.y) < 0.1
+  );
+  
+  if (posIndex !== -1) {
+    const pos = viewerPositions.occupiedPositions[posIndex];
+    
+    // If we have grid coordinates stored, free up the grid cell
+    if (pos.gridX !== undefined && pos.gridY !== undefined) {
+      if (pos.gridX >= 0 && pos.gridX < viewerPositions.grid.length && 
+          pos.gridY >= 0 && pos.gridY < viewerPositions.grid[0].length) {
+        viewerPositions.grid[pos.gridX][pos.gridY] = false;
+        console.log(`Freed grid position (${pos.gridX}, ${pos.gridY})`);
+      }
+    } else {
+      // Fallback if we don't have grid coordinates
+      const gridWidth = viewerPositions.grid.length;
+      const gridHeight = viewerPositions.grid[0].length;
+      
+      // Convert world coordinates to grid position
+      const gridX = Math.floor((position.x / viewerPositions.gridSize) + (gridWidth / 2));
+      const gridY = Math.floor((position.y / viewerPositions.gridSize) + (gridHeight / 2));
+      
+      // Check if position is within grid bounds
+      if (gridX >= 0 && gridX < gridWidth && gridY >= 0 && gridY < gridHeight) {
+        viewerPositions.grid[gridX][gridY] = false;
+        console.log(`Freed grid position (${gridX}, ${gridY}) from world coords`);
+      }
+    }
+    
+    // Remove from occupied positions array
+    viewerPositions.occupiedPositions.splice(posIndex, 1);
+  } else {
+    console.log(`Could not find position to free: (${position.x.toFixed(2)}, ${position.y.toFixed(2)})`);
+  }
+}
+
 // Handle socket connections
 io.on('connection', (socket) => {
   console.log('New user connected:', socket.id);
   
-  // Add new user as a viewer
+  // Add new user as a viewer with improved positioning
+  const position = getRandomViewerPosition();
   const newViewer = {
     id: socket.id,
-    position: getRandomViewerPosition(),
+    position: position,
     color: getRandomColor()
   };
   
@@ -46,6 +254,12 @@ io.on('connection', (socket) => {
   // Handle disconnection
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
+    
+    // Find the user's position before removing them
+    const viewer = gameState.viewers.find(v => v.id === socket.id);
+    if (viewer) {
+      freeViewerPosition(viewer.position);
+    }
     
     // Remove user from viewers or fighters
     removeUser(socket.id);
@@ -111,51 +325,34 @@ io.on('connection', (socket) => {
   });
 });
 
-// Helper functions
-function getRandomViewerPosition() {
-  // Randomly place viewers on left, right, or top
-  const area = Math.floor(Math.random() * 3); // 0: left, 1: right, 2: top
-  
-  let x, y, z;
-  
-  switch (area) {
-    case 0: // left
-      x = -10;
-      y = Math.random() * 6 - 3;
-      z = 0;
-      break;
-    case 1: // right
-      x = 10;
-      y = Math.random() * 6 - 3;
-      z = 0;
-      break;
-    case 2: // top
-      x = Math.random() * 16 - 8;
-      y = 7;
-      z = 0;
-      break;
-  }
-  
-  return { x, y, z };
-}
-
 function getRandomColor() {
   return '#' + Math.floor(Math.random() * 16777215).toString(16);
 }
 
+// Update the removeUser function to free up positions
 function removeUser(userId) {
-  // Remove from viewers
-  gameState.viewers = gameState.viewers.filter(viewer => viewer.id !== userId);
+  // Check if user is a viewer
+  const viewerIndex = gameState.viewers.findIndex(viewer => viewer.id === userId);
+  if (viewerIndex !== -1) {
+    // Free up the position
+    freeViewerPosition(gameState.viewers[viewerIndex].position);
+    // Remove from viewers array
+    gameState.viewers.splice(viewerIndex, 1);
+    return;
+  }
   
-  // Remove from fighters
-  gameState.fighters = gameState.fighters.filter(fighter => fighter.id !== userId);
-  
-  // If a fighter left, select new fighters
-  if (gameState.fighters.length < 2 && gameState.currentFight) {
-    endCurrentFight();
-    if (gameState.viewers.length >= 2) {
-      selectNewFighters();
+  // Check if user is a fighter
+  const fighterIndex = gameState.fighters.findIndex(fighter => fighter.id === userId);
+  if (fighterIndex !== -1) {
+    // End the fight if a fighter disconnects
+    const otherFighterIndex = fighterIndex === 0 ? 1 : 0;
+    if (gameState.fighters[otherFighterIndex]) {
+      endFight(gameState.fighters[otherFighterIndex].id, userId);
+    } else {
+      // Just remove the fighter if there's no opponent
+      gameState.fighters.splice(fighterIndex, 1);
     }
+    return;
   }
 }
 
@@ -270,7 +467,7 @@ function endFight(winnerId, loserId) {
   // End current fight
   endCurrentFight();
   
-  // After a short delay, return fighters to viewers and select new fighters
+  // After a short delay, return fighters to viewers
   setTimeout(() => {
     // Return fighters to viewers
     const fighter1 = gameState.fighters[0];
@@ -289,7 +486,7 @@ function endFight(winnerId, loserId) {
       if (fighter) {
         const newViewer = {
           id: fighter.id,
-          position: getRandomViewerPosition(),
+          position: getRandomViewerPosition(), // Use our new positioning system
           color: fighter.color
         };
         
@@ -302,7 +499,7 @@ function endFight(winnerId, loserId) {
     io.emit('fightersReturnedToViewers', {
       fighter1Id: fighter1 ? fighter1.id : null,
       fighter2Id: fighter2 ? fighter2.id : null,
-      newViewers: newViewers // Send the new viewer objects to all clients
+      newViewers: newViewers
     });
     
     // After another short delay, select new fighters
@@ -310,8 +507,8 @@ function endFight(winnerId, loserId) {
       if (gameState.viewers.length >= 2) {
         selectNewFighters();
       }
-    }, 2000); // Increased delay to ensure proper transition
-  }, 2000); // Increased delay to ensure proper transition
+    }, 2000);
+  }, 2000);
 }
 
 function endCurrentFight() {
