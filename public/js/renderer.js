@@ -6,8 +6,11 @@ let faceTextures = [];
 
 // Constants for scene dimensions
 const RING_RADIUS = 7; // Base measurement for the scene
-const RING_HEIGHT = 0.5;
+const RING_HEIGHT = 1.0;
 const FLOOR_SIZE = RING_RADIUS * 5;
+
+const SQUARE_RING_RADIUS = RING_RADIUS + 0.5;
+const SQUARE_BOTTOM_RADIUS = SQUARE_RING_RADIUS + 0.7;
 
 // Initialize the 3D scene
 function initScene(initialGameState) {
@@ -197,6 +200,17 @@ function generateFaceTextures() {
 
 // Create the sumo ring
 function createRing() {
+  const squareBase = new THREE.BufferGeometry();
+  squareBase.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    // Bottom (y=0): 4 vertices
+    -SQUARE_BOTTOM_RADIUS,0,-SQUARE_BOTTOM_RADIUS,  SQUARE_BOTTOM_RADIUS,0,-SQUARE_BOTTOM_RADIUS,  SQUARE_BOTTOM_RADIUS,0,SQUARE_BOTTOM_RADIUS,  -SQUARE_BOTTOM_RADIUS,0,SQUARE_BOTTOM_RADIUS,
+    // Top (y=1): 4 vertices
+    -SQUARE_RING_RADIUS,RING_HEIGHT,-SQUARE_RING_RADIUS,  SQUARE_RING_RADIUS,RING_HEIGHT,-SQUARE_RING_RADIUS,  SQUARE_RING_RADIUS,RING_HEIGHT,SQUARE_RING_RADIUS,  -SQUARE_RING_RADIUS,RING_HEIGHT,SQUARE_RING_RADIUS
+  ]), 3));
+  squareBase.setIndex([0,1,2,0,2,3,4,6,5,4,7,6,0,4,5,0,5,1,1,5,6,1,6,2,2,6,7,2,7,3,3,7,4,3,4,0]);
+  squareBase.computeVertexNormals();
+  scene.add(new THREE.Mesh(squareBase, new THREE.MeshLambertMaterial({ color: 0xD2B48C,  })));  
+
   // Create the sumo ring (dohyo)
   const ringGeometry = new THREE.CylinderGeometry(RING_RADIUS, RING_RADIUS, RING_HEIGHT, 32);
   const ringMaterial = new THREE.MeshLambertMaterial({ color: 0xD2B48C }); // Tan color
@@ -784,4 +798,38 @@ function showMatchDrawAnimation() {
   setTimeout(() => {
     scene.remove(drawPlane);
   }, 5000);
+}
+
+// Example of loading a texture and assigning it to a material
+function createTexturedMaterial(texturePath) {
+  return new Promise((resolve, reject) => {
+    textureLoader.load(
+      texturePath,
+      (texture) => {
+        const material = new THREE.MeshBasicMaterial({
+          map: texture,
+          transparent: true,
+          opacity: 1
+        });
+        resolve(material);
+      },
+      undefined,
+      (error) => {
+        console.error('Error loading texture:', error);
+        reject(error);
+      }
+    );
+  });
+}
+
+// Usage example
+async function createTexturedMesh() {
+  try {
+    const material = await createTexturedMaterial('path/to/texture.jpg');
+    const geometry = new THREE.PlaneGeometry(10, 5);
+    const mesh = new THREE.Mesh(geometry, material);
+    scene.add(mesh);
+  } catch (error) {
+    console.error('Failed to create textured mesh:', error);
+  }
 } 
