@@ -232,6 +232,10 @@ function connectToServer() {
     if (gameState.myRole === 'fighter') {
       gameState.myRole = 'viewer';
     }
+
+    gameState.viewers.forEach(viewer => {
+      updatePlayerInScene(viewer);
+    });
     updateUI();
   });
 
