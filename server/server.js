@@ -21,7 +21,7 @@ const gameState = {
   stageStartTime: null,
   stageDuration: 0,
 
-  // ADDED: Track sponsor timeouts so we can clear them if ceremony ends early
+  // Track sponsor timeouts so we can clear them if ceremony ends early
   sponsorTimeouts: []
 };
 
@@ -116,7 +116,7 @@ function changeGameStage(newStage) {
 function progressToNextStage(currentStage) {
   switch (currentStage) {
     case GAME_STAGES.WAITING_FOR_PLAYERS:
-      // MODIFIED: Need at least 3 viewers to proceed
+      // Need at least 3 viewers to proceed
       if (gameState.viewers.length >= 3) {
         changeGameStage(GAME_STAGES.FIGHTER_SELECTION);
       }
@@ -155,7 +155,7 @@ function selectFighters() {
   // Always start with empty fighters array
   gameState.fighters = [];
 
-  // MODIFIED: Now we require at least 3 watchers to pick 2 fighters + 1 referee
+  // Require at least 3 watchers to pick 2 fighters + 1 referee
   if (gameState.viewers.length < 3) {
     console.log("Not enough viewers to select fighters + referee");
     changeGameStage(GAME_STAGES.WAITING_FOR_PLAYERS);
@@ -176,28 +176,24 @@ function selectFighters() {
   const fighter2Index = Math.floor(Math.random() * gameState.viewers.length);
   const fighter2 = gameState.viewers.splice(fighter2Index, 1)[0];
 
-  // Set their roles & positions
+  // Set their roles & positions (no more .ready here)
   fighter1.role = 'fighter';
   fighter1.position = { x: -3, y: 0, z: 0 };
   fighter1.rotation = -Math.PI / 2;
-  fighter1.ready = false;
 
   fighter2.role = 'fighter';
   fighter2.position = { x: 3, y: 0, z: 0 };
   fighter2.rotation = Math.PI / 2;
-  fighter2.ready = false;
 
   // Add them to the fighters array
   gameState.fighters.push(fighter1);
   gameState.fighters.push(fighter2);
 
-  // Select a referee from the remaining viewers (at least 1 left)
-  if (gameState.viewers.length > 0) {
-    const refereeIndex = Math.floor(Math.random() * gameState.viewers.length);
-    gameState.referee = gameState.viewers.splice(refereeIndex, 1)[0];
-    gameState.referee.role = 'referee';
-    gameState.referee.position = { x: 0, y: 0, z: 0 };
-  }
+  // Select a referee from the remaining viewers
+  const refereeIndex = Math.floor(Math.random() * gameState.viewers.length);
+  gameState.referee = gameState.viewers.splice(refereeIndex, 1)[0];
+  gameState.referee.role = 'referee';
+  gameState.referee.position = { x: 0, y: 0, z: 0 };
 
   // Announce fighter selection
   io.emit('fightersSelected', {
@@ -243,7 +239,7 @@ function startPreMatchCeremony() {
     });
   });
 
-  // ADDED: Sponsor timeouts stored in gameState
+  // Schedule sponsor banners
   const t1 = setTimeout(() => {
     if (gameState.stage === GAME_STAGES.PRE_MATCH_CEREMONY) {
       io.emit('sponsorBanner', {
@@ -298,7 +294,6 @@ function declareDraw() {
   io.emit('matchDraw', {
     fighters: gameState.fighters
   });
-
   changeGameStage(GAME_STAGES.VICTORY_CEREMONY);
 }
 
@@ -366,8 +361,7 @@ io.on('connection', (socket) => {
     id: socket.id,
     role: 'viewer',
     position: { x: 0, y: 0, z: 0 },
-    rotation: 0,
-    ready: false
+    rotation: 0
   };
 
   // Add to viewers
@@ -393,7 +387,6 @@ io.on('connection', (socket) => {
   socket.broadcast.emit('playerJoined', sanitizeForSocketIO(player));
 
   // Check if we should start the game
-  // MODIFIED: require at least 3 viewers
   if (gameState.stage === GAME_STAGES.WAITING_FOR_PLAYERS && gameState.viewers.length >= 3) {
     changeGameStage(GAME_STAGES.FIGHTER_SELECTION);
   }
@@ -454,35 +447,6 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Handle pre-match ritual ready signal
-  socket.on('ritualReady', () => {
-    if (player.role !== 'fighter' || gameState.stage !== GAME_STAGES.PRE_MATCH_CEREMONY) return;
-
-    const fighter = gameState.fighters.find(f => f.id === socket.id);
-    if (fighter) {
-      fighter.ready = true;
-      io.emit('fighterReady', { id: fighter.id });
-
-      // Check if both fighters are ready
-      if (gameState.fighters.every(f => f.ready)) {
-        // Both fighters ready, skip directly to MATCH_IN_PROGRESS
-        // Clear sponsor timeouts
-        if (gameState.sponsorTimeouts && gameState.sponsorTimeouts.length > 0) {
-          for (const t of gameState.sponsorTimeouts) {
-            clearTimeout(t);
-          }
-          gameState.sponsorTimeouts = [];
-        }
-
-        // Clear stage timer
-        if (gameState.stageTimer) {
-          clearTimeout(gameState.stageTimer);
-          gameState.stageTimer = null;
-        }
-        changeGameStage(GAME_STAGES.MATCH_IN_PROGRESS);
-      }
-    }
-  });
 
   // Handle player emote
   socket.on('emote', (emoteType) => {
@@ -560,7 +524,7 @@ io.on('connection', (socket) => {
         }
       }
 
-      // ADDED: If a fighter leaves during PRE_MATCH_CEREMONY
+      // If a fighter leaves during PRE_MATCH_CEREMONY
       if (gameState.stage === GAME_STAGES.PRE_MATCH_CEREMONY && gameState.fighters.length < 2) {
         console.log("A fighter left during PRE_MATCH_CEREMONY.");
         // Decide where to revert: if we still have at least 3 viewers, do FIGHTER_SELECTION; else WAITING
