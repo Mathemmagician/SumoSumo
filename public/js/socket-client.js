@@ -137,6 +137,7 @@ function connectToServer() {
   
   // Player moved
   socket.on('playerMoved', (data) => {
+    console.log('Player moved:', data);
     updatePlayerPosition(data.id, data.position, data.rotation);
   });
   
@@ -583,4 +584,14 @@ function logPlayerCounts(context) {
   console.log("Fighter IDs:", gameState.fighters.map(f => f.id));
   console.log("Viewer IDs:", gameState.viewers.map(v => v.id));
   console.log("Referee ID:", gameState.referee ? gameState.referee.id : "none");
+}
+
+// Define the updatePlayerPosition function
+function updatePlayerPosition(playerId, position, rotation) {
+  const playerModel = playerModels[playerId];
+  if (!playerModel) return;
+
+  // Update the player's position and rotation
+  playerModel.position.set(position.x, position.y, position.z);
+  playerModel.rotation.y = rotation;
 } 

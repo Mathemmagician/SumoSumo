@@ -481,7 +481,7 @@ function updatePlayerInScene(player) {
 function positionViewer(model, viewerIndex) {
   // Constants for viewer positioning
   const FIRST_ROW_DISTANCE = RING_RADIUS * 1.3;
-  const ROW_SPACING = RING_RADIUS * 0.4;
+  const ROW_SPACING = BENCH_WIDTH;
   
   const BENCH_HEIGHT = 0.1;
   const ELEVATION_INCREMENT = 0.8;
@@ -489,14 +489,15 @@ function positionViewer(model, viewerIndex) {
   const SEATS_INCREMENT = 2;
   const NUM_ROWS = 16;
   
-  // Calculate total seats per side
+  // Calculate total seats per prioritized side (North, West, East)
   let totalSeatsPerSide = 0;
   for (let i = 0; i < NUM_ROWS; i++) {
     totalSeatsPerSide += (SEATS_PER_FIRST_ROW + (i * SEATS_INCREMENT));
   }
   
   // Determine which side and seat
-  const side = Math.floor(viewerIndex / totalSeatsPerSide) % 4; // 0=North, 1=East, 2=West, 3=South
+  const sideOrder = [0, 2, 1]; // 0=North, 2=West, 1=East (prioritize these sides)
+  const side = sideOrder[Math.floor(viewerIndex / totalSeatsPerSide) % 3];
   const seatInSide = viewerIndex % totalSeatsPerSide;
   
   // Find which row and seat in row
@@ -524,7 +525,7 @@ function positionViewer(model, viewerIndex) {
   
   // Calculate offset from center of row
   const seatsInRow = SEATS_PER_FIRST_ROW + (row * SEATS_INCREMENT);
-  const offset = (seatOffset - (seatsInRow - 1) / 2) * (RING_RADIUS * 0.4);
+  const offset = (seatOffset - (seatsInRow - 1) / 2) * BENCH_WIDTH;
   
   // Position based on side
   switch (side) {
@@ -542,11 +543,6 @@ function positionViewer(model, viewerIndex) {
       x = -distance;
       z = offset;
       rotation = Math.PI / 2;
-      break;
-    case 3: // South
-      x = offset;
-      z = distance;
-      rotation = 0;
       break;
   }
   
