@@ -517,15 +517,11 @@ function updatePlayerInScene(player) {
 // Position viewer (used by updateScene() in some cases)
 // Position viewer
 function positionViewer(model, viewerIndex) {
-  // Constants for viewer positioning
-  const FIRST_ROW_DISTANCE = RING_RADIUS * 1.3;
-  const ROW_SPACING = BENCH_WIDTH;
-  
-  const BENCH_HEIGHT = 0.1;
+  const NUM_ROWS = 5;
   const ELEVATION_INCREMENT = 0.8;
   const SEATS_PER_FIRST_ROW = 10;
   const SEATS_INCREMENT = 2;
-  const NUM_ROWS = 16;
+  const FIRST_ROW_DISTANCE = RING_RADIUS * 1.3;
   
   // Calculate total seats per prioritized side (North, West, East)
   let totalSeatsPerSide = 0;
@@ -587,6 +583,9 @@ function positionViewer(model, viewerIndex) {
   // Set position and rotation
   model.position.set(x, y, z);
   model.rotation.y = rotation;
+  
+  // ADDED: Store the base Y position for animation
+  model.userData.baseY = y;
 }
 
 // Window resize
@@ -615,8 +614,9 @@ function animate() {
       // Bob up and down slightly
       // Use a numeric ID approach for offset
       const numericId = parseInt(playerId.substring(0, 8), 16) || 0;
-      model.position.y =
-        Math.sin(Date.now() * 0.002 + numericId) * 0.1; 
+      // FIXED: Add bobbing to the base position instead of replacing it
+      const baseY = model.userData.baseY || 0;
+      model.position.y = baseY + Math.sin(Date.now() * 0.002 + numericId) * 0.1;
     }
 
     // Emote bubble float
