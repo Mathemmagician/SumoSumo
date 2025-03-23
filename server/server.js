@@ -12,14 +12,14 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // Game state
 const gameState = {
-  fighters: [], // Current fighters (max 2)
-  referee: null, // Current referee
-  viewers: [], // Current viewers
-  ringRadius: 7, // Increased ring radius in Three.js units
-  stage: 'WAITING_FOR_PLAYERS', // Current game stage
-  stageTimer: null, // Timer for current stage
-  stageStartTime: null, // When the current stage started
-  stageDuration: 0, // Duration of current stage in milliseconds
+  fighters: [], // (max 2)
+  referee: null,
+  viewers: [],
+  ringRadius: 7,
+  stage: 'WAITING_FOR_PLAYERS',
+  stageTimer: null,
+  stageStartTime: null,
+  stageDuration: 0,
 };
 
 // Game stage constants
