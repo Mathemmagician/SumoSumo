@@ -4,6 +4,9 @@ let ring, playerModels = {};
 let textureLoader;
 let faceTextures = [];
 
+// ADDED: simple global flag to see if we've already inited once
+let sceneInitialized = false;
+
 // Constants for scene dimensions
 const RING_RADIUS = 7; // Base measurement for the scene
 const RING_HEIGHT = 1.0;
@@ -12,66 +15,79 @@ const FLOOR_SIZE = RING_RADIUS * 5;
 const SQUARE_RING_RADIUS = RING_RADIUS + 0.5;
 const SQUARE_BOTTOM_RADIUS = SQUARE_RING_RADIUS + 0.7;
 
-// Initialize the 3D scene
+// BENCH/MAT constants for audience seats
+// (used in createAudienceAreas() with InstancedMesh)
+const BENCH_WIDTH = 2.0 * RING_RADIUS / 10; // default seats per first row = 10
+const BENCH_HEIGHT = 0.1;
+const BENCH_DEPTH = BENCH_WIDTH;
+const ROW_SPACING = BENCH_WIDTH; // distance between rows
+
+/**
+ * Initialize the 3D scene. We only want to do this once.
+ */
 function initScene(initialGameState) {
+  // ADDED: Check if scene is already initialized
+  if (sceneInitialized) {
+    console.warn('initScene() was called more than once! Skipping re-initialization.');
+    return;
+  }
+  sceneInitialized = true; // Mark as inited
+
   // Create scene
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x87CEEB); // Sky blue background
-  
+
   // Create camera
   camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
   camera.position.set(-5, 15, 25);
   camera.lookAt(0, 0, 0);
-  
+
   // Create renderer
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   document.getElementById('game-container').appendChild(renderer.domElement);
-  
+
   // Enhanced lighting setup
   setupLighting();
-  
+
   // Create texture loader
   textureLoader = new THREE.TextureLoader();
-  
+
   // Generate face textures dynamically
   generateFaceTextures();
-  
+
   // Create the sumo ring
   createRing();
-  
-  // Create the audience areas
+
+  // Create the audience areas (using InstancedMesh)
   createAudienceAreas();
-  
+
   // Add all existing players to the scene
   initialGameState.fighters.forEach(fighter => {
     addPlayerToScene(fighter);
   });
-  
   if (initialGameState.referee) {
     addPlayerToScene(initialGameState.referee);
   }
-  
   initialGameState.viewers.forEach(viewer => {
     addPlayerToScene(viewer);
   });
-  
+
   // Start animation loop
   animate();
-  
+
   // Handle window resize
   window.addEventListener('resize', onWindowResize);
 }
 
 // Setup lighting
 function setupLighting() {
-  // Soft ambient light for overall scene illumination
-  const ambientLight = new THREE.AmbientLight(0xf5e1c0, 0.4); // Warm ambient light
+  const ambientLight = new THREE.AmbientLight(0xf5e1c0, 0.4);
   scene.add(ambientLight);
-  
-  // Main spotlight from above - simulates traditional sumo arena lighting
+
+  // Main spotlight
   const mainSpotlight = new THREE.SpotLight(0xffffff, 1.0);
   mainSpotlight.position.set(0, 30, 0);
   mainSpotlight.angle = Math.PI / 6;
@@ -86,21 +102,21 @@ function setupLighting() {
   mainSpotlight.target.position.set(0, 0, 0);
   scene.add(mainSpotlight);
   scene.add(mainSpotlight.target);
-  
-  // Warm fill light from one side (simulates sunset/traditional lighting)
+
+  // Fill light
   const fillLight = new THREE.DirectionalLight(0xffcc88, 0.6);
   fillLight.position.set(RING_RADIUS * 2, RING_RADIUS, RING_RADIUS * 2);
   fillLight.castShadow = true;
   fillLight.shadow.mapSize.width = 1024;
   fillLight.shadow.mapSize.height = 1024;
   scene.add(fillLight);
-  
-  // Cool rim light from the opposite side (creates depth)
+
+  // Rim light
   const rimLight = new THREE.DirectionalLight(0x8888ff, 0.5);
   rimLight.position.set(-RING_RADIUS * 2, RING_RADIUS, -RING_RADIUS * 2);
   scene.add(rimLight);
-  
-  // Subtle ground bounce light (reflects off the floor)
+
+  // Bounce light
   const bounceLight = new THREE.DirectionalLight(0xffffcc, 0.2);
   bounceLight.position.set(0, -5, 0);
   bounceLight.target.position.set(0, 0, 0);
@@ -115,58 +131,51 @@ function generateFaceTextures() {
     canvas.width = 256;
     canvas.height = 256;
     const ctx = canvas.getContext('2d');
-    
+
     // Face background color
     ctx.fillStyle = `hsl(${i * 36}, 80%, 80%)`;
     ctx.fillRect(0, 0, 256, 256);
-    
+
     // Draw eyes
     ctx.fillStyle = 'black';
     const eyeSize = 20 + Math.random() * 15;
-    
     // Left eye
     ctx.beginPath();
     ctx.arc(90, 100, eyeSize, 0, Math.PI * 2);
     ctx.fill();
-    
     // Right eye
     ctx.beginPath();
     ctx.arc(166, 100, eyeSize, 0, Math.PI * 2);
     ctx.fill();
-    
-    // Draw eyebrows
+
+    // Eyebrows
     ctx.lineWidth = 8;
     ctx.lineCap = 'round';
-    
-    // Left eyebrow
     ctx.beginPath();
     ctx.moveTo(60, 70);
     ctx.lineTo(120, 70 + (Math.random() > 0.5 ? -10 : 10));
     ctx.stroke();
-    
-    // Right eyebrow
     ctx.beginPath();
     ctx.moveTo(136, 70 + (Math.random() > 0.5 ? -10 : 10));
     ctx.lineTo(196, 70);
     ctx.stroke();
-    
-    // Draw mouth (different styles)
+
+    // Mouth
     ctx.lineWidth = 6;
     const mouthStyle = Math.floor(Math.random() * 4);
-    
     switch (mouthStyle) {
-      case 0: // Happy mouth
+      case 0: // Happy
         ctx.beginPath();
         ctx.arc(128, 160, 40, 0, Math.PI);
         ctx.stroke();
         break;
-      case 1: // Straight mouth
+      case 1: // Straight
         ctx.beginPath();
         ctx.moveTo(88, 160);
         ctx.lineTo(168, 160);
         ctx.stroke();
         break;
-      case 2: // Surprised mouth
+      case 2: // Surprised
         ctx.beginPath();
         ctx.arc(128, 160, 20, 0, Math.PI * 2);
         ctx.stroke();
@@ -177,8 +186,8 @@ function generateFaceTextures() {
         ctx.stroke();
         break;
     }
-    
-    // Add some random details (like moles, scars, etc.)
+
+    // Random details
     if (Math.random() > 0.7) {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
       ctx.beginPath();
@@ -191,8 +200,7 @@ function generateFaceTextures() {
       );
       ctx.fill();
     }
-    
-    // Create texture from canvas
+
     const texture = new THREE.CanvasTexture(canvas);
     faceTextures[i] = texture;
   }
@@ -203,37 +211,50 @@ function createRing() {
   const squareBase = new THREE.BufferGeometry();
   squareBase.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
     // Bottom (y=0): 4 vertices
-    -SQUARE_BOTTOM_RADIUS,0,-SQUARE_BOTTOM_RADIUS,  SQUARE_BOTTOM_RADIUS,0,-SQUARE_BOTTOM_RADIUS,  SQUARE_BOTTOM_RADIUS,0,SQUARE_BOTTOM_RADIUS,  -SQUARE_BOTTOM_RADIUS,0,SQUARE_BOTTOM_RADIUS,
+    -SQUARE_BOTTOM_RADIUS,0,-SQUARE_BOTTOM_RADIUS,  
+    SQUARE_BOTTOM_RADIUS,0,-SQUARE_BOTTOM_RADIUS,   
+    SQUARE_BOTTOM_RADIUS,0,SQUARE_BOTTOM_RADIUS,    
+    -SQUARE_BOTTOM_RADIUS,0,SQUARE_BOTTOM_RADIUS,
     // Top (y=1): 4 vertices
-    -SQUARE_RING_RADIUS,RING_HEIGHT,-SQUARE_RING_RADIUS,  SQUARE_RING_RADIUS,RING_HEIGHT,-SQUARE_RING_RADIUS,  SQUARE_RING_RADIUS,RING_HEIGHT,SQUARE_RING_RADIUS,  -SQUARE_RING_RADIUS,RING_HEIGHT,SQUARE_RING_RADIUS
+    -SQUARE_RING_RADIUS,RING_HEIGHT,-SQUARE_RING_RADIUS,  
+    SQUARE_RING_RADIUS,RING_HEIGHT,-SQUARE_RING_RADIUS,   
+    SQUARE_RING_RADIUS,RING_HEIGHT,SQUARE_RING_RADIUS,    
+    -SQUARE_RING_RADIUS,RING_HEIGHT,SQUARE_RING_RADIUS
   ]), 3));
-  squareBase.setIndex([0,1,2,0,2,3,4,6,5,4,7,6,0,4,5,0,5,1,1,5,6,1,6,2,2,6,7,2,7,3,3,7,4,3,4,0]);
+  squareBase.setIndex([
+    0,1,2, 0,2,3,    // bottom face
+    4,6,5, 4,7,6,    // top face
+    0,4,5, 0,5,1,    // front vertical
+    1,5,6, 1,6,2,    // right vertical
+    2,6,7, 2,7,3,    // back vertical
+    3,7,4, 3,4,0     // left vertical
+  ]);
   squareBase.computeVertexNormals();
-  scene.add(new THREE.Mesh(squareBase, new THREE.MeshLambertMaterial({ color: 0xD2B48C,  })));  
+  scene.add(new THREE.Mesh(squareBase, new THREE.MeshLambertMaterial({ color: 0xD2B48C })));
 
-  // Create the sumo ring (dohyo)
+  // Dohyo cylinder
   const ringGeometry = new THREE.CylinderGeometry(RING_RADIUS, RING_RADIUS, RING_HEIGHT, 32);
-  const ringMaterial = new THREE.MeshLambertMaterial({ color: 0xD2B48C }); // Tan color
+  const ringMaterial = new THREE.MeshLambertMaterial({ color: 0xD2B48C });
   ring = new THREE.Mesh(ringGeometry, ringMaterial);
-  ring.position.y = RING_HEIGHT / 2; // Half of the height
+  ring.position.y = RING_HEIGHT / 2;
   ring.castShadow = true;
   ring.receiveShadow = true;
   scene.add(ring);
-  
-  // Add a ring border
+
+  // Border
   const borderGeometry = new THREE.RingGeometry(RING_RADIUS, RING_RADIUS + 0.5, 32);
   const borderMaterial = new THREE.MeshLambertMaterial({ 
     color: 0x8B4513,
     side: THREE.DoubleSide
   });
   const border = new THREE.Mesh(borderGeometry, borderMaterial);
-  border.rotation.x = Math.PI / 2; // Lay flat
-  border.position.y = RING_HEIGHT + 0.01; // Just above the ring
+  border.rotation.x = Math.PI / 2;
+  border.position.y = RING_HEIGHT + 0.01;
   border.receiveShadow = true;
   scene.add(border);
-  
-  // Add ring markings (lines)
-  const markingsGeometry = new THREE.CircleGeometry(RING_RADIUS * 0.8, 32); // Inner circle
+
+  // Markings
+  const markingsGeometry = new THREE.CircleGeometry(RING_RADIUS * 0.8, 32);
   const markingsMaterial = new THREE.MeshBasicMaterial({ 
     color: 0xFFFFFF,
     transparent: true,
@@ -241,128 +262,135 @@ function createRing() {
     side: THREE.DoubleSide
   });
   const markings = new THREE.Mesh(markingsGeometry, markingsMaterial);
-  markings.rotation.x = Math.PI / 2; // Lay flat
-  markings.position.y = RING_HEIGHT + 0.02; // Just above the ring
+  markings.rotation.x = Math.PI / 2;
+  markings.position.y = RING_HEIGHT + 0.02;
   scene.add(markings);
-  
-  // Add the floor around the ring
+
+  // Floor
   const floorGeometry = new THREE.PlaneGeometry(FLOOR_SIZE, FLOOR_SIZE);
   const floorMaterial = new THREE.MeshLambertMaterial({ 
     color: 0xBF924A,
     side: THREE.DoubleSide
   });
   const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-  floor.rotation.x = Math.PI / 2; // Lay flat
-  floor.position.y = 0; // At the bottom
+  floor.rotation.x = Math.PI / 2;
+  floor.position.y = 0;
   floor.receiveShadow = true;
   scene.add(floor);
 }
 
-// Create audience areas
+/**
+ * Create audience areas but use InstancedMesh for the seats to reduce overhead.
+ */
 function createAudienceAreas() {
-  // Constants for bench layout
-  const ELEVATION_INCREMENT = 0.8; // Height increase every 2 rows
-  const SEATS_PER_FIRST_ROW = 10; // Number of seats in the first row
-  const SEATS_INCREMENT = 2; // Additional seats per row as we go back
-  const NUM_ROWS = 16; // Total number of rows
+  const NUM_ROWS = 20;
+  const ELEVATION_INCREMENT = 0.8;
+  const SEATS_PER_FIRST_ROW = 10;
+  const SEATS_INCREMENT = 2;
   const FIRST_ROW_DISTANCE = RING_RADIUS * 1.3;
-  const BENCH_WIDTH = 2.0 * RING_RADIUS / SEATS_PER_FIRST_ROW;
-  const BENCH_HEIGHT = 0.1;
-  const BENCH_DEPTH = 2.0 * RING_RADIUS / SEATS_PER_FIRST_ROW;
-  const ROW_SPACING = BENCH_WIDTH; // Distance between rows
-  
-  // Materials
+
+  // We'll keep the old platform approach for elevation, but each platform is a single Mesh
+  // The seats themselves are turned into InstancedMeshes for benches & mats
+
+  // Materials for benches/mats
   const benchMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // Brown wood
-  const matMaterial = new THREE.MeshLambertMaterial({ color: 0xAA0000 }); // Red mat
-  
-  // Create benches for each side (North, East, West, South)
-  const sides = [
-    { name: 'North', rotation: 0, z: -1 },
-    { name: 'East', rotation: Math.PI / 2, x: 1 },
-    { name: 'West', rotation: -Math.PI / 2, x: -1 },
-    { name: 'South', rotation: Math.PI, z: 1 }
-  ];
-  
-  // For each side
-  sides.forEach(side => {
-    // For each row
+  const matMaterial = new THREE.MeshLambertMaterial({ color: 0xAA0000 });   // Red mat
+
+  // Single geometry for bench
+  const benchGeometry = new THREE.BoxGeometry(BENCH_WIDTH * 0.9, BENCH_HEIGHT, BENCH_DEPTH * 0.9);
+  // Single geometry for mat
+  const matGeometry = new THREE.BoxGeometry(BENCH_WIDTH * 0.8, 0.05, BENCH_DEPTH * 0.8);
+
+  // We'll calculate total seat count so we can create InstancedMesh with correct capacity
+  let totalSeats = 0;
+  const sides = ['North','East','West','South'];
+  sides.forEach(() => {
     for (let rowIndex = 0; rowIndex < NUM_ROWS; rowIndex++) {
-      // Calculate row properties
+      const seatsInRow = SEATS_PER_FIRST_ROW + (rowIndex * SEATS_INCREMENT);
+      totalSeats += seatsInRow;
+    }
+  });
+  // We do 4 sides, so totalSeats accounts for that above
+
+  // Create InstancedMesh for benches & mats
+  const benchInstancedMesh = new THREE.InstancedMesh(benchGeometry, benchMaterial, totalSeats);
+  const matInstancedMesh = new THREE.InstancedMesh(matGeometry, matMaterial, totalSeats);
+  benchInstancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  matInstancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+  let seatIndex = 0;
+
+  // We'll keep the same side definitions
+  const sideData = [
+    { name: 'North', rotation: 0, x: 0, z: -1 },
+    { name: 'East', rotation: Math.PI / 2, x: 1, z: 0 },
+    { name: 'West', rotation: -Math.PI / 2, x: -1, z: 0 },
+    { name: 'South', rotation: Math.PI, x: 0, z: 1 }
+  ];
+
+  sideData.forEach(side => {
+    for (let rowIndex = 0; rowIndex < NUM_ROWS; rowIndex++) {
+      // Row properties
       const distance = FIRST_ROW_DISTANCE + (rowIndex * ROW_SPACING);
       const seatsInRow = SEATS_PER_FIRST_ROW + (rowIndex * SEATS_INCREMENT);
-      const elevationLevel = Math.floor(rowIndex / 2); // Increase elevation every 2 rows
+      const elevationLevel = Math.floor(rowIndex / 2);
       const elevation = elevationLevel * ELEVATION_INCREMENT;
-      
-      // Create the row platform if elevated
+
+      // Create platform if elevated
       if (elevation > 0) {
-        // Calculate platform width based on number of seats
         const platformWidth = BENCH_WIDTH * seatsInRow;
-        
         const platformGeometry = new THREE.BoxGeometry(
-          side.z ? platformWidth : BENCH_DEPTH,
+          (side.z !== 0 ? platformWidth : BENCH_DEPTH),
           elevation,
-          side.x ? platformWidth : BENCH_DEPTH
+          (side.x !== 0 ? platformWidth : BENCH_DEPTH)
         );
-        
         const platform = new THREE.Mesh(platformGeometry, benchMaterial);
-        
-        // Position the platform
-        if (side.x) {
-          platform.position.set(
-            side.x * distance,
-            elevation / 2,
-            0
-          );
+
+        if (side.x !== 0) {
+          platform.position.set(side.x * distance, elevation / 2, 0);
         } else {
-          platform.position.set(
-            0,
-            elevation / 2,
-            side.z * distance
-          );
+          platform.position.set(0, elevation / 2, side.z * distance);
         }
-        
         scene.add(platform);
       }
-      
-      // Create individual seats with mats for this row
+
       for (let i = 0; i < seatsInRow; i++) {
-        // Calculate offset from center
+        // offset from center
         const offset = (i - (seatsInRow - 1) / 2) * BENCH_WIDTH;
-        
-        // Create bench
-        const benchGeometry = new THREE.BoxGeometry(BENCH_WIDTH * 0.9, BENCH_HEIGHT, BENCH_DEPTH * 0.9);
-        const bench = new THREE.Mesh(benchGeometry, benchMaterial);
-        
-        // Create mat
-        const matGeometry = new THREE.BoxGeometry(BENCH_WIDTH * 0.8, 0.05, BENCH_DEPTH * 0.8);
-        const mat = new THREE.Mesh(matGeometry, matMaterial);
-        mat.position.y = BENCH_HEIGHT / 2 + 0.025; // Place on top of bench
-        bench.add(mat);
-        
-        // Position based on side
+
         let x = 0, y = BENCH_HEIGHT / 2, z = 0;
-        
-        // Add elevation if needed
-        if (elevation > 0) {
-          y += elevation;
-        }
-        
-        if (side.x) {
+        if (elevation > 0) y += elevation;
+
+        if (side.x !== 0) {
           x = side.x * distance;
           z = offset;
         } else {
           x = offset;
           z = side.z * distance;
         }
+
+        // Build a transform matrix for the bench
+        const benchMatrix = new THREE.Matrix4();
+        benchMatrix.makeTranslation(x, y, z);
+        benchMatrix.multiply(new THREE.Matrix4().makeRotationY(side.rotation));
+
+        // For the mat, we place it slightly above the bench
+        const matMatrix = benchMatrix.clone();
+        // We can shift the mat up a little bit
+        const matOffset = new THREE.Matrix4().makeTranslation(0, BENCH_HEIGHT / 2 + 0.025, 0);
+        matMatrix.multiply(matOffset);
+
+        // Set the instance matrix
+        benchInstancedMesh.setMatrixAt(seatIndex, benchMatrix);
+        matInstancedMesh.setMatrixAt(seatIndex, matMatrix);
         
-        bench.position.set(x, y, z);
-        bench.rotation.y = side.rotation;
-        
-        // Add to scene
-        scene.add(bench);
+        seatIndex++;
       }
     }
   });
+
+  scene.add(benchInstancedMesh);
+  scene.add(matInstancedMesh);
 }
 
 // Add player to scene
@@ -375,66 +403,64 @@ function addPlayerToScene(player) {
 
 // Create sumo model
 function createSumoModel(player) {
-  // Create the sumo model
+  const numericId = hashString(player.id);
+
   const model = new THREE.Group();
-  
-  // Store the player's role in userData for future reference
   model.userData = {
     id: player.id,
     role: player.role
   };
-  
-  // Body (sphere)
+
+  // Body
   const bodyGeometry = new THREE.SphereGeometry(1, 32, 32);
-  const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700 }); // Gold color for the sumo mawashi
+  const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700 });
   const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
   body.castShadow = true;
   model.add(body);
-  
-  // Head (smaller sphere)
+
+  // Head
   const headGeometry = new THREE.SphereGeometry(0.5, 32, 32);
-  const headMaterial = new THREE.MeshStandardMaterial({ map: faceTextures[player.id % faceTextures.length] });
+  const headMaterial = new THREE.MeshStandardMaterial({
+    map: faceTextures[numericId % faceTextures.length]
+  });
   const head = new THREE.Mesh(headGeometry, headMaterial);
   head.position.y = 1;
   model.add(head);
-  
-  // Face (use texture)
+
+  // Face plane
   const faceGeometry = new THREE.PlaneGeometry(1, 1);
   const faceMaterial = new THREE.MeshBasicMaterial({ 
-    map: faceTextures[player.id % faceTextures.length],
+    map: faceTextures[numericId % faceTextures.length],
     transparent: true
   });
   const face = new THREE.Mesh(faceGeometry, faceMaterial);
-  face.position.set(0, 1, 0.51); // Slightly in front of the head
+  face.position.set(0, 1, 0.51);
   model.add(face);
-  
+
   // Arms
   const armGeometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 32);
   const armMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700 });
-  
   const leftArm = new THREE.Mesh(armGeometry, armMaterial);
   leftArm.position.set(-0.8, 0.2, 0);
   leftArm.rotation.z = Math.PI / 4;
   model.add(leftArm);
-  
+
   const rightArm = new THREE.Mesh(armGeometry, armMaterial);
   rightArm.position.set(0.8, 0.2, 0);
   rightArm.rotation.z = -Math.PI / 4;
   model.add(rightArm);
-  
+
   // Legs
   const legGeometry = new THREE.CylinderGeometry(0.15, 0.15, 1, 32);
   const legMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700 });
-  
   const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
   leftLeg.position.set(-0.4, -0.8, 0);
   model.add(leftLeg);
-  
   const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
   rightLeg.position.set(0.4, -0.8, 0);
   model.add(rightLeg);
-  
-  // Add emote bubble (hidden by default)
+
+  // Emote bubble (hidden)
   const emoteBubbleGeometry = new THREE.PlaneGeometry(1, 1);
   const emoteBubbleMaterial = new THREE.MeshBasicMaterial({ 
     color: 0xffffff,
@@ -446,8 +472,8 @@ function createSumoModel(player) {
   emoteBubble.visible = false;
   emoteBubble.name = 'emoteBubble';
   model.add(emoteBubble);
-  
-  // Add text bubble (hidden by default)
+
+  // Text bubble (hidden)
   const textBubbleGeometry = new THREE.PlaneGeometry(2, 1);
   const textBubbleMaterial = new THREE.MeshBasicMaterial({ 
     color: 0xffffff,
@@ -459,15 +485,11 @@ function createSumoModel(player) {
   textBubble.visible = false;
   textBubble.name = 'textBubble';
   model.add(textBubble);
-  
-  // Set initial position and rotation
-  model.position.set(
-    player.position.x,
-    player.position.y,
-    player.position.z
-  );
+
+  // Set initial transform
+  model.position.set(player.position.x, player.position.y, player.position.z);
   model.rotation.y = player.rotation || 0;
-  
+
   return model;
 }
 
@@ -475,22 +497,24 @@ function createSumoModel(player) {
 function updatePlayerInScene(player) {
   const model = playerModels[player.id];
   if (!model) return;
-  
-  // Update position and rotation
-  model.position.set(
-    player.position.x,
-    player.position.y,
-    player.position.z
-  );
-  model.rotation.y = player.rotation || 0;
-  
-  // Update role indicator
-  const roleIndicator = model.getObjectByName('roleIndicator');
-  if (roleIndicator) {
-    roleIndicator.visible = player.role === 'fighter';
+
+  // Update position & rotation
+
+  if (player.role === 'viewer') {
+    const numericId = hashString(player.id);
+    positionViewer(model, numericId);
+  } else {
+    model.position.set(player.position.x, player.position.y, player.position.z);
   }
+  model.rotation.y = player.rotation || 0;
+
+  // REMOVED: roleIndicator since we don't actually create it
+  // if (roleIndicator) { ... }
 }
 
+// REMOVED: updateFighterReadyState(...) entirely
+
+// Position viewer (used by updateScene() in some cases)
 // Position viewer
 function positionViewer(model, viewerIndex) {
   // Constants for viewer positioning
@@ -565,7 +589,7 @@ function positionViewer(model, viewerIndex) {
   model.rotation.y = rotation;
 }
 
-// Handle window resize
+// Window resize
 function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -575,61 +599,36 @@ function onWindowResize() {
 // Animation loop
 function animate() {
   requestAnimationFrame(animate);
-  
-  // Add any animations here (e.g., subtle movements for viewers)
+
+  // Optional bobbing for viewers
   Object.values(playerModels).forEach(model => {
-    // Find the player data for this model
-    const playerId = Object.keys(playerModels).find(key => playerModels[key] === model);
-    const player = gameState.fighters.find(f => f.id === playerId) || 
-                  gameState.viewers.find(v => v.id === playerId) ||
-                  (gameState.referee && gameState.referee.id === playerId ? gameState.referee : null);
-    
+    // We can do a mild bob, if role === 'viewer'
+    // Must find the player from gameState, or skip
+    // If gameState is globally accessible, do:
+    const playerId = model.userData.id;
+    const player =
+      gameState.fighters.find(f => f.id === playerId) ||
+      gameState.viewers.find(v => v.id === playerId) ||
+      (gameState.referee && gameState.referee.id === playerId ? gameState.referee : null);
+
     if (player && player.role === 'viewer') {
-      // Make viewers bob up and down slightly
-      model.position.y = Math.sin(Date.now() * 0.002 + parseInt(playerId.substring(0, 8), 16)) * 0.1;
+      // Bob up and down slightly
+      // Use a numeric ID approach for offset
+      const numericId = parseInt(playerId.substring(0, 8), 16) || 0;
+      model.position.y =
+        Math.sin(Date.now() * 0.002 + numericId) * 0.1; 
     }
-    
-    // Make emote bubbles float and pulse
+
+    // Emote bubble float
     const emoteBubble = model.getObjectByName('emoteBubble');
     if (emoteBubble && emoteBubble.visible) {
       emoteBubble.position.y = 2 + Math.sin(Date.now() * 0.003) * 0.1;
-      emoteBubble.scale.set(
-        1 + Math.sin(Date.now() * 0.006) * 0.1,
-        1 + Math.sin(Date.now() * 0.006) * 0.1,
-        1 + Math.sin(Date.now() * 0.006) * 0.1
-      );
+      const scaleFactor = 1 + Math.sin(Date.now() * 0.006) * 0.1;
+      emoteBubble.scale.set(scaleFactor, scaleFactor, scaleFactor);
     }
   });
-  
-  renderer.render(scene, camera);
-}
 
-// Update fighter ready state
-function updateFighterReadyState(fighterId, isReady) {
-  const model = playerModels[fighterId];
-  if (!model) return;
-  
-  // Add a visual indicator that the fighter is ready
-  if (isReady) {
-    // Create a ready indicator (e.g., a glowing aura)
-    const readyGeometry = new THREE.RingGeometry(1.5, 1.7, 32);
-    const readyMaterial = new THREE.MeshBasicMaterial({ 
-      color: 0x00FF00,
-      transparent: true,
-      opacity: 0.7
-    });
-    const readyIndicator = new THREE.Mesh(readyGeometry, readyMaterial);
-    readyIndicator.rotation.x = Math.PI / 2; // Lay flat
-    readyIndicator.position.y = 0.1; // Just above the ground
-    readyIndicator.name = 'readyIndicator';
-    model.add(readyIndicator);
-  } else {
-    // Remove the ready indicator if it exists
-    const readyIndicator = model.getObjectByName('readyIndicator');
-    if (readyIndicator) {
-      model.remove(readyIndicator);
-    }
-  }
+  renderer.render(scene, camera);
 }
 
 // Show match start animation
@@ -800,7 +799,7 @@ function showMatchDrawAnimation() {
   }, 5000);
 }
 
-// Example of loading a texture and assigning it to a material
+// Example of texture-based mesh creation
 function createTexturedMaterial(texturePath) {
   return new Promise((resolve, reject) => {
     textureLoader.load(
@@ -822,7 +821,6 @@ function createTexturedMaterial(texturePath) {
   });
 }
 
-// Usage example
 async function createTexturedMesh() {
   try {
     const material = await createTexturedMaterial('path/to/texture.jpg');
@@ -832,4 +830,15 @@ async function createTexturedMesh() {
   } catch (error) {
     console.error('Failed to create textured mesh:', error);
   }
-} 
+}
+
+
+function hashString(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i); 
+    // or any simple hashing approach
+    hash |= 0; // force 32-bit
+  }
+  return Math.abs(hash); // make it positive
+}
