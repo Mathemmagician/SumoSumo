@@ -193,7 +193,7 @@ function selectFighters() {
   const refereeIndex = Math.floor(Math.random() * gameState.viewers.length);
   gameState.referee = gameState.viewers.splice(refereeIndex, 1)[0];
   gameState.referee.role = 'referee';
-  gameState.referee.position = { x: 0, y: 0, z: 0 };
+  gameState.referee.position = { x: 0, y: 2, z: 0 };
 
   // Announce fighter selection
   io.emit('fightersSelected', {
@@ -227,8 +227,8 @@ function startPreMatchCeremony() {
   });
 
   // Move fighters slightly apart
-  gameState.fighters[0].position = { x: -5, y: 0, z: 0 };
-  gameState.fighters[1].position = { x: 5, y: 0, z: 0 };
+  gameState.fighters[0].position = { x: -5, y: 2, z: 0 };
+  gameState.fighters[1].position = { x: 5, y: 2, z: 0 };
 
   // Broadcast updated positions
   gameState.fighters.forEach(fighter => {
