@@ -8,14 +8,6 @@ let faceTextures = [];
 const RING_RADIUS = 7; // Base measurement for the scene
 const RING_HEIGHT = 0.5;
 const FLOOR_SIZE = RING_RADIUS * 5;
-const FIRST_ROW_DISTANCE = RING_RADIUS * 1.5;
-const SECOND_ROW_DISTANCE = RING_RADIUS * 1.8;
-const BENCH_WIDTH = RING_RADIUS * 0.2;
-const BENCH_HEIGHT = 0.5;
-const BENCH_DEPTH = RING_RADIUS * 0.1;
-const PLATFORM_HEIGHT = 1;
-const PLATFORM_WIDTH = RING_RADIUS * 0.3;
-const PLATFORM_DEPTH = RING_RADIUS * 2;
 
 // Initialize the 3D scene
 function initScene(initialGameState) {
@@ -36,6 +28,42 @@ function initScene(initialGameState) {
   document.getElementById('game-container').appendChild(renderer.domElement);
   
   // Enhanced lighting setup
+  setupLighting();
+  
+  // Create texture loader
+  textureLoader = new THREE.TextureLoader();
+  
+  // Generate face textures dynamically
+  generateFaceTextures();
+  
+  // Create the sumo ring
+  createRing();
+  
+  // Create the audience areas
+  createAudienceAreas();
+  
+  // Add all existing players to the scene
+  initialGameState.fighters.forEach(fighter => {
+    addPlayerToScene(fighter);
+  });
+  
+  if (initialGameState.referee) {
+    addPlayerToScene(initialGameState.referee);
+  }
+  
+  initialGameState.viewers.forEach(viewer => {
+    addPlayerToScene(viewer);
+  });
+  
+  // Start animation loop
+  animate();
+  
+  // Handle window resize
+  window.addEventListener('resize', onWindowResize);
+}
+
+// Setup lighting
+function setupLighting() {
   // Soft ambient light for overall scene illumination
   const ambientLight = new THREE.AmbientLight(0xf5e1c0, 0.4); // Warm ambient light
   scene.add(ambientLight);
@@ -75,11 +103,10 @@ function initScene(initialGameState) {
   bounceLight.target.position.set(0, 0, 0);
   scene.add(bounceLight);
   scene.add(bounceLight.target);
-  
-  // Create texture loader
-  textureLoader = new THREE.TextureLoader();
-  
-  // Generate face textures dynamically
+}
+
+// Generate face textures
+function generateFaceTextures() {
   for (let i = 0; i < 10; i++) {
     const canvas = document.createElement('canvas');
     canvas.width = 256;
@@ -166,31 +193,6 @@ function initScene(initialGameState) {
     const texture = new THREE.CanvasTexture(canvas);
     faceTextures[i] = texture;
   }
-  
-  // Create the sumo ring
-  createRing();
-  
-  // Create the audience areas
-  createAudienceAreas();
-  
-  // Add all existing players to the scene
-  initialGameState.fighters.forEach(fighter => {
-    addPlayerToScene(fighter);
-  });
-  
-  if (initialGameState.referee) {
-    addPlayerToScene(initialGameState.referee);
-  }
-  
-  initialGameState.viewers.forEach(viewer => {
-    addPlayerToScene(viewer);
-  });
-  
-  // Start animation loop
-  animate();
-  
-  // Handle window resize
-  window.addEventListener('resize', onWindowResize);
 }
 
 // Create the sumo ring
@@ -242,30 +244,24 @@ function createRing() {
   scene.add(floor);
 }
 
-// Update the audience seating layout
+// Create audience areas
 function createAudienceAreas() {
-  // Create audience seating areas (benches)
-  // We'll create multiple rows on each of the sides of the ring
-  
   // Constants for bench layout
   const ELEVATION_INCREMENT = 0.8; // Height increase every 2 rows
   const SEATS_PER_FIRST_ROW = 10; // Number of seats in the first row
   const SEATS_INCREMENT = 2; // Additional seats per row as we go back
   const NUM_ROWS = 16; // Total number of rows
-
   const FIRST_ROW_DISTANCE = RING_RADIUS * 1.3;
-  
   const BENCH_WIDTH = 2.0 * RING_RADIUS / SEATS_PER_FIRST_ROW;
   const BENCH_HEIGHT = 0.1;
   const BENCH_DEPTH = 2.0 * RING_RADIUS / SEATS_PER_FIRST_ROW;
-
   const ROW_SPACING = BENCH_WIDTH; // Distance between rows
   
   // Materials
   const benchMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // Brown wood
   const matMaterial = new THREE.MeshLambertMaterial({ color: 0xAA0000 }); // Red mat
   
-  // Create benches for each side (North, East, West)
+  // Create benches for each side (North, East, West, South)
   const sides = [
     { name: 'North', rotation: 0, z: -1 },
     { name: 'East', rotation: Math.PI / 2, x: 1 },
@@ -311,7 +307,6 @@ function createAudienceAreas() {
           );
         }
         
-        // platform.rotation.y = side.rotation;
         scene.add(platform);
       }
       
@@ -356,17 +351,143 @@ function createAudienceAreas() {
   });
 }
 
-// Update the positionViewer function to match the new seating layout
+// Add player to scene
+function addPlayerToScene(player) {
+  const model = createSumoModel(player);
+  playerModels[player.id] = model;
+  updatePlayerInScene(player);
+  scene.add(model);
+}
+
+// Create sumo model
+function createSumoModel(player) {
+  // Create the sumo model
+  const model = new THREE.Group();
+  
+  // Store the player's role in userData for future reference
+  model.userData = {
+    id: player.id,
+    role: player.role
+  };
+  
+  // Body (sphere)
+  const bodyGeometry = new THREE.SphereGeometry(1, 32, 32);
+  const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700 }); // Gold color for the sumo mawashi
+  const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+  body.castShadow = true;
+  model.add(body);
+  
+  // Head (smaller sphere)
+  const headGeometry = new THREE.SphereGeometry(0.5, 32, 32);
+  const headMaterial = new THREE.MeshStandardMaterial({ map: faceTextures[player.id % faceTextures.length] });
+  const head = new THREE.Mesh(headGeometry, headMaterial);
+  head.position.y = 1;
+  model.add(head);
+  
+  // Face (use texture)
+  const faceGeometry = new THREE.PlaneGeometry(1, 1);
+  const faceMaterial = new THREE.MeshBasicMaterial({ 
+    map: faceTextures[player.id % faceTextures.length],
+    transparent: true
+  });
+  const face = new THREE.Mesh(faceGeometry, faceMaterial);
+  face.position.set(0, 1, 0.51); // Slightly in front of the head
+  model.add(face);
+  
+  // Arms
+  const armGeometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 32);
+  const armMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700 });
+  
+  const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+  leftArm.position.set(-0.8, 0.2, 0);
+  leftArm.rotation.z = Math.PI / 4;
+  model.add(leftArm);
+  
+  const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+  rightArm.position.set(0.8, 0.2, 0);
+  rightArm.rotation.z = -Math.PI / 4;
+  model.add(rightArm);
+  
+  // Legs
+  const legGeometry = new THREE.CylinderGeometry(0.15, 0.15, 1, 32);
+  const legMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700 });
+  
+  const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+  leftLeg.position.set(-0.4, -0.8, 0);
+  model.add(leftLeg);
+  
+  const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+  rightLeg.position.set(0.4, -0.8, 0);
+  model.add(rightLeg);
+  
+  // Add emote bubble (hidden by default)
+  const emoteBubbleGeometry = new THREE.PlaneGeometry(1, 1);
+  const emoteBubbleMaterial = new THREE.MeshBasicMaterial({ 
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0
+  });
+  const emoteBubble = new THREE.Mesh(emoteBubbleGeometry, emoteBubbleMaterial);
+  emoteBubble.position.set(0, 2, 0);
+  emoteBubble.visible = false;
+  emoteBubble.name = 'emoteBubble';
+  model.add(emoteBubble);
+  
+  // Add text bubble (hidden by default)
+  const textBubbleGeometry = new THREE.PlaneGeometry(2, 1);
+  const textBubbleMaterial = new THREE.MeshBasicMaterial({ 
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0
+  });
+  const textBubble = new THREE.Mesh(textBubbleGeometry, textBubbleMaterial);
+  textBubble.position.set(0, 2.5, 0);
+  textBubble.visible = false;
+  textBubble.name = 'textBubble';
+  model.add(textBubble);
+  
+  // Set initial position and rotation
+  model.position.set(
+    player.position.x,
+    player.position.y,
+    player.position.z
+  );
+  model.rotation.y = player.rotation || 0;
+  
+  return model;
+}
+
+// Update player in scene
+function updatePlayerInScene(player) {
+  const model = playerModels[player.id];
+  if (!model) return;
+  
+  // Update position and rotation
+  model.position.set(
+    player.position.x,
+    player.position.y,
+    player.position.z
+  );
+  model.rotation.y = player.rotation || 0;
+  
+  // Update role indicator
+  const roleIndicator = model.getObjectByName('roleIndicator');
+  if (roleIndicator) {
+    roleIndicator.visible = player.role === 'fighter';
+  }
+}
+
+// Position viewer
 function positionViewer(model, viewerIndex) {
   // Constants for viewer positioning
-  const FIRST_ROW_DISTANCE = RING_RADIUS * 1.5;
-  const ROW_SPACING = RING_RADIUS * 0.5;
+  const FIRST_ROW_DISTANCE = RING_RADIUS * 1.3;
+  const ROW_SPACING = RING_RADIUS * 0.4;
   
   const BENCH_HEIGHT = 0.1;
-  const ELEVATION_INCREMENT = 0.5;
-  const SEATS_PER_FIRST_ROW = 5;
+  const ELEVATION_INCREMENT = 0.8;
+  const SEATS_PER_FIRST_ROW = 10;
   const SEATS_INCREMENT = 2;
-  const NUM_ROWS = 6;
+  const NUM_ROWS = 16;
   
   // Calculate total seats per side
   let totalSeatsPerSide = 0;
@@ -375,7 +496,7 @@ function positionViewer(model, viewerIndex) {
   }
   
   // Determine which side and seat
-  const side = Math.floor(viewerIndex / totalSeatsPerSide) % 3; // 0=North, 1=East, 2=West
+  const side = Math.floor(viewerIndex / totalSeatsPerSide) % 4; // 0=North, 1=East, 2=West, 3=South
   const seatInSide = viewerIndex % totalSeatsPerSide;
   
   // Find which row and seat in row
@@ -422,492 +543,16 @@ function positionViewer(model, viewerIndex) {
       z = offset;
       rotation = Math.PI / 2;
       break;
+    case 3: // South
+      x = offset;
+      z = distance;
+      rotation = 0;
+      break;
   }
   
   // Set position and rotation
   model.position.set(x, y, z);
   model.rotation.y = rotation;
-}
-
-// Create a sumo wrestler model
-function createSumoModel(player) {
-  // Create the sumo model
-  const model = new THREE.Group();
-  
-  // Store the player's role in userData for future reference
-  model.userData = {
-    id: player.id,
-    role: player.role
-  };
-  
-  // Body (sphere)
-  const bodyGeometry = new THREE.SphereGeometry(1, 32, 32);
-  const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700 }); // Gold color for the sumo mawashi
-  const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-  body.castShadow = true;
-  model.add(body);
-  
-  // Head (smaller sphere)
-  const headGeometry = new THREE.SphereGeometry(0.5, 32, 32);
-  const headMaterial = new THREE.MeshStandardMaterial({ color: 0xFFE4C4 }); // Bisque color
-  const head = new THREE.Mesh(headGeometry, headMaterial);
-  head.position.y = 1;
-  model.add(head);
-  
-  // Face (use texture)
-  const faceGeometry = new THREE.PlaneGeometry(0.5, 0.5);
-  const faceMaterial = new THREE.MeshBasicMaterial({ 
-    map: faceTextures[player.faceTexture] || faceTextures[0],
-    transparent: true
-  });
-  const face = new THREE.Mesh(faceGeometry, faceMaterial);
-  face.position.set(0, 1, 0.51); // Slightly in front of the head
-  model.add(face);
-  
-  // Arms
-  const armGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.8, 16);
-  const armMaterial = new THREE.MeshStandardMaterial({ color: 0xFFE4C4 });
-  
-  const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-  leftArm.position.set(-0.8, 0.2, 0);
-  leftArm.rotation.z = Math.PI / 4;
-  model.add(leftArm);
-  
-  const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-  rightArm.position.set(0.8, 0.2, 0);
-  rightArm.rotation.z = -Math.PI / 4;
-  model.add(rightArm);
-  
-  // Legs
-  const legGeometry = new THREE.CylinderGeometry(0.25, 0.25, 0.6, 16);
-  const legMaterial = new THREE.MeshStandardMaterial({ color: 0xFFE4C4 });
-  
-  const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-  leftLeg.position.set(-0.4, -0.8, 0);
-  model.add(leftLeg);
-  
-  const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-  rightLeg.position.set(0.4, -0.8, 0);
-  model.add(rightLeg);
-  
-  // Add emote bubble (hidden by default)
-  const bubbleGeometry = new THREE.SphereGeometry(0.4, 16, 16);
-  const bubbleMaterial = new THREE.MeshBasicMaterial({ 
-    color: 0xFFFFFF,
-    transparent: true,
-    opacity: 0.8
-  });
-  const emoteBubble = new THREE.Mesh(bubbleGeometry, bubbleMaterial);
-  emoteBubble.position.set(0, 2, 0);
-  emoteBubble.visible = false;
-  emoteBubble.name = 'emoteBubble';
-  model.add(emoteBubble);
-  
-  // Add text bubble (hidden by default)
-  const textBubbleGeometry = new THREE.PlaneGeometry(2, 0.8);
-  const textBubbleMaterial = new THREE.MeshBasicMaterial({
-    color: 0xFFFFFF,
-    transparent: true,
-    opacity: 0.8
-  });
-  const textBubble = new THREE.Mesh(textBubbleGeometry, textBubbleMaterial);
-  textBubble.position.set(0, 2.2, 0);
-  textBubble.visible = false;
-  textBubble.name = 'textBubble';
-  model.add(textBubble);
-  
-  // Set initial position and rotation
-  model.position.set(
-    player.position.x,
-    player.position.y,
-    player.position.z
-  );
-  model.rotation.y = player.rotation || 0;
-  
-  // Add role indicator
-  let roleMaterial;
-  if (player.role === 'fighter') {
-    roleMaterial = new THREE.MeshBasicMaterial({ color: 0xFF0000 }); // Red for fighters
-  } else if (player.role === 'referee') {
-    roleMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 }); // Black for referee
-  } else {
-    roleMaterial = new THREE.MeshBasicMaterial({ color: 0x0000FF }); // Blue for viewers
-  }
-  
-  const roleIndicator = new THREE.Mesh(
-    new THREE.SphereGeometry(0.2, 16, 16),
-    roleMaterial
-  );
-  roleIndicator.position.y = 2;
-  roleIndicator.name = 'roleIndicator';
-  model.add(roleIndicator);
-  
-  return model;
-}
-
-// Add a player to the scene
-function addPlayerToScene(player) {
-  // Create a sumo model for the player
-  const model = createSumoModel(player);
-  
-  // Position the player based on their role
-  if (player.role === 'fighter') {
-    // Fighters are on the ring
-    model.position.set(
-      player.position.x,
-      RING_HEIGHT + 0.5, // On top of the ring
-      player.position.z
-    );
-    model.rotation.y = player.rotation;
-  } else if (player.role === 'referee') {
-    // Referee is in the center of the ring
-    model.position.set(0, RING_HEIGHT + 0.5, 0);
-    model.scale.set(0.8, 0.8, 0.8);
-  } else {
-    // Viewer positioning - use a deterministic approach based on player ID
-    const idNumber = parseInt(player.id.substring(0, 8), 16);
-    const viewerIndex = idNumber % 60; // Limit to 60 seats (our bench capacity)
-    
-    positionViewer(model, viewerIndex);
-  }
-  
-  // Add to scene and store in playerModels
-  scene.add(model);
-  playerModels[player.id] = model;
-  
-  // If the player has an emote, show it
-  if (player.emote) {
-    showPlayerEmote(player.id, player.emote);
-  }
-  
-  // If the player has a message, show it
-  if (player.message) {
-    showPlayerMessage(player.id, player.message);
-  }
-  
-  return model;
-}
-
-// Remove a player from the scene
-function removePlayerFromScene(playerId) {
-  const model = playerModels[playerId];
-  if (model) {
-    scene.remove(model);
-    delete playerModels[playerId];
-  }
-}
-
-// Update a player's position and rotation
-function updatePlayerPosition(playerId, position, rotation) {
-  const model = playerModels[playerId];
-  if (model) {
-    model.position.x = position.x;
-    model.position.y = position.y;
-    model.position.z = position.z;
-    
-    if (rotation !== undefined) {
-      model.rotation.y = rotation;
-    }
-  }
-}
-
-// Show an emote for a player
-function showPlayerEmote(playerId, emoteType) {
-  const model = playerModels[playerId];
-  if (!model) return;
-  
-  // Find or create an emote bubble for this player
-  let emoteBubble = model.getObjectByName('emoteBubble');
-  
-  if (!emoteBubble) {
-    // Create a new emote bubble
-    const bubbleGeometry = new THREE.PlaneGeometry(1, 1);
-    const bubbleMaterial = new THREE.MeshBasicMaterial({
-      transparent: true,
-      opacity: 0.9,
-      side: THREE.DoubleSide
-    });
-    
-    emoteBubble = new THREE.Mesh(bubbleGeometry, bubbleMaterial);
-    emoteBubble.position.set(0, 2, 0);
-    emoteBubble.name = 'emoteBubble';
-    emoteBubble.visible = false;
-    model.add(emoteBubble);
-  }
-  
-  if (emoteType) {
-    emoteBubble.visible = true;
-    
-    // Create a canvas texture for the emote
-    const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    
-    // Draw bubble background
-    ctx.fillStyle = 'white';
-    ctx.strokeStyle = 'black';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(64, 64, 60, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    
-    // Draw emote
-    ctx.fillStyle = 'black';
-    ctx.font = '60px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
-    let emoteSymbol = '👍';
-    switch (emoteType) {
-      case 'cheer':
-        emoteSymbol = '👏';
-        break;
-      case 'laugh':
-        emoteSymbol = '😂';
-        break;
-      case 'surprise':
-        emoteSymbol = '😮';
-        break;
-      case 'angry':
-        emoteSymbol = '😠';
-        break;
-    }
-    
-    ctx.fillText(emoteSymbol, 64, 64);
-    
-    // Update the texture
-    const texture = new THREE.CanvasTexture(canvas);
-    emoteBubble.material.map = texture;
-    emoteBubble.material.needsUpdate = true;
-  } else {
-    emoteBubble.visible = false;
-  }
-}
-
-// Show a message for a player
-function showPlayerMessage(playerId, message) {
-  const model = playerModels[playerId];
-  if (!model) return;
-  
-  // Find or create a text bubble for this player
-  let textBubble = model.getObjectByName('textBubble');
-  
-  if (!textBubble) {
-    // Create a new text bubble
-    const bubbleGeometry = new THREE.PlaneGeometry(2, 1);
-    const bubbleMaterial = new THREE.MeshBasicMaterial({
-      transparent: true,
-      opacity: 0.9,
-      side: THREE.DoubleSide
-    });
-    
-    textBubble = new THREE.Mesh(bubbleGeometry, bubbleMaterial);
-    textBubble.position.set(0, 2.5, 0);
-    textBubble.name = 'textBubble';
-    textBubble.visible = false;
-    model.add(textBubble);
-  }
-  
-  if (message) {
-    textBubble.visible = true;
-    
-    // Create a canvas texture for the text
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    
-    // Draw bubble background
-    ctx.fillStyle = 'white';
-    ctx.strokeStyle = 'black';
-    ctx.lineWidth = 3;
-    roundRect(ctx, 5, 5, 246, 118, 10, true, true);
-    
-    // Draw text
-    ctx.fillStyle = 'black';
-    ctx.font = '20px "Sawarabi Mincho", serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
-    // Word wrap the message
-    const words = message.split(' ');
-    let line = '';
-    let y = 64;
-    const lineHeight = 24;
-    const maxWidth = 230;
-    
-    if (words.length === 1) {
-      // Single word, just center it
-      ctx.fillText(message, 128, 64);
-    } else {
-      // Multiple words, do word wrapping
-      let lines = [];
-      let currentLine = '';
-      
-      for (let i = 0; i < words.length; i++) {
-        const testLine = currentLine + words[i] + ' ';
-        const metrics = ctx.measureText(testLine);
-        
-        if (metrics.width > maxWidth && i > 0) {
-          lines.push(currentLine);
-          currentLine = words[i] + ' ';
-        } else {
-          currentLine = testLine;
-        }
-      }
-      lines.push(currentLine);
-      
-      // Calculate starting Y based on number of lines
-      const startY = 64 - ((lines.length - 1) * lineHeight / 2);
-      
-      // Draw each line
-      for (let i = 0; i < lines.length; i++) {
-        ctx.fillText(lines[i], 128, startY + (i * lineHeight));
-      }
-    }
-    
-    // Update the texture
-    const texture = new THREE.CanvasTexture(canvas);
-    textBubble.material.map = texture;
-    textBubble.material.needsUpdate = true;
-  } else {
-    textBubble.visible = false;
-  }
-}
-
-// Helper function to draw rounded rectangles
-function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.lineTo(x + width - radius, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-  ctx.lineTo(x + width, y + height - radius);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-  ctx.lineTo(x + radius, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-  ctx.lineTo(x, y + radius);
-  ctx.quadraticCurveTo(x, y, x + radius, y);
-  ctx.closePath();
-  if (fill) {
-    ctx.fill();
-  }
-  if (stroke) {
-    ctx.stroke();
-  }
-}
-
-// Show round start animation
-function showRoundStart(fighter1, fighter2) {
-  // Create a text overlay
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  
-  // Draw background
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(0, 0, 512, 256);
-  
-  // Draw text
-  ctx.fillStyle = 'white';
-  ctx.font = 'bold 40px Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('ROUND START!', 256, 80);
-  
-  ctx.font = '30px Arial';
-  ctx.fillText(`${fighter1.id.substring(0, 6)} VS ${fighter2.id.substring(0, 6)}`, 256, 150);
-  
-  // Create a plane to display the text
-  const geometry = new THREE.PlaneGeometry(10, 5);
-  const texture = new THREE.CanvasTexture(canvas);
-  const material = new THREE.MeshBasicMaterial({
-    map: texture,
-    transparent: true,
-    opacity: 1
-  });
-  
-  const roundStartPlane = new THREE.Mesh(geometry, material);
-  roundStartPlane.position.set(0, 5, 0);
-  roundStartPlane.name = 'roundStartPlane';
-  scene.add(roundStartPlane);
-  
-  // Remove after a few seconds
-  setTimeout(() => {
-    scene.remove(roundStartPlane);
-  }, 3000);
-}
-
-// Show round end animation
-function showRoundEnd(winnerId, loserId) {
-  // Create a text overlay
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  
-  // Draw background
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(0, 0, 512, 256);
-  
-  // Draw text
-  ctx.fillStyle = 'white';
-  ctx.font = 'bold 40px Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('ROUND OVER!', 256, 80);
-  
-  ctx.font = '30px Arial';
-  if (winnerId) {
-    ctx.fillText(`Winner: ${winnerId.substring(0, 6)}`, 256, 150);
-  } else {
-    ctx.fillText('No winner', 256, 150);
-  }
-  
-  // Create a plane to display the text
-  const geometry = new THREE.PlaneGeometry(10, 5);
-  const texture = new THREE.CanvasTexture(canvas);
-  const material = new THREE.MeshBasicMaterial({
-    map: texture,
-    transparent: true,
-    opacity: 1
-  });
-  
-  const roundEndPlane = new THREE.Mesh(geometry, material);
-  roundEndPlane.position.set(0, 5, 0);
-  roundEndPlane.name = 'roundEndPlane';
-  scene.add(roundEndPlane);
-  
-  // Remove after a few seconds
-  setTimeout(() => {
-    scene.remove(roundEndPlane);
-  }, 3000);
-}
-
-// Update the scene when roles change
-function updateScene() {
-  // Remove all existing player models
-  Object.keys(playerModels).forEach(id => {
-    scene.remove(playerModels[id]);
-    delete playerModels[id];
-  });
-  
-  // Add fighters
-  gameState.fighters.forEach(fighter => {
-    addPlayerToScene(fighter);
-  });
-  
-  // Add referee
-  if (gameState.referee) {
-    addPlayerToScene(gameState.referee);
-  }
-  
-  // Add viewers
-  gameState.viewers.forEach(viewer => {
-    addPlayerToScene(viewer);
-  });
 }
 
 // Handle window resize
