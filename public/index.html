@@ -85,53 +85,62 @@
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
         }
         
-        /* Improved Controls Panel */
+        /* Reorganized Controls Layout */
         #controls-panel {
             position: absolute;
             bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 80%;
-            max-width: 800px;
+            right: 20px;
+            width: 30%; /* Make input area wider (30% of window) */
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            align-items: center;
+            align-items: flex-end;
         }
         
-        /* Emote Buttons */
-        .emote-container {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
+        /* Chat area (bottom right) */
+        .chat-area {
             width: 100%;
-            flex-wrap: wrap;
-        }
-        
-        .emote-btn {
-            background-color: rgba(255, 255, 255, 0.85);
-            border: none;
-            border-radius: 10px;
-            padding: 15px;
-            cursor: pointer;
-            transition: all 0.2s ease;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
-            width: 60px;
-            height: 60px;
+            flex-direction: column;
         }
         
-        .emote-emoji {
-            font-size: 2rem;
+        /* Chat history */
+        .chat-history {
+            width: 100%;
+            margin-bottom: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
         
-        /* Chat Input */
+        .chat-message {
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+            word-break: break-word;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .chat-message .sender {
+            font-weight: bold;
+            margin-right: 5px;
+            color: #f9d9aa;
+        }
+        
+        /* Chat input */
         .chat-container {
             display: flex;
             width: 100%;
             gap: 10px;
+            margin-bottom: 10px;
         }
         
         #chat-input {
@@ -161,6 +170,7 @@
             font-size: 1.1rem;
             transition: all 0.2s ease;
             box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+            white-space: nowrap;
         }
         
         #send-btn:hover {
@@ -169,9 +179,37 @@
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
         }
         
-        #send-btn:active {
-            transform: translateY(1px);
-            box-shadow: 0 2px 3px rgba(0, 0, 0, 0.2);
+        /* Emoji panel (now below chat input) */
+        .emote-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            width: 100%;
+        }
+        
+        .emote-btn {
+            background-color: rgba(255, 255, 255, 0.85);
+            border: none;
+            border-radius: 10px;
+            padding: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+            width: 45px;
+            height: 45px;
+        }
+        
+        .emote-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .emote-emoji {
+            font-size: 1.8rem;
         }
         
         /* Role badge */
@@ -280,32 +318,42 @@
         <!-- Add sponsor banner -->
         <div id="sponsor-banner"></div>
         
-        <!-- Improved Controls Panel with icon-only emotes -->
+        <!-- Reorganized Controls Panel -->
         <div id="controls-panel">
-            <div class="emote-container">
-                <button class="emote-btn" onclick="sendEmote('👏')">
-                    <span class="emote-emoji">👏</span>
-                </button>
-                <button class="emote-btn" onclick="sendEmote('😂')">
-                    <span class="emote-emoji">😂</span>
-                </button>
-                <button class="emote-btn" onclick="sendEmote('😮')">
-                    <span class="emote-emoji">😮</span>
-                </button>
-                <button class="emote-btn" onclick="sendEmote('😠')">
-                    <span class="emote-emoji">😠</span>
-                </button>
-                <button class="emote-btn" onclick="sendEmote('🙌')">
-                    <span class="emote-emoji">🙌</span>
-                </button>
-                <button class="emote-btn" onclick="sendEmote('🎉')">
-                    <span class="emote-emoji">🎉</span>
-                </button>
-            </div>
-            
-            <div class="chat-container">
-                <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off">
-                <button id="send-btn" onclick="sendMessage()">Send</button>
+            <!-- Chat area on bottom right -->
+            <div class="chat-area">
+                <!-- Chat history panel -->
+                <div class="chat-history" id="chat-history">
+                    <!-- Messages will be added here dynamically -->
+                </div>
+                
+                <!-- Chat input container -->
+                <div class="chat-container">
+                    <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off">
+                    <button id="send-btn" onclick="sendMessage()">Send</button>
+                </div>
+                
+                <!-- Emoji buttons below chat input -->
+                <div class="emote-container">
+                    <button class="emote-btn" onclick="sendEmote('👏')">
+                        <span class="emote-emoji">👏</span>
+                    </button>
+                    <button class="emote-btn" onclick="sendEmote('😂')">
+                        <span class="emote-emoji">😂</span>
+                    </button>
+                    <button class="emote-btn" onclick="sendEmote('😮')">
+                        <span class="emote-emoji">😮</span>
+                    </button>
+                    <button class="emote-btn" onclick="sendEmote('😠')">
+                        <span class="emote-emoji">😠</span>
+                    </button>
+                    <button class="emote-btn" onclick="sendEmote('🙌')">
+                        <span class="emote-emoji">🙌</span>
+                    </button>
+                    <button class="emote-btn" onclick="sendEmote('🎉')">
+                        <span class="emote-emoji">🎉</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -351,9 +399,12 @@
             document.getElementById('player-count').textContent = count;
         }
         
-        // Emote button handler
+        // Modified emote handler to also update chat history
         function sendEmote(emote) {
             if (window.sendPlayerEmoteToServer) {
+                // Add emote to local chat history
+                addEmoteToHistory('You', emote);
+                
                 window.sendPlayerEmoteToServer(emote);
                 
                 // Add animation effect to button
@@ -369,16 +420,105 @@
             }
         }
         
-        // Chat message handler
+        // Modified chat message handler to update chat history
         function sendMessage() {
             const chatInput = document.getElementById('chat-input');
             const message = chatInput.value.trim();
             
             if (message && window.sendPlayerMessageToServer) {
+                // Add message to local chat history (as "You")
+                addMessageToHistory('You', message);
+                
+                // Send to server
                 window.sendPlayerMessageToServer(message);
                 chatInput.value = '';
             }
         }
+        
+        // Function to add message to chat history
+        function addMessageToHistory(sender, message) {
+            // Don't show duplicate "You" messages from server
+            if (sender !== 'You' || !window.gameState || sender !== window.gameState.myId.substring(0, 6)) {
+                const chatHistory = document.getElementById('chat-history');
+                const messageElement = document.createElement('div');
+                messageElement.className = 'chat-message';
+                
+                // Create sender span
+                const senderSpan = document.createElement('span');
+                senderSpan.className = 'sender';
+                senderSpan.textContent = sender + ':';
+                
+                // Add message content
+                messageElement.appendChild(senderSpan);
+                messageElement.appendChild(document.createTextNode(' ' + message));
+                
+                // Add to history
+                chatHistory.appendChild(messageElement);
+                
+                // Limit history to last 5 messages
+                while (chatHistory.children.length > 5) {
+                    chatHistory.removeChild(chatHistory.children[0]);
+                }
+            }
+        }
+        
+        // Function to add emote to chat history
+        function addEmoteToHistory(sender, emote) {
+            const chatHistory = document.getElementById('chat-history');
+            const messageElement = document.createElement('div');
+            messageElement.className = 'chat-message';
+            
+            // Create sender span
+            const senderSpan = document.createElement('span');
+            senderSpan.className = 'sender';
+            senderSpan.textContent = sender + ':';
+            
+            // Add emote content
+            messageElement.appendChild(senderSpan);
+            
+            // Add emote with larger font
+            const emoteSpan = document.createElement('span');
+            emoteSpan.style.fontSize = '1.8rem';
+            emoteSpan.style.marginLeft = '8px';
+            emoteSpan.textContent = emote;
+            messageElement.appendChild(emoteSpan);
+            
+            // Add to history
+            chatHistory.appendChild(messageElement);
+            
+            // Limit history to last 5 messages
+            while (chatHistory.children.length > 5) {
+                chatHistory.removeChild(chatHistory.children[0]);
+            }
+        }
+        
+        // Listen for player messages from server
+        window.addEventListener('playerMessageReceived', function(e) {
+            if (e.detail && e.detail.id && e.detail.message) {
+                // Skip if this is your own message (already added with "You")
+                if (e.detail.id === window.gameState.myId) {
+                    return;
+                }
+                
+                // Use a short ID or username if available
+                const username = e.detail.username || e.detail.id.substring(0, 6);
+                addMessageToHistory(username, e.detail.message);
+            }
+        });
+        
+        // Listen for player emotes from server
+        window.addEventListener('playerEmoteReceived', function(e) {
+            if (e.detail && e.detail.id && e.detail.emote) {
+                // Skip if this is your own emote (already added with "You")
+                if (e.detail.id === window.gameState.myId) {
+                    return;
+                }
+                
+                // Use a short ID or username if available
+                const username = e.detail.username || e.detail.id.substring(0, 6);
+                addEmoteToHistory(username, e.detail.emote);
+            }
+        });
         
         // Add enter key handler for chat
         document.getElementById('chat-input').addEventListener('keypress', function(e) {

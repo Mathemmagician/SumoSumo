@@ -135,11 +135,31 @@ function connectToServer() {
   // Player emote
   socket.on('playerEmote', (data) => {
     showPlayerEmote(data.id, data.emote);
+    
+    // Dispatch custom event for chat history
+    const emoteEvent = new CustomEvent('playerEmoteReceived', {
+      detail: {
+        id: data.id,
+        emote: data.emote,
+        username: findPlayerUsername(data.id)
+      }
+    });
+    window.dispatchEvent(emoteEvent);
   });
 
   // Player message
   socket.on('playerMessage', (data) => {
     showPlayerMessage(data.id, data.message);
+    
+    // Dispatch custom event for chat history
+    const messageEvent = new CustomEvent('playerMessageReceived', {
+      detail: {
+        id: data.id,
+        message: data.message,
+        username: findPlayerUsername(data.id)
+      }
+    });
+    window.dispatchEvent(messageEvent);
   });
 
   // Fighters selected
@@ -495,3 +515,13 @@ window.sendPlayerMessageToServer = function(message) {
     if (messageInput) messageInput.value = '';
   }
 };
+
+// Helper function to get username from player ID
+function findPlayerUsername(id) {
+  const player = findPlayerInGameState(id);
+  if (player) {
+    // If there's a name property, use it, otherwise use a short ID
+    return player.name || id.substring(0, 6);
+  }
+  return id.substring(0, 6);
+}

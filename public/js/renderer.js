@@ -983,7 +983,7 @@ function showPlayerEmote(playerId, emoteType) {
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, 128, 128);
     ctx.fillStyle = 'black';
-    ctx.font = 'bold 60px Arial';
+    ctx.font = 'bold 80px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(emoteType, 64, 64);
@@ -1025,9 +1025,9 @@ function showPlayerMessage(playerId, message) {
     ctx.lineWidth = 4;
     ctx.strokeRect(2, 2, 508, 252);
 
-    // Draw text
+    // Draw text - INCREASE FONT SIZE HERE
     ctx.fillStyle = 'black';
-    ctx.font = '24px Arial';
+    ctx.font = '36px Arial'; // Changed from 24px to 36px
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
@@ -1035,8 +1035,8 @@ function showPlayerMessage(playerId, message) {
     const words = message.split(' ');
     let line = '';
     let y = 128;
-    const maxWidth = 480;
-    const lineHeight = 30;
+    const maxWidth = 460; // Slightly reduced to account for larger font
+    const lineHeight = 42; // Increased from 30 to 42
 
     for (let i = 0; i < words.length; i++) {
       const testLine = line + words[i] + ' ';
