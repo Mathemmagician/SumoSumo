@@ -477,11 +477,6 @@ function logPlayerCounts(context) {
   const totalPlayers = gameState.fighters.length
     + gameState.viewers.length
     + (gameState.referee ? 1 : 0);
-  console.log(`${context} - Total players: ${totalPlayers}`);
-  console.log(`Fighters: ${gameState.fighters.length}, Viewers: ${gameState.viewers.length}, Referee: ${gameState.referee ? 1 : 0}`);
-  console.log("Fighter IDs:", gameState.fighters.map(f => f.id));
-  console.log("Viewer IDs:", gameState.viewers.map(v => v.id));
-  console.log("Referee ID:", gameState.referee ? gameState.referee.id : "none");
 }
 
 function capitalize(str) {
