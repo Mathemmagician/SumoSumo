@@ -361,7 +361,10 @@ io.on('connection', (socket) => {
     id: socket.id,
     role: 'viewer',
     position: { x: 0, y: 0, z: 0 },
-    rotation: 0
+    rotation: 0,
+    faceId: Math.floor(Math.random() * 10),  // 0-9 inclusive
+    colorId: Math.floor(Math.random() * 10), // 0-9 inclusive
+    seed: Math.floor(Math.random() * 1000000) // Random seed for any future randomization needs
   };
 
   // Add to viewers

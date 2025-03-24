@@ -404,43 +404,42 @@ function addPlayerToScene(player) {
 
 // Create sumo model
 function createSumoModel(player) {
-  const numericId = hashString(player.id);
-
   const model = new THREE.Group();
   model.userData = {
     id: player.id,
     role: player.role
   };
 
-  // Body
+  // Body - now using player.colorId
   const bodyGeometry = new THREE.SphereGeometry(1, 32, 32);
-  const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700 });
+  const bodyColor = new THREE.Color().setHSL(player.colorId * 0.1, 0.8, 0.6); // Spread colors across hue spectrum
+  const bodyMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
   const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
   body.castShadow = true;
   model.add(body);
 
-  // Head
+  // Head - now using player.faceId directly
   const headGeometry = new THREE.SphereGeometry(0.5, 32, 32);
   const headMaterial = new THREE.MeshStandardMaterial({
-    map: faceTextures[numericId % faceTextures.length]
+    map: faceTextures[player.faceId]
   });
   const head = new THREE.Mesh(headGeometry, headMaterial);
   head.position.y = 1;
   model.add(head);
 
-  // Face plane
+  // Face plane - now using player.faceId directly
   const faceGeometry = new THREE.PlaneGeometry(1, 1);
   const faceMaterial = new THREE.MeshBasicMaterial({ 
-    map: faceTextures[numericId % faceTextures.length],
+    map: faceTextures[player.faceId],
     transparent: true
   });
   const face = new THREE.Mesh(faceGeometry, faceMaterial);
   face.position.set(0, 1, 0.51);
   model.add(face);
 
-  // Arms
+  // Arms - match body color
   const armGeometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 32);
-  const armMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700 });
+  const armMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
   const leftArm = new THREE.Mesh(armGeometry, armMaterial);
   leftArm.position.set(-0.8, 0.2, 0);
   leftArm.rotation.z = Math.PI / 4;
@@ -451,9 +450,9 @@ function createSumoModel(player) {
   rightArm.rotation.z = -Math.PI / 4;
   model.add(rightArm);
 
-  // Legs
+  // Legs - match body color
   const legGeometry = new THREE.CylinderGeometry(0.15, 0.15, 1, 32);
-  const legMaterial = new THREE.MeshStandardMaterial({ color: 0xFFD700 });
+  const legMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
   const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
   leftLeg.position.set(-0.4, -0.8, 0);
   model.add(leftLeg);
@@ -502,8 +501,7 @@ function updatePlayerInScene(player) {
   // Update position & rotation
 
   if (player.role === 'viewer') {
-    const numericId = hashString(player.id);
-    positionViewer(model, numericId);
+    positionViewer(model, player.seed);
   } else {
     model.position.set(player.position.x, player.position.y, player.position.z);
   }
@@ -515,21 +513,30 @@ function updatePlayerInScene(player) {
 
 // REMOVED: updateFighterReadyState(...) entirely
 
-// Position viewer (used by updateScene() in some cases)
-// Position viewer
+// Position viewer - now using player.seed instead of hashString
 function positionViewer(model, viewerIndex) {
-  const NUM_ROWS = 5;
-  
+  // Find the player object from gameState
+  const playerId = model.userData.id;
+  const player = 
+    gameState.viewers.find(v => v.id === playerId) ||
+    gameState.fighters.find(f => f.id === playerId) ||
+    (gameState.referee && gameState.referee.id === playerId ? gameState.referee : null);
+
+  if (!player) return;
+
+  // Use player.seed instead of viewerIndex for consistent positioning
+  const seatIndex = player.seed % 60; // Limit to 60 seats for cycling
+
   // Calculate total seats per prioritized side (North, West, East)
   let totalSeatsPerSide = 0;
-  for (let i = 0; i < NUM_ROWS; i++) {
+  for (let i = 0; i < 5; i++) {
     totalSeatsPerSide += (SEATS_PER_FIRST_ROW + (i * SEATS_INCREMENT));
   }
   
   // Determine which side and seat
   const sideOrder = [0, 2, 1]; // 0=North, 2=West, 1=East (prioritize these sides)
-  const side = sideOrder[Math.floor(viewerIndex / totalSeatsPerSide) % 3];
-  const seatInSide = viewerIndex % totalSeatsPerSide;
+  const side = sideOrder[Math.floor(seatIndex / totalSeatsPerSide) % 3];
+  const seatInSide = seatIndex % totalSeatsPerSide;
   
   // Find which row and seat in row
   let row = 0;
@@ -827,15 +834,4 @@ async function createTexturedMesh() {
   } catch (error) {
     console.error('Failed to create textured mesh:', error);
   }
-}
-
-
-function hashString(str) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i); 
-    // or any simple hashing approach
-    hash |= 0; // force 32-bit
-  }
-  return Math.abs(hash); // make it positive
 }
