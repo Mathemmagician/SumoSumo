@@ -178,11 +178,11 @@ function selectFighters() {
 
   // Set their roles & positions (no more .ready here)
   fighter1.role = 'fighter';
-  fighter1.position = { x: -3, y: 0, z: 0 };
+  fighter1.position = { x: -3, y: 2, z: 0 };
   fighter1.rotation = -Math.PI / 2;
 
   fighter2.role = 'fighter';
-  fighter2.position = { x: 3, y: 0, z: 0 };
+  fighter2.position = { x: 3, y: 2, z: 0 };
   fighter2.rotation = Math.PI / 2;
 
   // Add them to the fighters array
@@ -226,7 +226,7 @@ function startPreMatchCeremony() {
     referee: sanitizeForSocketIO(gameState.referee)
   });
 
-  // Move fighters slightly apart
+  // Move fighters slightly apart and up in the air
   gameState.fighters[0].position = { x: -5, y: 2, z: 0 };
   gameState.fighters[1].position = { x: 5, y: 2, z: 0 };
 
@@ -271,8 +271,8 @@ function startMatch() {
   }
 
   // Reset fighter positions
-  gameState.fighters[0].position = { x: -3, y: 0, z: 0 };
-  gameState.fighters[1].position = { x: 3, y: 0, z: 0 };
+  gameState.fighters[0].position = { x: -3, y: 2, z: 0 };
+  gameState.fighters[1].position = { x: 3, y: 2, z: 0 };
 
   // Broadcast match start
   io.emit('matchStart', {
