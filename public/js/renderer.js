@@ -1,3 +1,10 @@
+// At the very top of renderer.js, add:
+window.removePlayerFromScene = removePlayerFromScene;
+window.showPlayerEmote = showPlayerEmote;
+window.showPlayerMessage = showPlayerMessage;
+window.addPlayerToScene = addPlayerToScene;
+window.updatePlayerInScene = updatePlayerInScene;
+
 // Three.js renderer code
 let scene, camera, renderer;
 let ring, playerModels = {};
@@ -402,7 +409,7 @@ function addPlayerToScene(player) {
   scene.add(model);
 }
 
-// Create sumo model
+// Create player model based on role
 function createSumoModel(player) {
   const model = new THREE.Group();
   model.userData = {
@@ -410,36 +417,42 @@ function createSumoModel(player) {
     role: player.role
   };
 
-  // Body - now using player.colorId
+  // Create the appropriate model based on role
+  if (player.role === 'fighter') {
+    addFighterModel(model, player);
+  } else if (player.role === 'referee') {
+    addRefereeModel(model, player);
+  } else {
+    addViewerModel(model, player);
+  }
+
+  // Add common elements (emote/text bubbles)
+  addCommonElements(model);
+
+  // Set initial transform
+  model.position.set(player.position.x, player.position.y, player.position.z);
+  model.rotation.y = player.rotation || 0;
+
+  return model;
+}
+
+// Fighter model (sumo wrestler)
+function addFighterModel(model, player) {
+  // Body (sphere)
   const bodyGeometry = new THREE.SphereGeometry(1, 32, 32);
-  const bodyColor = new THREE.Color().setHSL(player.colorId * 0.1, 0.8, 0.6); // Spread colors across hue spectrum
+  const bodyColor = new THREE.Color().setHSL(player.colorId * 0.1, 0.8, 0.6);
   const bodyMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
   const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
   body.castShadow = true;
   model.add(body);
 
-  // Head - now using player.faceId directly
-  const headGeometry = new THREE.SphereGeometry(0.5, 32, 32);
-  const headMaterial = new THREE.MeshStandardMaterial({
-    map: faceTextures[player.faceId]
-  });
-  const head = new THREE.Mesh(headGeometry, headMaterial);
-  head.position.y = 1;
-  model.add(head);
+  // Head with face
+  addHead(model, player);
 
-  // Face plane - now using player.faceId directly
-  const faceGeometry = new THREE.PlaneGeometry(1, 1);
-  const faceMaterial = new THREE.MeshBasicMaterial({ 
-    map: faceTextures[player.faceId],
-    transparent: true
-  });
-  const face = new THREE.Mesh(faceGeometry, faceMaterial);
-  face.position.set(0, 1, 0.51);
-  model.add(face);
-
-  // Arms - match body color
-  const armGeometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 32);
+  // Arms (thick cylinders)
+  const armGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1, 32);
   const armMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
+  
   const leftArm = new THREE.Mesh(armGeometry, armMaterial);
   leftArm.position.set(-0.8, 0.2, 0);
   leftArm.rotation.z = Math.PI / 4;
@@ -450,17 +463,104 @@ function createSumoModel(player) {
   rightArm.rotation.z = -Math.PI / 4;
   model.add(rightArm);
 
-  // Legs - match body color
-  const legGeometry = new THREE.CylinderGeometry(0.15, 0.15, 1, 32);
+  // Legs (thick cylinders)
+  const legGeometry = new THREE.CylinderGeometry(0.25, 0.25, 1, 32);
   const legMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
+  
   const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
   leftLeg.position.set(-0.4, -0.8, 0);
   model.add(leftLeg);
+  
   const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
   rightLeg.position.set(0.4, -0.8, 0);
   model.add(rightLeg);
+}
 
-  // Emote bubble (hidden)
+// Referee model (fancy capsule with robe)
+function addRefereeModel(model, player) {
+  // Body (tall capsule)
+  const bodyGeometry = new THREE.CapsuleGeometry(0.5, 1.5, 4, 8);
+  const bodyColor = new THREE.Color().setHSL(player.colorId * 0.1, 0.5, 0.3); // Darker, more formal color
+  const bodyMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
+  const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+  body.castShadow = true;
+  model.add(body);
+
+  // Head with face
+  addHead(model, player);
+
+  // Robe (cone)
+  const robeGeometry = new THREE.ConeGeometry(0.8, 1.8, 8);
+  const robeMaterial = new THREE.MeshStandardMaterial({ 
+    color: 0x2c3e50,
+    side: THREE.DoubleSide 
+  });
+  const robe = new THREE.Mesh(robeGeometry, robeMaterial);
+  robe.position.y = -0.5;
+  model.add(robe);
+
+  // Fan (traditional referee fan)
+  const fanGeometry = new THREE.BoxGeometry(0.1, 0.4, 0.02);
+  const fanMaterial = new THREE.MeshStandardMaterial({ color: 0xf1c40f });
+  const fan = new THREE.Mesh(fanGeometry, fanMaterial);
+  fan.position.set(0.6, 0.2, 0);
+  fan.rotation.z = Math.PI / 4;
+  model.add(fan);
+}
+
+// Viewer model (simple capsule)
+function addViewerModel(model, player) {
+  // Body (slim capsule)
+  const bodyGeometry = new THREE.CapsuleGeometry(0.3, 1.2, 4, 8);
+  const bodyColor = new THREE.Color().setHSL(player.colorId * 0.1, 0.7, 0.5);
+  const bodyMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
+  const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+  body.castShadow = true;
+  model.add(body);
+
+  // Head with face
+  addHead(model, player);
+
+  // Simple arms (thin cylinders)
+  const armGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.8, 8);
+  const armMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
+  
+  const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+  leftArm.position.set(-0.4, 0.2, 0);
+  leftArm.rotation.z = Math.PI / 6;
+  model.add(leftArm);
+
+  const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+  rightArm.position.set(0.4, 0.2, 0);
+  rightArm.rotation.z = -Math.PI / 6;
+  model.add(rightArm);
+}
+
+// Common head with face for all models
+function addHead(model, player) {
+  // Head sphere
+  const headGeometry = new THREE.SphereGeometry(0.4, 32, 32);
+  const headMaterial = new THREE.MeshStandardMaterial({
+    map: faceTextures[player.faceId]
+  });
+  const head = new THREE.Mesh(headGeometry, headMaterial);
+  head.position.y = 1;
+  model.add(head);
+
+  // Face plane (for clearer face display)
+  const faceGeometry = new THREE.PlaneGeometry(0.8, 0.8);
+  const faceMaterial = new THREE.MeshBasicMaterial({ 
+    map: faceTextures[player.faceId],
+    transparent: true
+  });
+  const face = new THREE.Mesh(faceGeometry, faceMaterial);
+  face.position.set(0, 1, 0.41); // Slightly in front of head sphere
+  model.add(face);
+}
+
+// Common elements (emote/text bubbles)
+function addCommonElements(model) {
+  // Emote bubble
   const emoteBubbleGeometry = new THREE.PlaneGeometry(1, 1);
   const emoteBubbleMaterial = new THREE.MeshBasicMaterial({ 
     color: 0xffffff,
@@ -473,7 +573,7 @@ function createSumoModel(player) {
   emoteBubble.name = 'emoteBubble';
   model.add(emoteBubble);
 
-  // Text bubble (hidden)
+  // Text bubble
   const textBubbleGeometry = new THREE.PlaneGeometry(2, 1);
   const textBubbleMaterial = new THREE.MeshBasicMaterial({ 
     color: 0xffffff,
@@ -485,12 +585,6 @@ function createSumoModel(player) {
   textBubble.visible = false;
   textBubble.name = 'textBubble';
   model.add(textBubble);
-
-  // Set initial transform
-  model.position.set(player.position.x, player.position.y, player.position.z);
-  model.rotation.y = player.rotation || 0;
-
-  return model;
 }
 
 // Update player in scene
@@ -498,17 +592,34 @@ function updatePlayerInScene(player) {
   const model = playerModels[player.id];
   if (!model) return;
 
-  // Update position & rotation
+  // Check if role changed
+  if (model.userData.role !== player.role) {
+    // Remove old model
+    scene.remove(model);
+    
+    // Create new model with updated role
+    const newModel = createSumoModel(player);
+    playerModels[player.id] = newModel;
+    scene.add(newModel);
+    
+    // Update position based on new role
+    if (player.role === 'viewer') {
+      positionViewer(newModel, player.seed);
+    } else {
+      newModel.position.set(player.position.x, player.position.y, player.position.z);
+      newModel.rotation.y = player.rotation || 0;
+    }
+    
+    return; // Exit early since we've handled everything for the new model
+  }
 
+  // If role hasn't changed, just update position & rotation
   if (player.role === 'viewer') {
     positionViewer(model, player.seed);
   } else {
     model.position.set(player.position.x, player.position.y, player.position.z);
   }
   model.rotation.y = player.rotation || 0;
-
-  // REMOVED: roleIndicator since we don't actually create it
-  // if (roleIndicator) { ... }
 }
 
 // REMOVED: updateFighterReadyState(...) entirely
@@ -605,22 +716,13 @@ function animate() {
 
   // Optional bobbing for viewers
   Object.values(playerModels).forEach(model => {
-    // We can do a mild bob, if role === 'viewer'
-    // Must find the player from gameState, or skip
-    // If gameState is globally accessible, do:
-    const playerId = model.userData.id;
-    const player =
-      gameState.fighters.find(f => f.id === playerId) ||
-      gameState.viewers.find(v => v.id === playerId) ||
-      (gameState.referee && gameState.referee.id === playerId ? gameState.referee : null);
-
-    if (player && player.role === 'viewer') {
-      // Bob up and down slightly
-      // Use a numeric ID approach for offset
-      const numericId = parseInt(playerId.substring(0, 8), 16) || 0;
-      // FIXED: Add bobbing to the base position instead of replacing it
-      const baseY = model.userData.baseY || 0;
-      model.position.y = baseY + Math.sin(Date.now() * 0.002 + numericId) * 0.1;
+    if (model.userData.role === 'viewer') {
+      const baseY = model.userData.baseY || model.position.y;
+      const playerId = model.userData.id;
+      const player = gameState.viewers.find(v => v.id === playerId);
+      if (player) {
+        model.position.y = baseY + Math.sin(Date.now() * 0.002 + player.seed * 0.1) * 0.1;
+      }
     }
 
     // Emote bubble float
@@ -835,3 +937,121 @@ async function createTexturedMesh() {
     console.error('Failed to create textured mesh:', error);
   }
 }
+
+// Remove player from scene
+function removePlayerFromScene(playerId) {
+  const model = playerModels[playerId];
+  if (model) {
+    scene.remove(model);
+    delete playerModels[playerId];
+  }
+}
+
+// Show player emote
+function showPlayerEmote(playerId, emoteType) {
+  const model = playerModels[playerId];
+  if (!model) return;
+
+  const emoteBubble = model.getObjectByName('emoteBubble');
+  if (!emoteBubble) return;
+
+  if (emoteType) {
+    // Show emote
+    emoteBubble.visible = true;
+    emoteBubble.material.opacity = 1;
+
+    // Create emote texture
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+
+    // Draw emote
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.fillStyle = 'black';
+    ctx.font = 'bold 60px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(emoteType, 64, 64);
+
+    // Update texture
+    const texture = new THREE.CanvasTexture(canvas);
+    emoteBubble.material.map = texture;
+    emoteBubble.material.needsUpdate = true;
+  } else {
+    // Hide emote
+    emoteBubble.visible = false;
+    emoteBubble.material.opacity = 0;
+  }
+}
+
+// Show player message
+function showPlayerMessage(playerId, message) {
+  const model = playerModels[playerId];
+  if (!model) return;
+
+  const textBubble = model.getObjectByName('textBubble');
+  if (!textBubble) return;
+
+  if (message) {
+    // Show message
+    textBubble.visible = true;
+    textBubble.material.opacity = 1;
+
+    // Create message texture
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+
+    // Draw speech bubble
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, 512, 256);
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(2, 2, 508, 252);
+
+    // Draw text
+    ctx.fillStyle = 'black';
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Word wrap the message
+    const words = message.split(' ');
+    let line = '';
+    let y = 128;
+    const maxWidth = 480;
+    const lineHeight = 30;
+
+    for (let i = 0; i < words.length; i++) {
+      const testLine = line + words[i] + ' ';
+      const metrics = ctx.measureText(testLine);
+      if (metrics.width > maxWidth && i > 0) {
+        ctx.fillText(line, 256, y);
+        line = words[i] + ' ';
+        y += lineHeight;
+      } else {
+        line = testLine;
+      }
+    }
+    ctx.fillText(line, 256, y);
+
+    // Update texture
+    const texture = new THREE.CanvasTexture(canvas);
+    textBubble.material.map = texture;
+    textBubble.material.needsUpdate = true;
+  } else {
+    // Hide message
+    textBubble.visible = false;
+    textBubble.material.opacity = 0;
+  }
+}
+
+// Expose necessary functions to global scope
+window.removePlayerFromScene = removePlayerFromScene;
+window.showPlayerEmote = showPlayerEmote;
+window.showPlayerMessage = showPlayerMessage;
+window.addPlayerToScene = addPlayerToScene;
+window.updatePlayerInScene = updatePlayerInScene;
