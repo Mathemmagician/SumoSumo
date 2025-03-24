@@ -34,6 +34,17 @@ const BENCH_HEIGHT = 0.1;
 const BENCH_DEPTH = BENCH_WIDTH;
 const ROW_SPACING = BENCH_WIDTH; // distance between rows
 
+// Cache canvas and context for reuse
+const messageCanvas = document.createElement('canvas');
+messageCanvas.width = 512;
+messageCanvas.height = 256;
+const messageCtx = messageCanvas.getContext('2d');
+
+const emoteCanvas = document.createElement('canvas');
+emoteCanvas.width = 128;
+emoteCanvas.height = 128;
+const emoteCtx = emoteCanvas.getContext('2d');
+
 /**
  * Initialize the 3D scene. We only want to do this once.
  */
@@ -960,7 +971,7 @@ function removePlayerFromScene(playerId) {
   }
 }
 
-// Show player emote
+// Show player emote (optimized)
 function showPlayerEmote(playerId, emoteType) {
   const model = playerModels[playerId];
   if (!model) return;
@@ -973,25 +984,24 @@ function showPlayerEmote(playerId, emoteType) {
     emoteBubble.visible = true;
     emoteBubble.material.opacity = 1;
 
-    // Create emote texture
-    const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
+    // Clear canvas
+    emoteCtx.clearRect(0, 0, 128, 128);
 
     // Draw emote
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, 128, 128);
-    ctx.fillStyle = 'black';
-    ctx.font = 'bold 80px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(emoteType, 64, 64);
+    emoteCtx.fillStyle = 'white';
+    emoteCtx.fillRect(0, 0, 128, 128);
+    emoteCtx.fillStyle = 'black';
+    emoteCtx.font = 'bold 80px Arial';
+    emoteCtx.textAlign = 'center';
+    emoteCtx.textBaseline = 'middle';
+    emoteCtx.fillText(emoteType, 64, 64);
 
-    // Update texture
-    const texture = new THREE.CanvasTexture(canvas);
-    emoteBubble.material.map = texture;
-    emoteBubble.material.needsUpdate = true;
+    // Reuse texture if possible
+    if (!emoteBubble.material.map) {
+      emoteBubble.material.map = new THREE.CanvasTexture(emoteCanvas);
+    } else {
+      emoteBubble.material.map.needsUpdate = true;
+    }
   } else {
     // Hide emote
     emoteBubble.visible = false;
@@ -999,7 +1009,7 @@ function showPlayerEmote(playerId, emoteType) {
   }
 }
 
-// Show player message
+// Show player message (optimized)
 function showPlayerMessage(playerId, message) {
   const model = playerModels[playerId];
   if (!model) return;
@@ -1012,49 +1022,48 @@ function showPlayerMessage(playerId, message) {
     textBubble.visible = true;
     textBubble.material.opacity = 1;
 
-    // Create message texture
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 256;
-    const ctx = canvas.getContext('2d');
+    // Clear canvas
+    messageCtx.clearRect(0, 0, 512, 256);
 
     // Draw speech bubble
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, 512, 256);
-    ctx.strokeStyle = 'black';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(2, 2, 508, 252);
+    messageCtx.fillStyle = 'white';
+    messageCtx.fillRect(0, 0, 512, 256);
+    messageCtx.strokeStyle = 'black';
+    messageCtx.lineWidth = 4;
+    messageCtx.strokeRect(2, 2, 508, 252);
 
-    // Draw text - INCREASE FONT SIZE HERE
-    ctx.fillStyle = 'black';
-    ctx.font = '36px Arial'; // Changed from 24px to 36px
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    // Draw text
+    messageCtx.fillStyle = 'black';
+    messageCtx.font = '36px Arial';
+    messageCtx.textAlign = 'center';
+    messageCtx.textBaseline = 'middle';
     
     // Word wrap the message
     const words = message.split(' ');
     let line = '';
     let y = 128;
-    const maxWidth = 460; // Slightly reduced to account for larger font
-    const lineHeight = 42; // Increased from 30 to 42
+    const maxWidth = 460;
+    const lineHeight = 42;
 
     for (let i = 0; i < words.length; i++) {
       const testLine = line + words[i] + ' ';
-      const metrics = ctx.measureText(testLine);
+      const metrics = messageCtx.measureText(testLine);
       if (metrics.width > maxWidth && i > 0) {
-        ctx.fillText(line, 256, y);
+        messageCtx.fillText(line, 256, y);
         line = words[i] + ' ';
         y += lineHeight;
       } else {
         line = testLine;
       }
     }
-    ctx.fillText(line, 256, y);
+    messageCtx.fillText(line, 256, y);
 
-    // Update texture
-    const texture = new THREE.CanvasTexture(canvas);
-    textBubble.material.map = texture;
-    textBubble.material.needsUpdate = true;
+    // Reuse texture if possible
+    if (!textBubble.material.map) {
+      textBubble.material.map = new THREE.CanvasTexture(messageCanvas);
+    } else {
+      textBubble.material.map.needsUpdate = true;
+    }
   } else {
     // Hide message
     textBubble.visible = false;

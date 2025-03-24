@@ -90,7 +90,7 @@
             position: absolute;
             bottom: 20px;
             right: 20px;
-            width: 30%; /* Make input area wider (30% of window) */
+            width: auto;
             display: flex;
             flex-direction: column;
             align-items: flex-end;
@@ -98,27 +98,28 @@
         
         /* Chat area (bottom right) */
         .chat-area {
-            width: 100%;
+            width: auto;
             display: flex;
             flex-direction: column;
+            align-items: flex-end;
         }
         
         /* Chat history */
         .chat-history {
             width: 100%;
-            margin-bottom: 10px;
-            background-color: rgba(0, 0, 0, 0.5);
+            /* margin-bottom: 10px; */
+            /* background-color: rgba(0, 0, 0, 0.5); */
             border-radius: 10px;
             padding: 10px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            /* gap: 8px; */
         }
         
         .chat-message {
-            background-color: rgba(255, 255, 255, 0.2);
+            /* background-color: rgba(255, 255, 255, 0.2); */
             border-radius: 8px;
-            padding: 8px 12px;
+            /* padding: 8px 12px; */
             font-size: 0.9rem;
             word-break: break-word;
             animation: fadeIn 0.3s ease;
@@ -138,78 +139,80 @@
         /* Chat input */
         .chat-container {
             display: flex;
-            width: 100%;
-            gap: 10px;
-            margin-bottom: 10px;
+            width: auto;
+            gap: 5px;
+            margin-bottom: 5px;
         }
         
         #chat-input {
-            flex-grow: 1;
-            border-radius: 10px;
+            flex-grow: 0;
+            border-radius: 0;
             border: none;
-            padding: 12px 15px;
-            font-size: 1.1rem;
+            padding: 8px 10px;
+            font-size: 0.9rem;
             font-family: 'Sawarabi Mincho', serif;
             background-color: rgba(255, 255, 255, 0.9);
-            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
+            width: 150px;
+            box-shadow: none;
         }
         
-        #chat-input:focus {
-            outline: none;
-            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1), 0 0 0 3px rgba(156, 102, 68, 0.3);
+        #chat-input::placeholder {
+            color: #666;
+            font-style: italic;
         }
         
         #send-btn {
-            border-radius: 10px;
+            border-radius: 0;  /* Square borders */
             border: none;
             background-color: #9c6644;
             color: white;
             font-weight: bold;
-            padding: 12px 25px;
+            padding: 8px 15px;
             cursor: pointer;
-            font-size: 1.1rem;
+            font-size: 0.9rem;
             transition: all 0.2s ease;
-            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+            box-shadow: none;  /* Remove shadow */
             white-space: nowrap;
         }
         
         #send-btn:hover {
             background-color: #a97755;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            transform: none;  /* Remove transform */
+            box-shadow: none;  /* Remove shadow */
         }
         
         /* Emoji panel (now below chat input) */
         .emote-container {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
-            justify-content: center;
-            width: 100%;
+            gap: 5px;  /* Reduced gap */
+            justify-content: flex-start;  /* Align to start */
+            width: auto;  /* Auto width */
+            margin-top: 5px;
         }
         
         .emote-btn {
             background-color: rgba(255, 255, 255, 0.85);
             border: none;
-            border-radius: 10px;
-            padding: 10px;
+            border-radius: 0;  /* Square borders */
+            padding: 8px;
             cursor: pointer;
             transition: all 0.2s ease;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
-            width: 45px;
-            height: 45px;
+            box-shadow: none;  /* Remove shadow */
+            width: 35px;  /* Smaller size */
+            height: 35px;  /* Smaller size */
         }
         
         .emote-btn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
+            transform: none;  /* Remove transform */
+            background-color: rgba(255, 255, 255, 1);
         }
         
         .emote-emoji {
-            font-size: 1.8rem;
+            font-size: 1.5rem;  /* Slightly smaller emoji */
         }
         
         /* Role badge */
@@ -329,8 +332,8 @@
                 
                 <!-- Chat input container -->
                 <div class="chat-container">
-                    <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off">
-                    <button id="send-btn" onclick="sendMessage()">Send</button>
+                    <input type="text" id="chat-input" placeholder="バイブ神..." autocomplete="off">
+                    <button id="send-btn" onclick="sendMessage()">勝者</button>
                 </div>
                 
                 <!-- Emoji buttons below chat input -->
@@ -362,6 +365,61 @@
     <script src="js/renderer.js"></script>
     <script src="js/main.js"></script>
     <script>
+        // Cache DOM elements
+        const chatHistory = document.getElementById('chat-history');
+        const chatInput = document.getElementById('chat-input');
+        
+        // Use DocumentFragment for batch DOM updates
+        function addMessageToHistory(sender, message) {
+            if (sender !== 'You' || !window.gameState || sender !== window.gameState.myId.substring(0, 6)) {
+                const fragment = document.createDocumentFragment();
+                const messageElement = document.createElement('div');
+                messageElement.className = 'chat-message';
+                
+                const senderSpan = document.createElement('span');
+                senderSpan.className = 'sender';
+                senderSpan.textContent = sender + ':';
+                
+                messageElement.appendChild(senderSpan);
+                messageElement.appendChild(document.createTextNode(' ' + message));
+                
+                fragment.appendChild(messageElement);
+                
+                // Remove old messages first if needed
+                while (chatHistory.children.length >= 5) {
+                    chatHistory.removeChild(chatHistory.firstChild);
+                }
+                
+                chatHistory.appendChild(fragment);
+            }
+        }
+        
+        // Debounce chat history updates
+        let updateTimeout;
+        function debouncedAddMessage(sender, message) {
+            clearTimeout(updateTimeout);
+            updateTimeout = setTimeout(() => {
+                addMessageToHistory(sender, message);
+            }, 16); // roughly one frame
+        }
+        
+        // Use the debounced version for event listeners
+        window.addEventListener('playerMessageReceived', function(e) {
+            if (e.detail && e.detail.id && e.detail.message) {
+                if (e.detail.id === window.gameState.myId) return;
+                const username = e.detail.username || e.detail.id.substring(0, 6);
+                debouncedAddMessage(username, e.detail.message);
+            }
+        });
+        
+        window.addEventListener('playerEmoteReceived', function(e) {
+            if (e.detail && e.detail.id && e.detail.emote) {
+                if (e.detail.id === window.gameState.myId) return;
+                const username = e.detail.username || e.detail.id.substring(0, 6);
+                debouncedAddMessage(username, e.detail.emote);
+            }
+        });
+        
         // Update role badge based on player role
         function updateRoleBadge(role) {
             const roleBadge = document.getElementById('role-badge');
@@ -435,33 +493,6 @@
             }
         }
         
-        // Function to add message to chat history
-        function addMessageToHistory(sender, message) {
-            // Don't show duplicate "You" messages from server
-            if (sender !== 'You' || !window.gameState || sender !== window.gameState.myId.substring(0, 6)) {
-                const chatHistory = document.getElementById('chat-history');
-                const messageElement = document.createElement('div');
-                messageElement.className = 'chat-message';
-                
-                // Create sender span
-                const senderSpan = document.createElement('span');
-                senderSpan.className = 'sender';
-                senderSpan.textContent = sender + ':';
-                
-                // Add message content
-                messageElement.appendChild(senderSpan);
-                messageElement.appendChild(document.createTextNode(' ' + message));
-                
-                // Add to history
-                chatHistory.appendChild(messageElement);
-                
-                // Limit history to last 5 messages
-                while (chatHistory.children.length > 5) {
-                    chatHistory.removeChild(chatHistory.children[0]);
-                }
-            }
-        }
-        
         // Function to add emote to chat history
         function addEmoteToHistory(sender, emote) {
             const chatHistory = document.getElementById('chat-history');
@@ -476,9 +507,9 @@
             // Add emote content
             messageElement.appendChild(senderSpan);
             
-            // Add emote with larger font
+            // Add emote with same font size as text
             const emoteSpan = document.createElement('span');
-            emoteSpan.style.fontSize = '1.8rem';
+            emoteSpan.style.fontSize = '0.9rem'; // Changed from 1.8rem to match text size
             emoteSpan.style.marginLeft = '8px';
             emoteSpan.textContent = emote;
             messageElement.appendChild(emoteSpan);
@@ -491,34 +522,6 @@
                 chatHistory.removeChild(chatHistory.children[0]);
             }
         }
-        
-        // Listen for player messages from server
-        window.addEventListener('playerMessageReceived', function(e) {
-            if (e.detail && e.detail.id && e.detail.message) {
-                // Skip if this is your own message (already added with "You")
-                if (e.detail.id === window.gameState.myId) {
-                    return;
-                }
-                
-                // Use a short ID or username if available
-                const username = e.detail.username || e.detail.id.substring(0, 6);
-                addMessageToHistory(username, e.detail.message);
-            }
-        });
-        
-        // Listen for player emotes from server
-        window.addEventListener('playerEmoteReceived', function(e) {
-            if (e.detail && e.detail.id && e.detail.emote) {
-                // Skip if this is your own emote (already added with "You")
-                if (e.detail.id === window.gameState.myId) {
-                    return;
-                }
-                
-                // Use a short ID or username if available
-                const username = e.detail.username || e.detail.id.substring(0, 6);
-                addEmoteToHistory(username, e.detail.emote);
-            }
-        });
         
         // Add enter key handler for chat
         document.getElementById('chat-input').addEventListener('keypress', function(e) {
