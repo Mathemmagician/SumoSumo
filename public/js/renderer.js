@@ -1036,13 +1036,6 @@ function roundRect(ctx, x, y, width, height, radius) {
   ctx.closePath();
 }
 
-// Expose necessary functions to global scope
-window.removePlayerFromScene = removePlayerFromScene;
-window.showPlayerEmote = showPlayerEmote;
-window.showPlayerMessage = showPlayerMessage;
-window.addPlayerToScene = addPlayerToScene;
-window.updatePlayerInScene = updatePlayerInScene;
-
 // Add this function after the other initialization code
 function createFpsDisplay() {
   const statsContainer = document.createElement('div');
