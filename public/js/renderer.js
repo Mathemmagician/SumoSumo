@@ -52,6 +52,29 @@ let fps = 0;
 let fpsUpdateInterval = 500; // Update FPS every 500ms
 let lastFpsUpdate = performance.now();
 
+// Add these near the top with other constants
+const CAMERA_ROTATION_SPEED = 0.002; // Adjust this value to change rotation speed
+const CAMERA_DISTANCE = 30; // Distance from center
+const CAMERA_HEIGHT = 15;   // Height of camera
+let cameraAngle = 0;       // Current angle of rotation
+
+// Add near the top with other constants
+const CEREMONY_ZOOM_DURATION = 1000; // 1 second per zoom
+const FACE_ZOOM_DISTANCE = 3;    // How close to zoom to faces
+const FACE_ZOOM_HEIGHT = 1.5;    // Slightly above eye level
+let ceremonyCameraActive = false;
+let originalCameraPosition = null;
+let cameraTarget = new THREE.Vector3();
+let ceremonyStartTime = 0;
+
+// Update near the top with other constants
+const FIGHTER1_HOLD_TIME = 2000; // 2 seconds on first fighter
+const FIGHTER2_HOLD_TIME = 2000; // 2 seconds on second fighter
+const REFEREE_HOLD_TIME = 1000;  // 1 second on referee
+
+// Add this near the top with other variables
+let modelFactory;
+
 /**
  * Initialize the 3D scene. We only want to do this once.
  */
@@ -69,7 +92,7 @@ function initScene(initialGameState) {
 
   // Create camera
   camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(-5, 15, 25);
+  camera.position.set(CAMERA_DISTANCE, CAMERA_HEIGHT, 0); // Start position
   camera.lookAt(0, 0, 0);
 
   // Create renderer
@@ -88,8 +111,9 @@ function initScene(initialGameState) {
   // Create texture loader
   textureLoader = new THREE.TextureLoader();
 
-  // Generate face textures dynamically
+  // Generate face textures dynamically and initialize ModelFactory
   generateFaceTextures();
+  modelFactory = new ModelFactory(faceTextures);
 
   // Create the sumo ring
   createRing();
@@ -440,6 +464,10 @@ function createAudienceAreas() {
 // Add player to scene
 function addPlayerToScene(player) {
   const model = createSumoModel(player);
+  if (!model) {
+    console.error('Failed to create model for player:', player);
+    return;
+  }
   playerModels[player.id] = model;
   updatePlayerInScene(player);
   scene.add(model);
@@ -447,181 +475,16 @@ function addPlayerToScene(player) {
 
 // Create player model based on role
 function createSumoModel(player) {
-  const model = new THREE.Group();
-  model.userData = {
-    id: player.id,
-    role: player.role
-  };
-
-  // Create the appropriate model based on role
-  if (player.role === 'fighter') {
-    addFighterModel(model, player);
-  } else if (player.role === 'referee') {
-    addRefereeModel(model, player);
-  } else {
-    addViewerModel(model, player);
+  if (!modelFactory) {
+    console.error('ModelFactory not initialized!');
+    return null;
   }
-
-  // Add common elements (emote/text bubbles)
-  addCommonElements(model);
-
-  // Set initial transform
-  model.position.set(player.position.x, player.position.y, player.position.z);
-  model.rotation.y = player.rotation || 0;
-
-  return model;
-}
-
-// Fighter model (sumo wrestler)
-function addFighterModel(model, player) {
-  // Body (sphere)
-  const bodyGeometry = new THREE.SphereGeometry(1, 32, 32);
-  const bodyColor = new THREE.Color().setHSL(player.colorId * 0.1, 0.8, 0.6);
-  const bodyMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
-  const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-  body.castShadow = true;
-  model.add(body);
-
-  // Head with face
-  addHead(model, player);
-
-  // Arms (thick cylinders)
-  const armGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1, 32);
-  const armMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
-  
-  const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-  leftArm.position.set(-0.8, 0.2, 0);
-  leftArm.rotation.z = Math.PI / 4;
-  model.add(leftArm);
-
-  const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-  rightArm.position.set(0.8, 0.2, 0);
-  rightArm.rotation.z = -Math.PI / 4;
-  model.add(rightArm);
-
-  // Legs (thick cylinders)
-  const legGeometry = new THREE.CylinderGeometry(0.25, 0.25, 1, 32);
-  const legMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
-  
-  const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
-  leftLeg.position.set(-0.4, -0.8, 0);
-  model.add(leftLeg);
-  
-  const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
-  rightLeg.position.set(0.4, -0.8, 0);
-  model.add(rightLeg);
-}
-
-// Referee model (fancy capsule with robe)
-function addRefereeModel(model, player) {
-  // Body (tall capsule)
-  const bodyGeometry = new THREE.CapsuleGeometry(0.5, 1.5, 4, 8);
-  const bodyColor = new THREE.Color().setHSL(player.colorId * 0.1, 0.5, 0.3); // Darker, more formal color
-  const bodyMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
-  const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-  body.castShadow = true;
-  model.add(body);
-
-  // Head with face
-  addHead(model, player);
-
-  // Robe (cone)
-  const robeGeometry = new THREE.ConeGeometry(0.8, 1.8, 8);
-  const robeMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0x2c3e50,
-    side: THREE.DoubleSide 
-  });
-  const robe = new THREE.Mesh(robeGeometry, robeMaterial);
-  robe.position.y = -0.5;
-  model.add(robe);
-
-  // Fan (traditional referee fan)
-  const fanGeometry = new THREE.BoxGeometry(0.1, 0.4, 0.02);
-  const fanMaterial = new THREE.MeshStandardMaterial({ color: 0xf1c40f });
-  const fan = new THREE.Mesh(fanGeometry, fanMaterial);
-  fan.position.set(0.6, 0.2, 0);
-  fan.rotation.z = Math.PI / 4;
-  model.add(fan);
-}
-
-// Viewer model (simple capsule)
-function addViewerModel(model, player) {
-  // Body (slim capsule)
-  const bodyGeometry = new THREE.CapsuleGeometry(0.3, 1.2, 4, 8);
-  const bodyColor = new THREE.Color().setHSL(player.colorId * 0.1, 0.7, 0.5);
-  const bodyMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
-  const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-  body.castShadow = true;
-  model.add(body);
-
-  // Head with face
-  addHead(model, player);
-
-  // Simple arms (thin cylinders)
-  const armGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.8, 8);
-  const armMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
-  
-  const leftArm = new THREE.Mesh(armGeometry, armMaterial);
-  leftArm.position.set(-0.4, 0.2, 0);
-  leftArm.rotation.z = Math.PI / 6;
-  model.add(leftArm);
-
-  const rightArm = new THREE.Mesh(armGeometry, armMaterial);
-  rightArm.position.set(0.4, 0.2, 0);
-  rightArm.rotation.z = -Math.PI / 6;
-  model.add(rightArm);
-}
-
-// Common head with face for all models
-function addHead(model, player) {
-  // Head sphere
-  const headGeometry = new THREE.SphereGeometry(0.4, 32, 32);
-  const headMaterial = new THREE.MeshStandardMaterial({
-    map: faceTextures[player.faceId]
-  });
-  const head = new THREE.Mesh(headGeometry, headMaterial);
-  head.position.y = 1;
-  model.add(head);
-
-  // Face plane (for clearer face display)
-  const faceGeometry = new THREE.PlaneGeometry(0.8, 0.8);
-  const faceMaterial = new THREE.MeshBasicMaterial({ 
-    map: faceTextures[player.faceId],
-    transparent: true
-  });
-  const face = new THREE.Mesh(faceGeometry, faceMaterial);
-  face.position.set(0, 1, 0.41); // Slightly in front of head sphere
-  model.add(face);
-}
-
-// Common elements (emote/text bubbles)
-function addCommonElements(model) {
-  // Emote bubble
-  const emoteBubbleGeometry = new THREE.PlaneGeometry(1, 1);
-  const emoteBubbleMaterial = new THREE.MeshBasicMaterial({ 
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0
-  });
-  const emoteBubble = new THREE.Mesh(emoteBubbleGeometry, emoteBubbleMaterial);
-  emoteBubble.position.set(0, 2, 0);
-  emoteBubble.visible = false;
-  emoteBubble.name = 'emoteBubble';
-  model.add(emoteBubble);
-
-  // Text bubble with much tighter proportions
-  const textBubbleGeometry = new THREE.PlaneGeometry(2.4, 1.2); // Smaller, more compact bubble
-  const textBubbleMaterial = new THREE.MeshBasicMaterial({ 
-    color: 0xffffff,
-    transparent: true,
-    opacity: 0,
-    depthTest: false
-  });
-  const textBubble = new THREE.Mesh(textBubbleGeometry, textBubbleMaterial);
-  textBubble.position.set(0, 2.8, 0); // Slightly lower
-  textBubble.visible = false;
-  textBubble.name = 'textBubble';
-  model.add(textBubble);
+  try {
+    return modelFactory.createPlayerModel(player);
+  } catch (error) {
+    console.error('Error creating player model:', error);
+    return null;
+  }
 }
 
 // Update player in scene
@@ -751,8 +614,23 @@ function onWindowResize() {
 function animate() {
   requestAnimationFrame(animate);
   
-  const currentTime = performance.now();
+  const currentTime = Date.now();
   frameCount++;
+
+  // Handle ceremony camera if active
+  if (gameState.stage === 'PRE_MATCH_CEREMONY' && gameState.stageTimeRemaining) {
+    updateCeremonyCamera(gameState.stageTimeRemaining);
+  }
+
+  // Only update regular camera if ceremony camera is not active
+  if (!ceremonyCameraActive) {
+    // Update camera position
+    cameraAngle += CAMERA_ROTATION_SPEED;
+    camera.position.x = Math.cos(cameraAngle) * CAMERA_DISTANCE;
+    camera.position.z = Math.sin(cameraAngle) * CAMERA_DISTANCE;
+    camera.position.y = CAMERA_HEIGHT;
+    camera.lookAt(0, 0, 0);
+  }
 
   // Update FPS counter every 500ms
   if (currentTime - lastFpsUpdate > fpsUpdateInterval) {
@@ -1228,4 +1106,92 @@ function updateSocketStats(stats) {
     html += `${event}: ${count}<br>`;
   });
   statsDiv.innerHTML = html;
+}
+
+// Simplified camera sequence function
+function updateCeremonyCamera(timeRemaining) {
+  // Start sequence at 5 seconds remaining
+  if (timeRemaining <= 5000 && !ceremonyCameraActive) {
+    ceremonyCameraActive = true;
+    ceremonyStartTime = Date.now();
+    originalCameraPosition = camera.position.clone();
+  }
+
+  if (!ceremonyCameraActive) return;
+
+  const elapsedTime = Date.now() - ceremonyStartTime;
+  
+  // Get all players
+  const fighter1 = gameState.fighters[0];
+  const fighter2 = gameState.fighters[1];
+  const referee = gameState.referee;
+
+  if (!fighter1 || !fighter2 || !referee) {
+    ceremonyCameraActive = false;
+    return;
+  }
+
+  const fighter1Model = playerModels[fighter1.id];
+  const fighter2Model = playerModels[fighter2.id];
+  const refereeModel = playerModels[referee.id];
+
+  // Calculate camera position for all players
+  const allModels = [fighter1Model, fighter2Model, refereeModel];
+  const centerPoint = new THREE.Vector3();
+  
+  allModels.forEach(model => {
+    if (model) {
+      centerPoint.add(model.position);
+    }
+  });
+  centerPoint.divideScalar(allModels.length);
+
+  // Determine current phase and instantly set camera position
+  if (elapsedTime < FIGHTER1_HOLD_TIME) {
+    // First fighter
+    setInstantCameraPosition(fighter1Model, allModels);
+  } else if (elapsedTime < FIGHTER1_HOLD_TIME + FIGHTER2_HOLD_TIME) {
+    // Second fighter
+    setInstantCameraPosition(fighter2Model, allModels);
+  } else if (elapsedTime < FIGHTER1_HOLD_TIME + FIGHTER2_HOLD_TIME + REFEREE_HOLD_TIME) {
+    // Referee
+    setInstantCameraPosition(refereeModel, allModels);
+  } else {
+    // Reset camera
+    ceremonyCameraActive = false;
+    camera.position.copy(originalCameraPosition);
+    camera.lookAt(centerPoint);
+  }
+}
+
+// Helper function to instantly set camera position
+function setInstantCameraPosition(targetModel, allModels) {
+  if (!targetModel) return;
+
+  // Calculate center point of all models
+  const centerPoint = new THREE.Vector3();
+  allModels.forEach(model => {
+    if (model) {
+      centerPoint.add(model.position);
+    }
+  });
+  centerPoint.divideScalar(allModels.length);
+
+  // Calculate direction from center to target
+  const modelPosition = targetModel.position.clone();
+  const direction = modelPosition.clone().sub(centerPoint).normalize();
+  
+  // Set camera position to look at target from appropriate angle
+  camera.position.copy(modelPosition)
+    .add(direction.multiplyScalar(FACE_ZOOM_DISTANCE));
+  camera.position.y = modelPosition.y + FACE_ZOOM_HEIGHT;
+  
+  // Look at the target model's face
+  camera.lookAt(modelPosition);
+
+  // Slightly rotate camera to show other players in background
+  const targetToCenter = centerPoint.clone().sub(modelPosition).normalize();
+  const rightVector = new THREE.Vector3().crossVectors(direction, new THREE.Vector3(0, 1, 0));
+  camera.position.add(rightVector.multiplyScalar(0.5)); // Offset camera slightly to side
+  camera.lookAt(modelPosition); // Keep looking at target
 }
