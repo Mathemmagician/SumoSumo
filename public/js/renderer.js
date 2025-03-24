@@ -46,7 +46,6 @@ emoteCanvas.height = 128;
 const emoteCtx = emoteCanvas.getContext('2d');
 
 // Near the top with other constants
-let lastTime = performance.now();
 let frameCount = 0;
 let fps = 0;
 let fpsUpdateInterval = 500; // Update FPS every 500ms
@@ -59,12 +58,10 @@ const CAMERA_HEIGHT = 15;   // Height of camera
 let cameraAngle = 0;       // Current angle of rotation
 
 // Add near the top with other constants
-const CEREMONY_ZOOM_DURATION = 1000; // 1 second per zoom
 const FACE_ZOOM_DISTANCE = 3;    // How close to zoom to faces
 const FACE_ZOOM_HEIGHT = 1.5;    // Slightly above eye level
 let ceremonyCameraActive = false;
 let originalCameraPosition = null;
-let cameraTarget = new THREE.Vector3();
 let ceremonyStartTime = 0;
 
 // Update near the top with other constants
@@ -79,12 +76,11 @@ let modelFactory;
  * Initialize the 3D scene. We only want to do this once.
  */
 function initScene(initialGameState) {
-  // ADDED: Check if scene is already initialized
   if (sceneInitialized) {
     console.warn('initScene() was called more than once! Skipping re-initialization.');
     return;
   }
-  sceneInitialized = true; // Mark as inited
+  sceneInitialized = true;
 
   // Create scene
   scene = new THREE.Scene();
@@ -111,7 +107,7 @@ function initScene(initialGameState) {
   // Create texture loader
   textureLoader = new THREE.TextureLoader();
 
-  // Generate face textures dynamically and initialize ModelFactory
+  // Generate face textures once and initialize ModelFactory
   generateFaceTextures();
   modelFactory = new ModelFactory(faceTextures);
 
@@ -561,11 +557,8 @@ function positionViewer(model, viewerIndex) {
   }
   
   // Calculate position
-  let x = 0, y = 0, z = 0;
-  let rotation = 0;
-  
-  // Determine row distance
-  const distance = FIRST_ROW_DISTANCE + (row * ROW_SPACING);
+  let x, y, z, rotation;
+  let distance = FIRST_ROW_DISTANCE + (row * ROW_SPACING);
   
   // Determine height (based on elevation level)
   const elevationLevel = Math.floor(row / 2);
@@ -829,39 +822,6 @@ function showMatchDrawAnimation() {
   setTimeout(() => {
     scene.remove(drawPlane);
   }, 5000);
-}
-
-// Example of texture-based mesh creation
-function createTexturedMaterial(texturePath) {
-  return new Promise((resolve, reject) => {
-    textureLoader.load(
-      texturePath,
-      (texture) => {
-        const material = new THREE.MeshBasicMaterial({
-          map: texture,
-          transparent: true,
-          opacity: 1
-        });
-        resolve(material);
-      },
-      undefined,
-      (error) => {
-        console.error('Error loading texture:', error);
-        reject(error);
-      }
-    );
-  });
-}
-
-async function createTexturedMesh() {
-  try {
-    const material = await createTexturedMaterial('path/to/texture.jpg');
-    const geometry = new THREE.PlaneGeometry(10, 5);
-    const mesh = new THREE.Mesh(geometry, material);
-    scene.add(mesh);
-  } catch (error) {
-    console.error('Failed to create textured mesh:', error);
-  }
 }
 
 // Remove player from scene
