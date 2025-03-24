@@ -597,15 +597,16 @@ function addCommonElements(model) {
   emoteBubble.name = 'emoteBubble';
   model.add(emoteBubble);
 
-  // Text bubble
-  const textBubbleGeometry = new THREE.PlaneGeometry(2, 1);
+  // Text bubble with much tighter proportions
+  const textBubbleGeometry = new THREE.PlaneGeometry(2.4, 1.2); // Smaller, more compact bubble
   const textBubbleMaterial = new THREE.MeshBasicMaterial({ 
     color: 0xffffff,
     transparent: true,
-    opacity: 0
+    opacity: 0,
+    depthTest: false
   });
   const textBubble = new THREE.Mesh(textBubbleGeometry, textBubbleMaterial);
-  textBubble.position.set(0, 2.5, 0);
+  textBubble.position.set(0, 2.8, 0); // Slightly lower
   textBubble.visible = false;
   textBubble.name = 'textBubble';
   model.add(textBubble);
@@ -1009,7 +1010,7 @@ function showPlayerEmote(playerId, emoteType) {
   }
 }
 
-// Show player message (optimized)
+// Show player message with minimal whitespace and large text
 function showPlayerMessage(playerId, message) {
   const model = playerModels[playerId];
   if (!model) return;
@@ -1022,41 +1023,79 @@ function showPlayerMessage(playerId, message) {
     textBubble.visible = true;
     textBubble.material.opacity = 1;
 
+    // Use minimal canvas size to reduce whitespace
+    const canvasWidth = 480;
+    const canvasHeight = 240;
+    messageCanvas.width = canvasWidth;
+    messageCanvas.height = canvasHeight;
+    
     // Clear canvas
-    messageCtx.clearRect(0, 0, 512, 256);
-
-    // Draw speech bubble
-    messageCtx.fillStyle = 'white';
-    messageCtx.fillRect(0, 0, 512, 256);
-    messageCtx.strokeStyle = 'black';
+    messageCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+    
+    // Draw speech bubble - minimal padding
+    messageCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    roundRect(messageCtx, 2, 2, canvasWidth-4, canvasHeight-4, 20);
+    messageCtx.fill();
+    
+    // Add border
+    messageCtx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
     messageCtx.lineWidth = 4;
-    messageCtx.strokeRect(2, 2, 508, 252);
+    roundRect(messageCtx, 2, 2, canvasWidth-4, canvasHeight-4, 20);
+    messageCtx.stroke();
 
-    // Draw text
+    // Draw text with LARGE font
     messageCtx.fillStyle = 'black';
-    messageCtx.font = '36px Arial';
+    messageCtx.font = 'bold 90px Arial'; // Very large font
     messageCtx.textAlign = 'center';
     messageCtx.textBaseline = 'middle';
     
-    // Word wrap the message
+    // Calculate appropriate font size based on message length
+    const fontSize = Math.min(90, Math.max(48, 300 / Math.sqrt(message.length)));
+    messageCtx.font = `bold ${Math.floor(fontSize)}px Arial`;
+    
+    // Word wrap with minimal margins
     const words = message.split(' ');
     let line = '';
-    let y = 128;
-    const maxWidth = 460;
-    const lineHeight = 42;
+    let y = canvasHeight / 2; // Start at center
+    const maxWidth = canvasWidth - 20; // Very little margin
+    const lineHeight = fontSize * 1.1; // Tight line height
+    
+    // For multi-line text, start higher up
+    const estimatedLines = Math.ceil(message.length / 15);
+    if (estimatedLines > 1) {
+      y = (canvasHeight / 2) - ((estimatedLines - 1) * lineHeight / 2);
+    }
 
     for (let i = 0; i < words.length; i++) {
       const testLine = line + words[i] + ' ';
       const metrics = messageCtx.measureText(testLine);
       if (metrics.width > maxWidth && i > 0) {
-        messageCtx.fillText(line, 256, y);
+        messageCtx.fillText(line, canvasWidth/2, y);
         line = words[i] + ' ';
         y += lineHeight;
       } else {
         line = testLine;
       }
     }
-    messageCtx.fillText(line, 256, y);
+    messageCtx.fillText(line, canvasWidth/2, y);
+
+    // Add a speech bubble tail
+    messageCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    messageCtx.beginPath();
+    messageCtx.moveTo(canvasWidth/2, canvasHeight-2);
+    messageCtx.lineTo(canvasWidth/2-30, canvasHeight+30);
+    messageCtx.lineTo(canvasWidth/2+30, canvasHeight+30);
+    messageCtx.closePath();
+    messageCtx.fill();
+    
+    messageCtx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    messageCtx.lineWidth = 4;
+    messageCtx.beginPath();
+    messageCtx.moveTo(canvasWidth/2, canvasHeight-2);
+    messageCtx.lineTo(canvasWidth/2-30, canvasHeight+30);
+    messageCtx.lineTo(canvasWidth/2+30, canvasHeight+30);
+    messageCtx.closePath();
+    messageCtx.stroke();
 
     // Reuse texture if possible
     if (!textBubble.material.map) {
@@ -1064,11 +1103,36 @@ function showPlayerMessage(playerId, message) {
     } else {
       textBubble.material.map.needsUpdate = true;
     }
+    
+    // Scale based on message length
+    const scaleFactor = Math.min(1.5, Math.max(1.0, Math.sqrt(message.length) / 6));
+    textBubble.scale.set(scaleFactor, scaleFactor, scaleFactor);
+    
+    // Make sure the bubble faces the camera
+    textBubble.lookAt(camera.position);
   } else {
     // Hide message
     textBubble.visible = false;
     textBubble.material.opacity = 0;
   }
+}
+
+// Helper function for drawing rounded rectangles
+function roundRect(ctx, x, y, width, height, radius) {
+  if (typeof radius === 'undefined') {
+    radius = 5;
+  }
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + width - radius, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+  ctx.lineTo(x + width, y + height - radius);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+  ctx.lineTo(x + radius, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
 }
 
 // Expose necessary functions to global scope
