@@ -12,12 +12,17 @@ const RING_RADIUS = 7; // Base measurement for the scene
 const RING_HEIGHT = 1.0;
 const FLOOR_SIZE = RING_RADIUS * 5;
 
-const SQUARE_RING_RADIUS = RING_RADIUS + 0.5;
-const SQUARE_BOTTOM_RADIUS = SQUARE_RING_RADIUS + 0.7;
+const SQUARE_RING_RADIUS = RING_RADIUS + 0.3;
+const SQUARE_BOTTOM_RADIUS = SQUARE_RING_RADIUS + 0.5;
 
 // BENCH/MAT constants for audience seats
 // (used in createAudienceAreas() with InstancedMesh)
-const BENCH_WIDTH = 2.0 * RING_RADIUS / 10; // default seats per first row = 10
+const ELEVATION_INCREMENT = 0.8;
+const SEATS_PER_FIRST_ROW = 6;
+const SEATS_INCREMENT = 2;
+const FIRST_ROW_DISTANCE = RING_RADIUS * 1.4;
+
+const BENCH_WIDTH = 2.0 * RING_RADIUS / SEATS_PER_FIRST_ROW; // default seats per first row = 10
 const BENCH_HEIGHT = 0.1;
 const BENCH_DEPTH = BENCH_WIDTH;
 const ROW_SPACING = BENCH_WIDTH; // distance between rows
@@ -284,10 +289,6 @@ function createRing() {
  */
 function createAudienceAreas() {
   const NUM_ROWS = 20;
-  const ELEVATION_INCREMENT = 0.8;
-  const SEATS_PER_FIRST_ROW = 10;
-  const SEATS_INCREMENT = 2;
-  const FIRST_ROW_DISTANCE = RING_RADIUS * 1.3;
 
   // We'll keep the old platform approach for elevation, but each platform is a single Mesh
   // The seats themselves are turned into InstancedMeshes for benches & mats
@@ -518,10 +519,6 @@ function updatePlayerInScene(player) {
 // Position viewer
 function positionViewer(model, viewerIndex) {
   const NUM_ROWS = 5;
-  const ELEVATION_INCREMENT = 0.8;
-  const SEATS_PER_FIRST_ROW = 10;
-  const SEATS_INCREMENT = 2;
-  const FIRST_ROW_DISTANCE = RING_RADIUS * 1.3;
   
   // Calculate total seats per prioritized side (North, West, East)
   let totalSeatsPerSide = 0;
