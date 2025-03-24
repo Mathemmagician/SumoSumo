@@ -193,7 +193,7 @@ function selectFighters() {
   const refereeIndex = Math.floor(Math.random() * gameState.viewers.length);
   gameState.referee = gameState.viewers.splice(refereeIndex, 1)[0];
   gameState.referee.role = 'referee';
-  gameState.referee.position = { x: 0, y: 2, z: 0 };
+  gameState.referee.position = { x: 0, y: 2, z: -2 };
 
   // Announce fighter selection
   io.emit('fightersSelected', {
