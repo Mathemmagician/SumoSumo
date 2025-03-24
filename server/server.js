@@ -45,6 +45,16 @@ const STAGE_DURATIONS = {
   [GAME_STAGES.POST_MATCH_COOLDOWN]: 5000
 };
 
+// Add near the top with other state variables
+const FAKE_USERS = {
+  count: 0,
+  users: new Map(), // Store fake user data
+  intervals: new Map(), // Store intervals for each fake user
+  targetCount: 20,
+  disconnectInterval: null,
+  reconnectInterval: null
+};
+
 // Function to change the game stage
 function changeGameStage(newStage) {
   // Clear any existing stage timer
@@ -566,9 +576,175 @@ function resetGameState() {
   io.emit('gameStateReset');
 }
 
-// Start the server
+// Add these new functions after the other initialization functions
+function startFakeUserSystem() {
+  // Initially add 20 fake users
+  while (FAKE_USERS.count < FAKE_USERS.targetCount) {
+    addFakeUser();
+  }
+
+  // Periodically disconnect random fake users
+  FAKE_USERS.disconnectInterval = setInterval(() => {
+    if (FAKE_USERS.users.size > 0) {
+      const numToDisconnect = Math.floor(Math.random() * 3) + 1; // Disconnect 1-3 users
+      const fakeUserIds = Array.from(FAKE_USERS.users.keys());
+      
+      for (let i = 0; i < numToDisconnect && i < fakeUserIds.length; i++) {
+        const randomIndex = Math.floor(Math.random() * fakeUserIds.length);
+        const userId = fakeUserIds[randomIndex];
+        disconnectFakeUser(userId);
+        fakeUserIds.splice(randomIndex, 1);
+      }
+    }
+  }, 15000); // Every 15 seconds
+
+  // Periodically reconnect or add new fake users to maintain target count
+  FAKE_USERS.reconnectInterval = setInterval(() => {
+    const currentTotal = FAKE_USERS.users.size;
+    if (currentTotal < FAKE_USERS.targetCount) {
+      const numToAdd = FAKE_USERS.targetCount - currentTotal;
+      for (let i = 0; i < numToAdd; i++) {
+        addFakeUser();
+      }
+    }
+  }, 10000); // Every 10 seconds
+}
+
+function addFakeUser() {
+  const fakeId = `fake-${FAKE_USERS.count++}`;
+  
+  // Create fake user with random properties
+  const fakeUser = {
+    id: fakeId,
+    role: 'viewer',
+    position: { x: 0, y: 0, z: 0 },
+    rotation: 0,
+    faceId: Math.floor(Math.random() * 10),
+    colorId: Math.floor(Math.random() * 10),
+    seed: Math.floor(Math.random() * 1000000)
+  };
+
+  // Store fake user
+  FAKE_USERS.users.set(fakeId, fakeUser);
+
+  // Add to game state
+  gameState.viewers.push(fakeUser);
+
+  // Broadcast new player to all clients
+  io.emit('playerJoined', sanitizeForSocketIO(fakeUser));
+
+  // Set up intervals for fake user behavior
+  const intervals = [];
+
+  // Random emotes
+  intervals.push(setInterval(() => {
+    if (Math.random() < 0.3) {
+      const emotes = ['👋', '👍', '🎉', '❤️', '😊'];
+      const emote = emotes[Math.floor(Math.random() * emotes.length)];
+      
+      io.emit('playerEmote', {
+        id: fakeId,
+        emote: emote
+      });
+
+      // Clear emote after 2-4 seconds
+      setTimeout(() => {
+        io.emit('playerEmote', {
+          id: fakeId,
+          emote: null
+        });
+      }, 2000 + Math.random() * 2000);
+    }
+  }, 5000));
+
+  // Random messages
+  intervals.push(setInterval(() => {
+    if (Math.random() < 0.2) {
+      const messages = [
+        'Go fighters!',
+        'Amazing match!',
+        'You can do it!',
+        'What a move!',
+        'This is exciting!',
+        'Great technique!'
+      ];
+      const message = messages[Math.floor(Math.random() * messages.length)];
+      
+      io.emit('playerMessage', {
+        id: fakeId,
+        message: message
+      });
+
+      // Clear message after 3-5 seconds
+      setTimeout(() => {
+        io.emit('playerMessage', {
+          id: fakeId,
+          message: null
+        });
+      }, 3000 + Math.random() * 2000);
+    }
+  }, 8000));
+
+  // Store intervals for cleanup
+  FAKE_USERS.intervals.set(fakeId, intervals);
+
+  // Check if we should start the game
+  if (gameState.stage === GAME_STAGES.WAITING_FOR_PLAYERS && gameState.viewers.length >= 3) {
+    changeGameStage(GAME_STAGES.FIGHTER_SELECTION);
+  }
+}
+
+function disconnectFakeUser(fakeId) {
+  // Clear intervals
+  const intervals = FAKE_USERS.intervals.get(fakeId);
+  if (intervals) {
+    intervals.forEach(interval => clearInterval(interval));
+    FAKE_USERS.intervals.delete(fakeId);
+  }
+
+  // Remove from game state
+  gameState.viewers = gameState.viewers.filter(v => v.id !== fakeId);
+  gameState.fighters = gameState.fighters.filter(f => f.id !== fakeId);
+  if (gameState.referee && gameState.referee.id === fakeId) {
+    gameState.referee = null;
+  }
+
+  // Remove from fake users map
+  FAKE_USERS.users.delete(fakeId);
+
+  // Broadcast disconnect
+  io.emit('playerLeft', fakeId);
+
+  // Check if we need to return to WAITING_FOR_PLAYERS
+  if ((gameState.viewers.length + gameState.fighters.length) < 2) {
+    changeGameStage(GAME_STAGES.WAITING_FOR_PLAYERS);
+  }
+}
+
+function stopFakeUserSystem() {
+  // Clear main intervals
+  if (FAKE_USERS.disconnectInterval) {
+    clearInterval(FAKE_USERS.disconnectInterval);
+    FAKE_USERS.disconnectInterval = null;
+  }
+  if (FAKE_USERS.reconnectInterval) {
+    clearInterval(FAKE_USERS.reconnectInterval);
+    FAKE_USERS.reconnectInterval = null;
+  }
+
+  // Disconnect all fake users
+  for (const fakeId of FAKE_USERS.users.keys()) {
+    disconnectFakeUser(fakeId);
+  }
+
+  // Reset counters
+  FAKE_USERS.count = 0;
+}
+
+// Modify the server startup to include fake users
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   initGameState();
+  startFakeUserSystem(); // Start the fake user system
 });

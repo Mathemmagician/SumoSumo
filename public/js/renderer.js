@@ -760,9 +760,9 @@ function showMatchEndAnimation(winnerId, loserId, reason) {
     scene.remove(matchEndPlane);
   }, 5000);
   
-  // If I'm the winner, add a crown to my model
-  if (winnerId === gameState.myId) {
-    const myModel = playerModels[gameState.myId];
+  // Add crown only if we have gameState and myId
+  if (window.gameState && window.gameState.myId && winnerId === window.gameState.myId) {
+    const myModel = playerModels[window.gameState.myId];
     if (myModel) {
       const crownGeometry = new THREE.ConeGeometry(0.3, 0.5, 4);
       const crownMaterial = new THREE.MeshBasicMaterial({ color: 0xFFD700 });
