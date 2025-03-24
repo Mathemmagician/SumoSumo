@@ -100,7 +100,7 @@ function changeGameStage(newStage) {
       break;
 
     case GAME_STAGES.POST_MATCH_COOLDOWN:
-      resetFighters();
+      resetGameState();
       break;
   }
 
@@ -316,26 +316,6 @@ function endRound(loserId) {
   changeGameStage(GAME_STAGES.VICTORY_CEREMONY);
 }
 
-// Reset fighters after a match
-function resetFighters() {
-  // Move all current fighters to viewers
-  gameState.fighters.forEach(fighter => {
-    fighter.role = 'viewer';
-    gameState.viewers.push(fighter);
-
-    // Broadcast role change
-    io.emit('playerRoleChanged', {
-      id: fighter.id,
-      role: 'viewer'
-    });
-  });
-
-  // Clear the fighters array
-  gameState.fighters = [];
-
-  // Broadcast that the fighters have been reset
-  io.emit('fightersReset');
-}
 
 function sanitizeForSocketIO(obj) {
   if (Array.isArray(obj)) {
