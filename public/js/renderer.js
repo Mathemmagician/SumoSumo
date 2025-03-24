@@ -45,6 +45,13 @@ emoteCanvas.width = 128;
 emoteCanvas.height = 128;
 const emoteCtx = emoteCanvas.getContext('2d');
 
+// Near the top with other constants
+let lastTime = performance.now();
+let frameCount = 0;
+let fps = 0;
+let fpsUpdateInterval = 500; // Update FPS every 500ms
+let lastFpsUpdate = performance.now();
+
 /**
  * Initialize the 3D scene. We only want to do this once.
  */
@@ -97,6 +104,8 @@ function initScene(initialGameState) {
   initialGameState.viewers.forEach(viewer => {
     addPlayerToScene(viewer);
   });
+
+  createFpsDisplay();
 
   // Start animation loop
   animate();
@@ -738,6 +747,17 @@ function onWindowResize() {
 // Animation loop
 function animate() {
   requestAnimationFrame(animate);
+  
+  const currentTime = performance.now();
+  frameCount++;
+
+  // Update FPS counter every 500ms
+  if (currentTime - lastFpsUpdate > fpsUpdateInterval) {
+    fps = Math.round((frameCount * 1000) / (currentTime - lastFpsUpdate));
+    document.getElementById('fps-counter').textContent = `${fps} FPS`;
+    frameCount = 0;
+    lastFpsUpdate = currentTime;
+  }
 
   // Optional bobbing for viewers
   Object.values(playerModels).forEach(model => {
@@ -1141,3 +1161,20 @@ window.showPlayerEmote = showPlayerEmote;
 window.showPlayerMessage = showPlayerMessage;
 window.addPlayerToScene = addPlayerToScene;
 window.updatePlayerInScene = updatePlayerInScene;
+
+// Add this function after the other initialization code
+function createFpsDisplay() {
+  const fpsDiv = document.createElement('div');
+  fpsDiv.id = 'fps-counter';
+  fpsDiv.style.cssText = `
+    position: fixed;
+    top: 5px;
+    left: 5px;
+    font-family: monospace;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    z-index: 1000;
+    pointer-events: none;
+  `;
+  document.body.appendChild(fpsDiv);
+}
