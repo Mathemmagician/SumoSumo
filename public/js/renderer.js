@@ -1167,17 +1167,65 @@ window.updatePlayerInScene = updatePlayerInScene;
 
 // Add this function after the other initialization code
 function createFpsDisplay() {
+  const statsContainer = document.createElement('div');
+  statsContainer.id = 'stats-container';
+  statsContainer.style.cssText = `
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background-color: rgba(0, 0, 0, 0.5);
+    color: white;
+    font-family: monospace;
+    font-size: 14px;
+    padding: 5px 10px;
+    border-radius: 4px;
+    z-index: 1000;
+  `;
+
   const fpsDiv = document.createElement('div');
   fpsDiv.id = 'fps-counter';
-  fpsDiv.style.cssText = `
-    position: fixed;
-    top: 5px;
-    left: 5px;
+  
+  const toggleButton = document.createElement('button');
+  toggleButton.textContent = '▼ Socket Stats';
+  toggleButton.style.cssText = `
+    background: none;
+    border: none;
+    color: white;
     font-family: monospace;
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.5);
-    z-index: 1000;
-    pointer-events: none;
+    font-size: 14px;
+    padding: 2px 0;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    margin: 5px 0;
   `;
-  document.body.appendChild(fpsDiv);
+  
+  const socketStatsDiv = document.createElement('div');
+  socketStatsDiv.id = 'socket-stats';
+  socketStatsDiv.style.display = 'none'; // Hidden by default
+  
+  statsContainer.appendChild(fpsDiv);
+  statsContainer.appendChild(toggleButton);
+  statsContainer.appendChild(socketStatsDiv);
+  document.body.appendChild(statsContainer);
+
+  // Toggle socket stats visibility
+  let isExpanded = false;
+  toggleButton.addEventListener('click', () => {
+    isExpanded = !isExpanded;
+    socketStatsDiv.style.display = isExpanded ? 'block' : 'none';
+    toggleButton.textContent = (isExpanded ? '▼' : '►') + ' Socket Stats';
+  });
+}
+
+// Add this function to update the socket stats display
+function updateSocketStats(stats) {
+  const statsDiv = document.getElementById('socket-stats');
+  if (!statsDiv) return;
+
+  let html = '';
+  Object.entries(stats).forEach(([event, count]) => {
+    html += `${event}: ${count}<br>`;
+  });
+  statsDiv.innerHTML = html;
 }

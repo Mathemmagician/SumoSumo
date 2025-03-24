@@ -11,6 +11,27 @@ let gameState = {
   stageTimeRemaining: 0
 };
 
+// Add at the top with other state
+const socketStats = {
+  connect: 0,
+  gameState: 0,
+  stageChange: 0,
+  playerJoined: 0,
+  playerLeft: 0,
+  playerMoved: 0,
+  playerEmote: 0,
+  playerMessage: 0,
+  fightersSelected: 0,
+  preCeremonyStart: 0,
+  sponsorBanner: 0,
+  matchStart: 0,
+  matchEnd: 0,
+  matchDraw: 0,
+  newReferee: 0,
+  gameStateReset: 0,
+  playerRoleChanged: 0
+};
+
 // Game stage display names
 const STAGE_DISPLAY_NAMES = {
   'WAITING_FOR_PLAYERS': 'Waiting for Players',
@@ -27,6 +48,8 @@ function connectToServer() {
 
   // When connected
   socket.on('connect', () => {
+    socketStats.connect++;
+    updateSocketStats(socketStats);
     console.log('Connected to server with ID:', socket.id);
     gameState.myId = socket.id;
     updateUI();
@@ -34,6 +57,8 @@ function connectToServer() {
 
   // Receive initial game state
   socket.on('gameState', (state) => {
+    socketStats.gameState++;
+    updateSocketStats(socketStats);
     console.log('Received game state:', state);
 
     // Replace our local state with the server state
@@ -61,6 +86,8 @@ function connectToServer() {
 
   // Handle stage change
   socket.on('stageChange', (data) => {
+    socketStats.stageChange++;
+    updateSocketStats(socketStats);
     console.log('Stage changed:', data);
     gameState.stage = data.stage;
     gameState.stageTimeRemaining = data.duration;
@@ -84,6 +111,8 @@ function connectToServer() {
 
   // New player joined
   socket.on('playerJoined', (player) => {
+    socketStats.playerJoined++;
+    updateSocketStats(socketStats);
     console.log('Player joined:', player);
 
     // Avoid double-adding ourselves
@@ -112,6 +141,8 @@ function connectToServer() {
 
   // Player left
   socket.on('playerLeft', (playerId) => {
+    socketStats.playerLeft++;
+    updateSocketStats(socketStats);
     console.log('Player left:', playerId);
 
     // Remove from all arrays
@@ -128,12 +159,16 @@ function connectToServer() {
 
   // Player moved
   socket.on('playerMoved', (data) => {
+    socketStats.playerMoved++;
+    updateSocketStats(socketStats);
     console.log('Player moved:', data);
     updatePlayerPosition(data.id, data.position, data.rotation);
   });
 
   // Player emote
   socket.on('playerEmote', (data) => {
+    socketStats.playerEmote++;
+    updateSocketStats(socketStats);
     showPlayerEmote(data.id, data.emote);
     
     // Dispatch custom event for chat history
@@ -149,6 +184,8 @@ function connectToServer() {
 
   // Player message
   socket.on('playerMessage', (data) => {
+    socketStats.playerMessage++;
+    updateSocketStats(socketStats);
     showPlayerMessage(data.id, data.message);
     
     // Dispatch custom event for chat history
@@ -164,6 +201,8 @@ function connectToServer() {
 
   // Fighters selected
   socket.on('fightersSelected', (data) => {
+    socketStats.fightersSelected++;
+    updateSocketStats(socketStats);
     console.log('Fighters selected:', data);
     gameState.fighters = [data.fighter1, data.fighter2];
     gameState.referee = data.referee;
@@ -175,6 +214,8 @@ function connectToServer() {
 
   // Pre-ceremony start
   socket.on('preCeremonyStart', (data) => {
+    socketStats.preCeremonyStart++;
+    updateSocketStats(socketStats);
     console.log('Pre-ceremony started:', data);
   });
 
@@ -183,6 +224,8 @@ function connectToServer() {
 
   // Sponsor banner
   socket.on('sponsorBanner', (data) => {
+    socketStats.sponsorBanner++;
+    updateSocketStats(socketStats);
     console.log('Sponsor banner:', data);
     const bannerElement = document.getElementById('sponsor-banner');
     bannerElement.textContent = data.sponsor;
@@ -195,24 +238,32 @@ function connectToServer() {
 
   // Match start
   socket.on('matchStart', (data) => {
+    socketStats.matchStart++;
+    updateSocketStats(socketStats);
     console.log('Match started:', data);
     showMatchStart();
   });
 
   // Match end
   socket.on('matchEnd', (data) => {
+    socketStats.matchEnd++;
+    updateSocketStats(socketStats);
     console.log('Match ended. Winner:', data.winnerId, 'Loser:', data.loserId);
     showMatchEnd(data.winnerId, data.loserId, data.reason);
   });
 
   // Match draw
   socket.on('matchDraw', (data) => {
+    socketStats.matchDraw++;
+    updateSocketStats(socketStats);
     console.log('Match ended in a draw');
     showMatchDraw();
   });
 
   // New referee
   socket.on('newReferee', (referee) => {
+    socketStats.newReferee++;
+    updateSocketStats(socketStats);
     console.log('New referee:', referee);
     gameState.referee = referee;
     updateScene();
@@ -221,6 +272,8 @@ function connectToServer() {
 
   // Handle game state reset
   socket.on('gameStateReset', () => {
+    socketStats.gameStateReset++;
+    updateSocketStats(socketStats);
     console.log('Game state reset received');
 
     const allPlayers = [
@@ -244,10 +297,10 @@ function connectToServer() {
     updateScene();
   });
 
-
-
   // Player role changed
   socket.on('playerRoleChanged', (data) => {
+    socketStats.playerRoleChanged++;
+    updateSocketStats(socketStats);
     console.log('Player role changed:', data);
     const { id, role } = data;
 
