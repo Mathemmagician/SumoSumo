@@ -50,7 +50,7 @@ const FAKE_USERS = {
   count: 0,
   users: new Map(), // Store fake user data
   intervals: new Map(), // Store intervals for each fake user
-  targetCount: 20,
+  targetCount: 50,
   disconnectInterval: null,
   reconnectInterval: null
 };

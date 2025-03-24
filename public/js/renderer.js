@@ -72,6 +72,9 @@ const REFEREE_HOLD_TIME = 1000;  // 1 second on referee
 // Add this near the top with other variables
 let modelFactory;
 
+// Add near the top with other constants
+const CINEMA_BAR_HEIGHT = 0.20; // 15% of screen height for top and bottom bars
+
 /**
  * Initialize the 3D scene. We only want to do this once.
  */
@@ -129,6 +132,9 @@ function initScene(initialGameState) {
   });
 
   createFpsDisplay();
+
+  // Create cinematic bars
+  cinematicBars = createCinematicBars();
 
   // Start animation loop
   animate();
@@ -601,6 +607,12 @@ function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+
+  // Recreate cinematic bars to match new window size
+  if (cinematicBars) {
+    document.body.removeChild(cinematicBars.container);
+    cinematicBars = createCinematicBars();
+  }
 }
 
 // Animation loop
@@ -1061,13 +1073,14 @@ function updateSocketStats(stats) {
   statsDiv.innerHTML = html;
 }
 
-// Simplified camera sequence function
+// Update the updateCeremonyCamera function
 function updateCeremonyCamera(timeRemaining) {
   // Start sequence at 5 seconds remaining
   if (timeRemaining <= 5000 && !ceremonyCameraActive) {
     ceremonyCameraActive = true;
     ceremonyStartTime = Date.now();
     originalCameraPosition = camera.position.clone();
+    if (cinematicBars) cinematicBars.hide(); // Start with bars hidden
   }
 
   if (!ceremonyCameraActive) return;
@@ -1081,6 +1094,7 @@ function updateCeremonyCamera(timeRemaining) {
 
   if (!fighter1 || !fighter2 || !referee) {
     ceremonyCameraActive = false;
+    if (cinematicBars) cinematicBars.hide();
     return;
   }
 
@@ -1099,25 +1113,58 @@ function updateCeremonyCamera(timeRemaining) {
   });
   centerPoint.divideScalar(allModels.length);
 
-  // Determine current phase and instantly set camera position
+  // Define transition points
+  const TRANSITION_TIME = 500; // 0.5 seconds for transitions
+  
+  // Calculate which phase we're in
   if (elapsedTime < FIGHTER1_HOLD_TIME) {
     // First fighter
+    const transitionIn = elapsedTime < TRANSITION_TIME;
+    const transitionOut = elapsedTime > FIGHTER1_HOLD_TIME - TRANSITION_TIME;
+    
+    if (transitionIn) {
+      if (cinematicBars) cinematicBars.show();
+    } else if (transitionOut) {
+      if (cinematicBars) cinematicBars.hide();
+    }
+    
     setInstantCameraPosition(fighter1Model, allModels);
-  } else if (elapsedTime < FIGHTER1_HOLD_TIME + FIGHTER2_HOLD_TIME) {
+  } 
+  else if (elapsedTime < FIGHTER1_HOLD_TIME + FIGHTER2_HOLD_TIME) {
     // Second fighter
+    const phaseTime = elapsedTime - FIGHTER1_HOLD_TIME;
+    const transitionIn = phaseTime < TRANSITION_TIME;
+    const transitionOut = phaseTime > FIGHTER2_HOLD_TIME - TRANSITION_TIME;
+    
+    if (transitionIn) {
+      if (cinematicBars) cinematicBars.show();
+    } else if (transitionOut) {
+      if (cinematicBars) cinematicBars.hide();
+    }
+    
     setInstantCameraPosition(fighter2Model, allModels);
-  } else if (elapsedTime < FIGHTER1_HOLD_TIME + FIGHTER2_HOLD_TIME + REFEREE_HOLD_TIME) {
+  } 
+  else if (elapsedTime < FIGHTER1_HOLD_TIME + FIGHTER2_HOLD_TIME + REFEREE_HOLD_TIME) {
     // Referee
+    const phaseTime = elapsedTime - (FIGHTER1_HOLD_TIME + FIGHTER2_HOLD_TIME);
+    const transitionIn = phaseTime < TRANSITION_TIME;
+    const transitionOut = phaseTime > REFEREE_HOLD_TIME - TRANSITION_TIME;
+    
+    if (transitionIn) {
+      if (cinematicBars) cinematicBars.show();
+    } else if (transitionOut) {
+      if (cinematicBars) cinematicBars.hide();
+    }
+    
     setInstantCameraPosition(refereeModel, allModels);
-  } else {
-    // Reset camera
-    ceremonyCameraActive = false;
-    camera.position.copy(originalCameraPosition);
-    camera.lookAt(centerPoint);
+  } 
+  else {
+    // Keep the last cinematic position
+    setInstantCameraPosition(fighter1Model, allModels);
   }
 }
 
-// Helper function to instantly set camera position
+// Update the setInstantCameraPosition function for smoother transitions
 function setInstantCameraPosition(targetModel, allModels) {
   if (!targetModel) return;
 
@@ -1132,19 +1179,88 @@ function setInstantCameraPosition(targetModel, allModels) {
 
   // Calculate direction from center to target
   const modelPosition = targetModel.position.clone();
-  const direction = modelPosition.clone().sub(centerPoint).normalize();
   
-  // Set camera position to look at target from appropriate angle
-  camera.position.copy(modelPosition)
-    .add(direction.multiplyScalar(FACE_ZOOM_DISTANCE));
-  camera.position.y = modelPosition.y + FACE_ZOOM_HEIGHT;
+  // Set target look position to be at eye level
+  const targetEyePosition = modelPosition.clone();
+  targetEyePosition.y += 2.0; // Set to approximate eye level
   
-  // Look at the target model's face
-  camera.lookAt(modelPosition);
+  // Position camera at eye level
+  camera.position.copy(modelPosition);
+  camera.position.y = targetEyePosition.y; // Match eye level
+  
+  // Move camera back from the face
+  const direction = camera.position.clone().sub(centerPoint).normalize();
+  camera.position.add(direction.multiplyScalar(FACE_ZOOM_DISTANCE));
+  
+  // Look directly at the eyes
+  camera.lookAt(targetEyePosition);
 
-  // Slightly rotate camera to show other players in background
-  const targetToCenter = centerPoint.clone().sub(modelPosition).normalize();
+  // Add slight offset for more dramatic angle
   const rightVector = new THREE.Vector3().crossVectors(direction, new THREE.Vector3(0, 1, 0));
-  camera.position.add(rightVector.multiplyScalar(0.5)); // Offset camera slightly to side
-  camera.lookAt(modelPosition); // Keep looking at target
+  camera.position.add(rightVector.multiplyScalar(0.5));
+  camera.lookAt(targetEyePosition);
 }
+
+// Add this new function after createFpsDisplay
+function createCinematicBars() {
+  const container = document.createElement('div');
+  container.id = 'cinematic-bars';
+  container.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+  `;
+
+  const topBar = document.createElement('div');
+  topBar.style.cssText = `
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: ${CINEMA_BAR_HEIGHT * 100}%;
+    background-color: black;
+    transform: translateY(-100%);
+    transition: transform 0.5s ease-in-out;
+  `;
+
+  const bottomBar = document.createElement('div');
+  bottomBar.style.cssText = `
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: ${CINEMA_BAR_HEIGHT * 100}%;
+    background-color: black;
+    transform: translateY(100%);
+    transition: transform 0.5s ease-in-out;
+  `;
+
+  container.appendChild(topBar);
+  container.appendChild(bottomBar);
+  document.body.appendChild(container);
+
+  return {
+    container,
+    topBar,
+    bottomBar,
+    show() {
+      container.style.opacity = '1';
+      topBar.style.transform = 'translateY(0)';
+      bottomBar.style.transform = 'translateY(0)';
+    },
+    hide() {
+      container.style.opacity = '0';
+      topBar.style.transform = 'translateY(-100%)';
+      bottomBar.style.transform = 'translateY(100%)';
+    }
+  };
+}
+
+// Add this variable near the top with other state variables
+let cinematicBars = null;
