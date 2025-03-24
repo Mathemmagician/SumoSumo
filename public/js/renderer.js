@@ -75,6 +75,23 @@ let modelFactory;
 // Add near the top with other constants
 const CINEMA_BAR_HEIGHT = 0.20; // 15% of screen height for top and bottom bars
 
+// Add these constants near the top
+const CAMERA_MOVE_SPEED = 0.5;
+const CAMERA_ROTATE_SPEED = 0.02;
+let freeCameraMode = false;
+let cameraControls = {
+  moveForward: false,
+  moveBackward: false,
+  moveLeft: false,
+  moveRight: false,
+  moveUp: false,
+  moveDown: false,
+  rotateLeft: false,
+  rotateRight: false,
+  rotateUp: false,
+  rotateDown: false
+};
+
 /**
  * Initialize the 3D scene. We only want to do this once.
  */
@@ -135,6 +152,13 @@ function initScene(initialGameState) {
 
   // Create cinematic bars
   cinematicBars = createCinematicBars();
+
+  // Create camera info display
+  createCameraInfoDisplay();
+  
+  // Add keyboard event listeners
+  window.addEventListener('keydown', handleKeyDown);
+  window.addEventListener('keyup', handleKeyUp);
 
   // Start animation loop
   animate();
@@ -622,19 +646,22 @@ function animate() {
   const currentTime = Date.now();
   frameCount++;
 
-  // Handle ceremony camera if active
-  if (gameState.stage === 'PRE_MATCH_CEREMONY' && gameState.stageTimeRemaining) {
-    updateCeremonyCamera(gameState.stageTimeRemaining);
-  }
+  // Only handle automatic camera movements if NOT in free camera mode
+  if (!freeCameraMode) {
+    // Handle ceremony camera if active
+    if (gameState.stage === 'PRE_MATCH_CEREMONY' && gameState.stageTimeRemaining) {
+      updateCeremonyCamera(gameState.stageTimeRemaining);
+    }
 
-  // Only update regular camera if ceremony camera is not active
-  if (!ceremonyCameraActive) {
-    // Update camera position
-    cameraAngle += CAMERA_ROTATION_SPEED;
-    camera.position.x = Math.cos(cameraAngle) * CAMERA_DISTANCE;
-    camera.position.z = Math.sin(cameraAngle) * CAMERA_DISTANCE;
-    camera.position.y = CAMERA_HEIGHT;
-    camera.lookAt(0, 0, 0);
+    // Only update regular camera if ceremony camera is not active
+    if (!ceremonyCameraActive) {
+      // Update camera position
+      cameraAngle += CAMERA_ROTATION_SPEED;
+      camera.position.x = Math.cos(cameraAngle) * CAMERA_DISTANCE;
+      camera.position.z = Math.sin(cameraAngle) * CAMERA_DISTANCE;
+      camera.position.y = CAMERA_HEIGHT;
+      camera.lookAt(0, 0, 0);
+    }
   }
 
   // Update FPS counter every 500ms
@@ -664,6 +691,42 @@ function animate() {
       emoteBubble.scale.set(scaleFactor, scaleFactor, scaleFactor);
     }
   });
+
+  // Handle free camera controls
+  if (freeCameraMode) {
+    // Handle camera movement
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    
+    if (cameraControls.moveForward) camera.position.addScaledVector(forward, CAMERA_MOVE_SPEED);
+    if (cameraControls.moveBackward) camera.position.addScaledVector(forward, -CAMERA_MOVE_SPEED);
+    if (cameraControls.moveRight) camera.position.addScaledVector(right, CAMERA_MOVE_SPEED);
+    if (cameraControls.moveLeft) camera.position.addScaledVector(right, -CAMERA_MOVE_SPEED);
+    if (cameraControls.moveUp) camera.position.y += CAMERA_MOVE_SPEED;
+    if (cameraControls.moveDown) camera.position.y -= CAMERA_MOVE_SPEED;
+    
+    // Create euler angles for rotation
+    const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+    euler.setFromQuaternion(camera.quaternion);
+    
+    // Handle camera rotation along world axes
+    if (cameraControls.rotateLeft) euler.y += CAMERA_ROTATE_SPEED;
+    if (cameraControls.rotateRight) euler.y -= CAMERA_ROTATE_SPEED;
+    if (cameraControls.rotateUp) euler.x = Math.max(-Math.PI/2, euler.x - CAMERA_ROTATE_SPEED);
+    if (cameraControls.rotateDown) euler.x = Math.min(Math.PI/2, euler.x + CAMERA_ROTATE_SPEED);
+    
+    // Apply the rotation
+    camera.quaternion.setFromEuler(euler);
+    
+    // Update camera info display
+    const infoDisplay = document.getElementById('camera-info');
+    infoDisplay.innerHTML = `
+      camera.position.set(${camera.position.x.toFixed(2)}, ${camera.position.y.toFixed(2)}, ${camera.position.z.toFixed(2)});
+      camera.rotation.set(${camera.rotation.x.toFixed(2)}, ${camera.rotation.y.toFixed(2)}, ${camera.rotation.z.toFixed(2)});
+      camera.lookAt(${camera.getWorldDirection(new THREE.Vector3()).x.toFixed(2)}, ${camera.getWorldDirection(new THREE.Vector3()).y.toFixed(2)}, ${camera.getWorldDirection(new THREE.Vector3()).z.toFixed(2)});
+      
+    `;
+  }
 
   renderer.render(scene, camera);
 }
@@ -1075,6 +1138,8 @@ function updateSocketStats(stats) {
 
 // Update the updateCeremonyCamera function
 function updateCeremonyCamera(timeRemaining) {
+  if (freeCameraMode) return; // Don't update camera if in free camera mode
+  
   // Start sequence at 5 seconds remaining
   if (timeRemaining <= 5000 && !ceremonyCameraActive) {
     ceremonyCameraActive = true;
@@ -1264,3 +1329,96 @@ function createCinematicBars() {
 
 // Add this variable near the top with other state variables
 let cinematicBars = null;
+
+// Add this function to create the camera info display
+function createCameraInfoDisplay() {
+  const infoContainer = document.createElement('div');
+  infoContainer.id = 'camera-info';
+  infoContainer.style.cssText = `
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    font-family: monospace;
+    font-size: 14px;
+    padding: 10px;
+    border-radius: 4px;
+    z-index: 1000;
+    display: none;
+  `;
+  
+  const toggleButton = document.createElement('button');
+  toggleButton.textContent = 'Toggle Free Camera (F)';
+  toggleButton.style.cssText = `
+    position: fixed;
+    top: 10px;
+    right: 200px;
+    padding: 5px 10px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: 1px solid white;
+    border-radius: 4px;
+    cursor: pointer;
+    z-index: 1000;
+  `;
+  
+  document.body.appendChild(infoContainer);
+  document.body.appendChild(toggleButton);
+  
+  toggleButton.addEventListener('click', toggleFreeCamera);
+  return infoContainer;
+}
+
+// Add this function to toggle free camera mode
+function toggleFreeCamera() {
+  freeCameraMode = !freeCameraMode;
+  const infoDisplay = document.getElementById('camera-info');
+  infoDisplay.style.display = freeCameraMode ? 'block' : 'none';
+  
+  if (freeCameraMode) {
+    // Store original camera position for restoration
+    originalCameraPosition = camera.position.clone();
+    originalCameraRotation = camera.rotation.clone();
+  } else {
+    // Restore original camera position
+    camera.position.copy(originalCameraPosition);
+    camera.rotation.copy(originalCameraRotation);
+  }
+}
+
+// Add these keyboard handler functions
+function handleKeyDown(event) {
+  if (!freeCameraMode) return;
+  
+  switch(event.key.toLowerCase()) {
+    case 'w': cameraControls.moveForward = true; break;
+    case 's': cameraControls.moveBackward = true; break;
+    case 'a': cameraControls.moveLeft = true; break;
+    case 'd': cameraControls.moveRight = true; break;
+    case 'q': cameraControls.moveDown = true; break;
+    case 'e': cameraControls.moveUp = true; break;
+    case 'arrowleft': cameraControls.rotateLeft = true; break;
+    case 'arrowright': cameraControls.rotateRight = true; break;
+    case 'arrowup': cameraControls.rotateUp = true; break;
+    case 'arrowdown': cameraControls.rotateDown = true; break;
+    case 'f': toggleFreeCamera(); break;
+  }
+}
+
+function handleKeyUp(event) {
+  if (!freeCameraMode) return;
+  
+  switch(event.key.toLowerCase()) {
+    case 'w': cameraControls.moveForward = false; break;
+    case 's': cameraControls.moveBackward = false; break;
+    case 'a': cameraControls.moveLeft = false; break;
+    case 'd': cameraControls.moveRight = false; break;
+    case 'q': cameraControls.moveDown = false; break;
+    case 'e': cameraControls.moveUp = false; break;
+    case 'arrowleft': cameraControls.rotateLeft = false; break;
+    case 'arrowright': cameraControls.rotateRight = false; break;
+    case 'arrowup': cameraControls.rotateUp = false; break;
+    case 'arrowdown': cameraControls.rotateDown = false; break;
+  }
+}
