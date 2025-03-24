@@ -4,141 +4,388 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SumoSumo!</title>
-    <!-- Add Sawarabi Mincho font from Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Sawarabi+Mincho&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sawarabi+Mincho&family=Yuji+Mai&display=swap" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
     <style>
         body {
             margin: 0;
+            padding: 0;
             overflow: hidden;
             font-family: 'Sawarabi Mincho', serif;
+            color: white;
         }
+        
         #game-container {
             position: relative;
             width: 100vw;
             height: 100vh;
         }
-        #ui-overlay {
+        
+        /* Improved UI Panel Styles */
+        .ui-panel {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            color: white;
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 10px;
-            border-radius: 5px;
-            z-index: 10;
-            font-family: 'Sawarabi Mincho', serif;
+            background-color: rgba(60, 20, 0, 0.85);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            padding: 15px 25px;
+            min-width: 200px;
+            backdrop-filter: blur(5px);
+            transition: all 0.3s ease;
+            border: 2px solid #9c6644;
         }
-        #stage-display {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            color: white;
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 10px;
-            border-radius: 5px;
-            z-index: 10;
-            font-family: 'Sawarabi Mincho', serif;
+        
+        .ui-panel:hover {
+            background-color: rgba(70, 25, 0, 0.9);
+        }
+        
+        #game-info {
+            top: 20px;
+            left: 20px;
+        }
+        
+        #match-info {
+            top: 20px;
+            right: 20px;
             text-align: right;
         }
-        #stage-timer {
-            font-size: 1.2em;
-            margin-top: 5px;
+        
+        .game-title {
+            font-family: 'Yuji Mai', serif;
+            font-size: 2.5rem;
+            margin: 0 0 10px 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            background: linear-gradient(45deg, #fff, #f9d9aa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
-        #emote-buttons {
+        
+        .role-info {
+            font-size: 1.4rem;
+            margin: 5px 0;
+        }
+        
+        .player-count {
+            font-size: 1.2rem;
+            margin: 5px 0;
+        }
+        
+        .match-status {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin: 0 0 10px 0;
+        }
+        
+        .match-timer {
+            font-size: 2rem;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Improved Controls Panel */
+        #controls-panel {
             position: absolute;
-            bottom: 10px;
-            left: 10px;
-            z-index: 10;
-            font-family: 'Sawarabi Mincho', serif;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
         }
-        #emote-buttons button {
-            margin: 5px;
-            padding: 10px;
-            font-size: 16px;
+        
+        /* Emote Buttons */
+        .emote-container {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            width: 100%;
+            flex-wrap: wrap;
+        }
+        
+        .emote-btn {
+            background-color: rgba(255, 255, 255, 0.85);
+            border: none;
+            border-radius: 10px;
+            padding: 15px;
             cursor: pointer;
-            font-family: 'Sawarabi Mincho', serif;
-            background-color: rgba(255, 255, 255, 0.8);
-            border: 1px solid #333;
-            border-radius: 5px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+            width: 60px;
+            height: 60px;
         }
-        #message-input {
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            z-index: 10;
-            font-family: 'Sawarabi Mincho', serif;
+        
+        .emote-emoji {
+            font-size: 2rem;
         }
-        #message-input input {
-            padding: 8px;
-            width: 200px;
-            font-family: 'Sawarabi Mincho', serif;
+        
+        /* Chat Input */
+        .chat-container {
+            display: flex;
+            width: 100%;
+            gap: 10px;
         }
-        #message-input button {
-            padding: 8px 12px;
+        
+        #chat-input {
+            flex-grow: 1;
+            border-radius: 10px;
+            border: none;
+            padding: 12px 15px;
+            font-size: 1.1rem;
+            font-family: 'Sawarabi Mincho', serif;
+            background-color: rgba(255, 255, 255, 0.9);
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        
+        #chat-input:focus {
+            outline: none;
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1), 0 0 0 3px rgba(156, 102, 68, 0.3);
+        }
+        
+        #send-btn {
+            border-radius: 10px;
+            border: none;
+            background-color: #9c6644;
+            color: white;
+            font-weight: bold;
+            padding: 12px 25px;
             cursor: pointer;
-            font-family: 'Sawarabi Mincho', serif;
+            font-size: 1.1rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
         }
-        #ritual-ready-button {
+        
+        #send-btn:hover {
+            background-color: #a97755;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        #send-btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 3px rgba(0, 0, 0, 0.2);
+        }
+        
+        /* Role badge */
+        .role-badge {
+            display: inline-block;
+            margin-left: 10px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .role-viewer {
+            background-color: #3498db;
+        }
+        
+        .role-fighter {
+            background-color: #e74c3c;
+        }
+        
+        .role-referee {
+            background-color: #f39c12;
+        }
+        
+        /* Match status indicator */
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-in-progress {
+            background-color: #2ecc71;
+            box-shadow: 0 0 8px #2ecc71;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .status-waiting {
+            background-color: #f39c12;
+            box-shadow: 0 0 8px #f39c12;
+        }
+        
+        .status-ended {
+            background-color: #e74c3c;
+            box-shadow: 0 0 8px #e74c3c;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+        
+        /* Add sponsor banner styling */
+        #sponsor-banner {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
             padding: 15px 30px;
-            font-size: 18px;
-            background-color: #ff4500;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            display: none;
-            font-family: 'Sawarabi Mincho', serif;
-            z-index: 20;
-        }
-        #sponsor-banner {
-            position: absolute;
-            bottom: 20%;
-            left: 0;
-            width: 100%;
+            border-radius: 10px;
+            font-size: 1.8rem;
+            font-weight: bold;
             text-align: center;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 10px 0;
-            font-size: 24px;
+            z-index: 100;
             display: none;
-            font-family: 'Sawarabi Mincho', serif;
-            z-index: 15;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.7);
+            border: 2px solid gold;
+            animation: glow 2s infinite alternate;
+            max-width: 80%;
+        }
+        
+        @keyframes glow {
+            from {
+                box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            }
+            to {
+                box-shadow: 0 0 20px rgba(255, 215, 0, 1);
+            }
         }
     </style>
 </head>
 <body>
     <div id="game-container">
-        <div id="ui-overlay">
-            <h2>SumoSumo!</h2>
-            <p id="role-display">Loading...</p>
-            <p id="players-count">Players: 0</p>
+        <!-- Improved Game Info Panel -->
+        <div id="game-info" class="ui-panel">
+            <h1 class="game-title">SumoSumo!</h1>
+            <p class="role-info">Your Role: <span id="player-role">Viewer</span> <span id="role-badge" class="role-badge role-viewer">Viewer</span></p>
+            <p class="player-count">Players: <span id="player-count">0</span></p>
         </div>
-        <div id="stage-display">
-            <h3 id="stage-name">Waiting for players</h3>
-            <div id="stage-timer"></div>
+        
+        <!-- Improved Match Info Panel -->
+        <div id="match-info" class="ui-panel">
+            <div class="match-status">
+                <span id="status-indicator" class="status-indicator status-in-progress"></span>
+                <span id="match-status">Match in Progress</span>
+            </div>
+            <div class="match-timer" id="match-timer">0s</div>
         </div>
-        <div id="emote-buttons">
-            <button onclick="sendEmote('cheer')">👏 Cheer</button>
-            <button onclick="sendEmote('laugh')">😂 Laugh</button>
-            <button onclick="sendEmote('surprise')">😮 Surprise</button>
-            <button onclick="sendEmote('angry')">😠 Angry</button>
-        </div>
-        <div id="message-input">
-            <input type="text" id="message-text" placeholder="Type a message..." maxlength="50">
-            <button onclick="sendMessage()">Send</button>
-        </div>
-        <button id="ritual-ready-button" onclick="sendRitualReady()">I'm Ready!</button>
+        
+        <!-- Add sponsor banner -->
         <div id="sponsor-banner"></div>
+        
+        <!-- Improved Controls Panel with icon-only emotes -->
+        <div id="controls-panel">
+            <div class="emote-container">
+                <button class="emote-btn" onclick="sendEmote('👏')">
+                    <span class="emote-emoji">👏</span>
+                </button>
+                <button class="emote-btn" onclick="sendEmote('😂')">
+                    <span class="emote-emoji">😂</span>
+                </button>
+                <button class="emote-btn" onclick="sendEmote('😮')">
+                    <span class="emote-emoji">😮</span>
+                </button>
+                <button class="emote-btn" onclick="sendEmote('😠')">
+                    <span class="emote-emoji">😠</span>
+                </button>
+                <button class="emote-btn" onclick="sendEmote('🙌')">
+                    <span class="emote-emoji">🙌</span>
+                </button>
+                <button class="emote-btn" onclick="sendEmote('🎉')">
+                    <span class="emote-emoji">🎉</span>
+                </button>
+            </div>
+            
+            <div class="chat-container">
+                <input type="text" id="chat-input" placeholder="Type a message..." autocomplete="off">
+                <button id="send-btn" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
     </div>
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+    
     <script src="js/socket-client.js"></script>
     <script src="js/renderer.js"></script>
     <script src="js/main.js"></script>
+    <script>
+        // Update role badge based on player role
+        function updateRoleBadge(role) {
+            const roleBadge = document.getElementById('role-badge');
+            const playerRoleText = document.getElementById('player-role');
+            
+            playerRoleText.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+            
+            roleBadge.className = 'role-badge';
+            roleBadge.classList.add('role-' + role.toLowerCase());
+            roleBadge.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+        }
+        
+        // Update match status indicator
+        function updateMatchStatus(status, timeLeft) {
+            const matchStatus = document.getElementById('match-status');
+            const statusIndicator = document.getElementById('status-indicator');
+            const matchTimer = document.getElementById('match-timer');
+            
+            matchStatus.textContent = status;
+            matchTimer.textContent = timeLeft + 's';
+            
+            statusIndicator.className = 'status-indicator';
+            
+            if (status === 'Match in Progress') {
+                statusIndicator.classList.add('status-in-progress');
+            } else if (status === 'Waiting for Players') {
+                statusIndicator.classList.add('status-waiting');
+            } else {
+                statusIndicator.classList.add('status-ended');
+            }
+        }
+        
+        // Update the player count
+        function updatePlayerCount(count) {
+            document.getElementById('player-count').textContent = count;
+        }
+        
+        // Emote button handler
+        function sendEmote(emote) {
+            if (window.sendPlayerEmoteToServer) {
+                window.sendPlayerEmoteToServer(emote);
+                
+                // Add animation effect to button
+                const buttons = document.querySelectorAll('.emote-btn');
+                buttons.forEach(btn => {
+                    if (btn.textContent.trim() === emote) {
+                        btn.style.transform = 'scale(1.3)';
+                        setTimeout(() => {
+                            btn.style.transform = '';
+                        }, 300);
+                    }
+                });
+            }
+        }
+        
+        // Chat message handler
+        function sendMessage() {
+            const chatInput = document.getElementById('chat-input');
+            const message = chatInput.value.trim();
+            
+            if (message && window.sendPlayerMessageToServer) {
+                window.sendPlayerMessageToServer(message);
+                chatInput.value = '';
+            }
+        }
+        
+        // Add enter key handler for chat
+        document.getElementById('chat-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
 </body>
 </html> 

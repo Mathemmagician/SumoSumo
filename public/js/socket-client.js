@@ -305,40 +305,30 @@ function determineMyRole() {
 
 // Update the UI
 function updateUI() {
-  const roleDisplay = document.getElementById('role-display');
-  if (roleDisplay) {
-    roleDisplay.textContent = `Your Role: ${capitalize(gameState.myRole)}`;
+  // Update role display
+  const playerRole = gameState.myRole;
+  if (typeof updateRoleBadge === 'function') {
+    updateRoleBadge(playerRole);
   }
-
-  const playersCount = document.getElementById('players-count');
-  if (playersCount) {
-    // Use a Set to avoid duplicates
-    const playerIds = new Set();
-    gameState.fighters.forEach(f => playerIds.add(f.id));
-    if (gameState.referee) playerIds.add(gameState.referee.id);
-    gameState.viewers.forEach(v => playerIds.add(v.id));
-
-    playersCount.textContent = `Players: ${playerIds.size}`;
+  
+  // Update player count
+  const playerIds = new Set();
+  gameState.fighters.forEach(f => playerIds.add(f.id));
+  if (gameState.referee) playerIds.add(gameState.referee.id);
+  gameState.viewers.forEach(v => playerIds.add(v.id));
+  
+  if (typeof updatePlayerCount === 'function') {
+    updatePlayerCount(playerIds.size);
   }
 }
 
 // Update the stage display
 function updateStageDisplay() {
-  const stageNameElement = document.getElementById('stage-name');
-  const stageTimerElement = document.getElementById('stage-timer');
-
-  if (stageNameElement) {
-    const displayName = STAGE_DISPLAY_NAMES[gameState.stage] || gameState.stage;
-    stageNameElement.textContent = displayName;
-  }
-
-  if (stageTimerElement) {
-    if (gameState.stageTimeRemaining > 0) {
-      const seconds = Math.ceil(gameState.stageTimeRemaining / 1000);
-      stageTimerElement.textContent = `${seconds}s`;
-    } else {
-      stageTimerElement.textContent = '';
-    }
+  const displayName = STAGE_DISPLAY_NAMES[gameState.stage] || gameState.stage;
+  const seconds = Math.ceil(gameState.stageTimeRemaining / 1000);
+  
+  if (typeof updateMatchStatus === 'function') {
+    updateMatchStatus(displayName, seconds);
   }
 }
 
@@ -500,3 +490,13 @@ function capitalize(str) {
 
 // Initialize connection
 window.addEventListener('load', connectToServer);
+
+// Expose functions to the global scope
+window.sendPlayerEmoteToServer = sendEmote;
+window.sendPlayerMessageToServer = function(message) {
+  const messageInput = document.getElementById('chat-input');
+  if (message) {
+    socket.emit('message', message);
+    if (messageInput) messageInput.value = '';
+  }
+};
