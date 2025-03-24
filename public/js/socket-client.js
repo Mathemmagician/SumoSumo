@@ -448,32 +448,6 @@ function updateScene() {
   }
 }
 
-function updatePlayerInScene(player) {
-  // If playerModels is a global object, ensure it's defined: let playerModels = {};
-  if (playerModels[player.id]) {
-    updatePlayerPosition(player.id, player.position, player.rotation);
-
-    // If role changed, reposition accordingly
-    const model = playerModels[player.id];
-    if (model.userData.role !== player.role) {
-      model.userData.role = player.role;
-      if (player.role === 'referee') {
-        // Example: a special position for referees
-        model.position.set(0, RING_HEIGHT + 0.5, 0);
-        model.scale.set(0.8, 0.8, 0.8);
-      } else if (player.role === 'viewer') {
-        // positionViewer is presumably your custom function
-        const idNumber = parseInt(player.id.substring(0, 8), 16);
-        const viewerIndex = idNumber % 60;
-        positionViewer(model, viewerIndex);
-      }
-    }
-  } else {
-    // The model doesn't exist yet
-    addPlayerToScene(player);
-  }
-}
-
 // Example of the updatePlayerPosition function
 function updatePlayerPosition(playerId, position, rotation) {
   const playerModel = playerModels[playerId];
