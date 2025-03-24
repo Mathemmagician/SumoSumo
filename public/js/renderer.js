@@ -138,19 +138,31 @@ function setupLighting() {
 
 // Generate face textures
 function generateFaceTextures() {
+  // Clear existing textures first
+  faceTextures = [];
+  
   for (let i = 0; i < 10; i++) {
     const canvas = document.createElement('canvas');
     canvas.width = 256;
     canvas.height = 256;
     const ctx = canvas.getContext('2d');
 
-    // Face background color
+    // Use consistent seed based on faceId for randomization
+    const seed = i; // Using faceId as seed
+    const random = () => {
+      // Simple deterministic random number generator
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    };
+
+    // Face background color - use fixed hue based on faceId
     ctx.fillStyle = `hsl(${i * 36}, 80%, 80%)`;
     ctx.fillRect(0, 0, 256, 256);
 
-    // Draw eyes
+    // Draw eyes - use fixed sizes based on faceId
     ctx.fillStyle = 'black';
-    const eyeSize = 20 + Math.random() * 15;
+    const eyeSize = 20 + (i % 3) * 5; // Deterministic eye size based on faceId
+    
     // Left eye
     ctx.beginPath();
     ctx.arc(90, 100, eyeSize, 0, Math.PI * 2);
@@ -160,21 +172,22 @@ function generateFaceTextures() {
     ctx.arc(166, 100, eyeSize, 0, Math.PI * 2);
     ctx.fill();
 
-    // Eyebrows
+    // Eyebrows - deterministic based on faceId
     ctx.lineWidth = 8;
     ctx.lineCap = 'round';
+    const eyebrowTilt = (i % 2) === 0 ? 10 : -10;
     ctx.beginPath();
     ctx.moveTo(60, 70);
-    ctx.lineTo(120, 70 + (Math.random() > 0.5 ? -10 : 10));
+    ctx.lineTo(120, 70 + eyebrowTilt);
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(136, 70 + (Math.random() > 0.5 ? -10 : 10));
+    ctx.moveTo(136, 70 + eyebrowTilt);
     ctx.lineTo(196, 70);
     ctx.stroke();
 
-    // Mouth
+    // Mouth - deterministic based on faceId
     ctx.lineWidth = 6;
-    const mouthStyle = Math.floor(Math.random() * 4);
+    const mouthStyle = i % 4; // Use faceId to determine mouth style
     switch (mouthStyle) {
       case 0: // Happy
         ctx.beginPath();
@@ -199,13 +212,13 @@ function generateFaceTextures() {
         break;
     }
 
-    // Random details
-    if (Math.random() > 0.7) {
+    // Optional details - deterministic based on faceId
+    if ((i % 3) === 0) {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
       ctx.beginPath();
       ctx.arc(
-        80 + Math.random() * 100,
-        120 + Math.random() * 80,
+        80 + (i * 10), // Deterministic x position
+        120 + (i * 8), // Deterministic y position
         3,
         0,
         Math.PI * 2
