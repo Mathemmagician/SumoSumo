@@ -58,8 +58,8 @@ const CAMERA_HEIGHT = 15;   // Height of camera
 let cameraAngle = 0;       // Current angle of rotation
 
 // Add near the top with other constants
-const FACE_ZOOM_DISTANCE = 3;    // How close to zoom to faces
-const FACE_ZOOM_HEIGHT = 1.5;    // Slightly above eye level
+const FACE_ZOOM_DISTANCE = 1.2;    // How close to zoom to faces
+const FACE_ZOOM_HEIGHT = 1.0;    // Slightly above eye level
 let ceremonyCameraActive = false;
 let originalCameraPosition = null;
 let ceremonyStartTime = 0;

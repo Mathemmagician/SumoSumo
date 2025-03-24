@@ -12,12 +12,16 @@ const MODEL_CONSTANTS = {
     HEAD_RADIUS: 0.4
   },
   REFEREE: {
-    BODY_RADIUS: 0.5,
-    BODY_HEIGHT: 1.5,
-    ROBE_RADIUS: 0.8,
-    ROBE_HEIGHT: 1.8,
-    FAN_WIDTH: 0.1,
-    FAN_HEIGHT: 0.4
+    BODY_RADIUS: 0.4,
+    BODY_HEIGHT: 1.2,
+    ROBE_RADIUS: 0.6,
+    ROBE_HEIGHT: 1.6,
+    FAN_WIDTH: 0.4,
+    FAN_HEIGHT: 0.6,
+    SASH_WIDTH: 0.3,
+    SASH_HEIGHT: 1.0,
+    HAT_RADIUS: 0.3,
+    HAT_HEIGHT: 0.2
   },
   VIEWER: {
     BODY_RADIUS: 0.3,
@@ -108,34 +112,107 @@ class ModelFactory {
   addRefereeModel(model, player) {
     const c = MODEL_CONSTANTS.REFEREE;
 
-    // Body (tall capsule)
-    const bodyGeometry = new THREE.CapsuleGeometry(c.BODY_RADIUS, c.BODY_HEIGHT, 4, 8);
+    // Body (slim capsule)
+    const bodyGeometry = new THREE.CapsuleGeometry(c.BODY_RADIUS, c.BODY_HEIGHT, 8, 16);
     const bodyColor = new THREE.Color().setHSL(player.colorId * 0.1, 0.5, 0.3);
     const bodyMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
     body.castShadow = true;
     model.add(body);
 
-    // Head with face
-    this.addHead(model, player);
+    // Head with face (slightly higher than other models)
+    const headGroup = new THREE.Group();
+    headGroup.position.y = c.BODY_HEIGHT / 2 + 0.2;
+    model.add(headGroup);
+    
+    // Add face to the head group
+    this.addHead(headGroup, player);
 
-    // Robe (cone)
-    const robeGeometry = new THREE.ConeGeometry(c.ROBE_RADIUS, c.ROBE_HEIGHT, 8);
+    // Traditional flat-top hat
+    const hatGeometry = new THREE.CylinderGeometry(c.HAT_RADIUS, c.HAT_RADIUS, c.HAT_HEIGHT, 16);
+    const hatMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+    const hat = new THREE.Mesh(hatGeometry, hatMaterial);
+    hat.position.y = 1.3;
+    model.add(hat);
+
+    // Decorative hat band
+    const hatBandGeometry = new THREE.TorusGeometry(c.HAT_RADIUS + 0.01, 0.05, 8, 16);
+    const hatBandMaterial = new THREE.MeshStandardMaterial({ color: 0xB8860B });
+    const hatBand = new THREE.Mesh(hatBandGeometry, hatBandMaterial);
+    hatBand.position.y = 1.3;
+    hatBand.rotation.x = Math.PI / 2;
+    model.add(hatBand);
+
+    // Ceremonial Robe
+    const robeGeometry = new THREE.ConeGeometry(c.ROBE_RADIUS, c.ROBE_HEIGHT, 16);
     const robeMaterial = new THREE.MeshStandardMaterial({ 
       color: 0x2c3e50,
       side: THREE.DoubleSide 
     });
     const robe = new THREE.Mesh(robeGeometry, robeMaterial);
-    robe.position.y = -0.5;
+    robe.position.y = -0.3;
     model.add(robe);
 
-    // Fan
-    const fanGeometry = new THREE.BoxGeometry(c.FAN_WIDTH, c.FAN_HEIGHT, 0.02);
-    const fanMaterial = new THREE.MeshStandardMaterial({ color: 0xf1c40f });
-    const fan = new THREE.Mesh(fanGeometry, fanMaterial);
-    fan.position.set(0.6, 0.2, 0);
-    fan.rotation.z = Math.PI / 4;
-    model.add(fan);
+    // Decorative Sash
+    const sashGeometry = new THREE.BoxGeometry(c.SASH_WIDTH, c.SASH_HEIGHT, 0.05);
+    const sashMaterial = new THREE.MeshStandardMaterial({ color: 0xB8860B });
+    const sash = new THREE.Mesh(sashGeometry, sashMaterial);
+    sash.position.set(0, 0.2, 0.3);
+    model.add(sash);
+
+    // Ceremonial Fan
+    const fanGroup = new THREE.Group();
+    
+    // Fan base
+    const fanBaseGeometry = new THREE.BoxGeometry(c.FAN_WIDTH, c.FAN_HEIGHT, 0.02);
+    const fanMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0xf1c40f,
+      side: THREE.DoubleSide 
+    });
+    const fanBase = new THREE.Mesh(fanBaseGeometry, fanMaterial);
+    fanGroup.add(fanBase);
+
+    // Fan decorative lines
+    for (let i = 0; i < 5; i++) {
+      const lineGeometry = new THREE.BoxGeometry(c.FAN_WIDTH * 0.9, 0.02, 0.03);
+      const lineMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+      const line = new THREE.Mesh(lineGeometry, lineMaterial);
+      line.position.y = -c.FAN_HEIGHT/2 + (i + 1) * c.FAN_HEIGHT/6;
+      fanGroup.add(line);
+    }
+
+    // Fan handle
+    const handleGeometry = new THREE.CylinderGeometry(0.03, 0.03, c.FAN_HEIGHT * 0.3, 8);
+    const handleMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+    const handle = new THREE.Mesh(handleGeometry, handleMaterial);
+    handle.rotation.x = Math.PI / 2;
+    handle.position.z = 0.1;
+    handle.position.y = -c.FAN_HEIGHT/2;
+    fanGroup.add(handle);
+
+    // Position the entire fan group
+    fanGroup.position.set(0.8, 0.4, 0);
+    fanGroup.rotation.z = Math.PI / 6;
+    model.add(fanGroup);
+
+    // Add sleeve details to the robe
+    const sleeveGeometry = new THREE.CylinderGeometry(0.2, 0.3, 0.6, 8);
+    const sleeveMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x2c3e50,
+      side: THREE.DoubleSide 
+    });
+
+    // Left sleeve
+    const leftSleeve = new THREE.Mesh(sleeveGeometry, sleeveMaterial);
+    leftSleeve.position.set(-0.5, 0.3, 0);
+    leftSleeve.rotation.z = Math.PI / 4;
+    model.add(leftSleeve);
+
+    // Right sleeve
+    const rightSleeve = new THREE.Mesh(sleeveGeometry, sleeveMaterial);
+    rightSleeve.position.set(0.5, 0.3, 0);
+    rightSleeve.rotation.z = -Math.PI / 4;
+    model.add(rightSleeve);
   }
 
   addViewerModel(model, player) {
