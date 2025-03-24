@@ -244,20 +244,7 @@ function connectToServer() {
     updateScene();
   });
 
-  // Fighters reset
-  socket.on('fightersReset', () => {
-    console.log('Fighters reset');
-    gameState.fighters = [];
 
-    if (gameState.myRole === 'fighter') {
-      gameState.myRole = 'viewer';
-    }
-
-    gameState.viewers.forEach(viewer => {
-      updatePlayerInScene(viewer);
-    });
-    updateUI();
-  });
 
   // Player role changed
   socket.on('playerRoleChanged', (data) => {
