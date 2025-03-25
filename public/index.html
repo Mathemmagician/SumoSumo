@@ -372,27 +372,28 @@
         
         // Use DocumentFragment for batch DOM updates
         function addMessageToHistory(sender, message) {
-            if (sender !== 'You' || !window.gameState || sender !== window.gameState.myId.substring(0, 6)) {
-                const fragment = document.createDocumentFragment();
-                const messageElement = document.createElement('div');
-                messageElement.className = 'chat-message';
-                
-                const senderSpan = document.createElement('span');
-                senderSpan.className = 'sender';
-                senderSpan.textContent = sender + ':';
-                
-                messageElement.appendChild(senderSpan);
-                messageElement.appendChild(document.createTextNode(' ' + message));
-                
-                fragment.appendChild(messageElement);
-                
-                // Remove old messages first if needed
-                while (chatHistory.children.length >= 5) {
-                    chatHistory.removeChild(chatHistory.firstChild);
-                }
-                
-                chatHistory.appendChild(fragment);
+            // Skip null or undefined messages
+            if (!message) return;
+            
+            const fragment = document.createDocumentFragment();
+            const messageElement = document.createElement('div');
+            messageElement.className = 'chat-message';
+            
+            const senderSpan = document.createElement('span');
+            senderSpan.className = 'sender';
+            senderSpan.textContent = sender + ':';
+            
+            messageElement.appendChild(senderSpan);
+            messageElement.appendChild(document.createTextNode(' ' + message));
+            
+            fragment.appendChild(messageElement);
+            
+            // Remove old messages first if needed
+            while (chatHistory.children.length >= 5) {
+                chatHistory.removeChild(chatHistory.firstChild);
             }
+            
+            chatHistory.appendChild(fragment);
         }
         
         // Debounce chat history updates
@@ -407,8 +408,15 @@
         // Use the debounced version for event listeners
         window.addEventListener('playerMessageReceived', function(e) {
             if (e.detail && e.detail.id) {
-                // Add null check for gameState
-                if (!window.gameState?.myId || e.detail.id === window.gameState.myId) return;
+                // Skip if this is our own message (we already added it when sending)
+                if (window.gameState?.myId && e.detail.id === window.gameState.myId) return;
+                
+                // Skip messages from bots (IDs starting with "fake-")
+                if (e.detail.id.startsWith('fake-')) return;
+                
+                // Skip null messages
+                if (!e.detail.message) return;
+                
                 const username = e.detail.username || e.detail.id.substring(0, 6);
                 debouncedAddMessage(username, e.detail.message);
             }
@@ -416,8 +424,15 @@
         
         window.addEventListener('playerEmoteReceived', function(e) {
             if (e.detail && e.detail.id) {
-                // Add null check for gameState
-                if (!window.gameState?.myId || e.detail.id === window.gameState.myId) return;
+                // Skip if this is our own emote (we already added it when sending)
+                if (window.gameState?.myId && e.detail.id === window.gameState.myId) return;
+                
+                // Skip emotes from bots (IDs starting with "fake-")
+                if (e.detail.id.startsWith('fake-')) return;
+                
+                // Skip null emotes
+                if (!e.detail.emote) return;
+                
                 const username = e.detail.username || e.detail.id.substring(0, 6);
                 debouncedAddMessage(username, e.detail.emote);
             }
@@ -460,11 +475,11 @@
             document.getElementById('player-count').textContent = count;
         }
         
-        // Modified emote handler to also update chat history
+        // Modified emote handler to avoid duplicate messages
         function sendEmote(emote) {
             if (window.sendPlayerEmoteToServer) {
-                // Add emote to local chat history
-                addEmoteToHistory('You', emote);
+                // We only add the emote to history here
+                debouncedAddMessage('You', emote);
                 
                 window.sendPlayerEmoteToServer(emote);
                 
@@ -481,48 +496,18 @@
             }
         }
         
-        // Modified chat message handler to update chat history
+        // Modified chat message handler to avoid duplicate messages
         function sendMessage() {
             const chatInput = document.getElementById('chat-input');
             const message = chatInput.value.trim();
             
             if (message && window.sendPlayerMessageToServer) {
-                // Add message to local chat history (as "You")
-                addMessageToHistory('You', message);
+                // We only add the message to history here
+                debouncedAddMessage('You', message);
                 
                 // Send to server
                 window.sendPlayerMessageToServer(message);
                 chatInput.value = '';
-            }
-        }
-        
-        // Function to add emote to chat history
-        function addEmoteToHistory(sender, emote) {
-            const chatHistory = document.getElementById('chat-history');
-            const messageElement = document.createElement('div');
-            messageElement.className = 'chat-message';
-            
-            // Create sender span
-            const senderSpan = document.createElement('span');
-            senderSpan.className = 'sender';
-            senderSpan.textContent = sender + ':';
-            
-            // Add emote content
-            messageElement.appendChild(senderSpan);
-            
-            // Add emote with same font size as text
-            const emoteSpan = document.createElement('span');
-            emoteSpan.style.fontSize = '0.9rem'; // Changed from 1.8rem to match text size
-            emoteSpan.style.marginLeft = '8px';
-            emoteSpan.textContent = emote;
-            messageElement.appendChild(emoteSpan);
-            
-            // Add to history
-            chatHistory.appendChild(messageElement);
-            
-            // Limit history to last 5 messages
-            while (chatHistory.children.length > 5) {
-                chatHistory.removeChild(chatHistory.children[0]);
             }
         }
         
