@@ -361,68 +361,286 @@ function createRing() {
     3,7,4, 3,4,0     // left vertical
   ]);
   squareBase.computeVertexNormals();
+  
+  // Create texture for the clay-like material with subtle variations
+  const clayTexture = new THREE.CanvasTexture(createClayTexture());
+  
   const baseMesh = new THREE.Mesh(squareBase, new THREE.MeshStandardMaterial({ 
-    color: 0xE5C8A0, // Lighter tan color
-    roughness: 0.5,
-    metalness: 0.2
+    color: 0xD9B382, // Warmer clay color
+    roughness: 0.8,
+    metalness: 0.1,
+    map: clayTexture
   }));
+  baseMesh.position.y = -0.05;
   baseMesh.castShadow = true;
   baseMesh.receiveShadow = true;
   scene.add(baseMesh);
 
-  // Dohyo cylinder with even brighter material
-  const ringGeometry = new THREE.CylinderGeometry(RING_RADIUS, RING_RADIUS, RING_HEIGHT, 32);
+  // Dohyo cylinder with more realistic material
+  const ringGeometry = new THREE.CylinderGeometry(RING_RADIUS, RING_RADIUS, RING_HEIGHT, 64);
+  const ringTexture = new THREE.CanvasTexture(createDohyoTexture());
+  
   const ringMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0xE5C8A0, 
-    roughness: 0.6, // Increased from 0.5 to 0.6
-    metalness: 0.15  // Decreased from 0.2 to 0.15
+    color: 0xD9B382, 
+    roughness: 0.7,
+    metalness: 0.1,
+    map: ringTexture
   });
+  
   ring = new THREE.Mesh(ringGeometry, ringMaterial);
   ring.position.y = RING_HEIGHT / 2;
   ring.castShadow = true;
   ring.receiveShadow = true;
   scene.add(ring);
 
-  // Border with brighter material
-  const borderGeometry = new THREE.RingGeometry(RING_RADIUS, RING_RADIUS + 0.5, 32);
-  const borderMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0xA05A2C, // Lighter brown
-    roughness: 0.5,
-    metalness: 0.2,
-    side: THREE.DoubleSide
+  // Traditional straw border (tawara)
+  const tawaraGeometry = new THREE.TorusGeometry(RING_RADIUS + 0.05, 0.25, 16, 64);
+  const tawaraMaterial = new THREE.MeshStandardMaterial({ 
+    color: 0xC9A165, // Straw color
+    roughness: 0.9,
+    metalness: 0.0,
+    map: createStrawTexture()
   });
-  const border = new THREE.Mesh(borderGeometry, borderMaterial);
-  border.rotation.x = Math.PI / 2;
-  border.position.y = RING_HEIGHT + 0.01;
-  border.receiveShadow = true;
-  scene.add(border);
+  
+  const tawara = new THREE.Mesh(tawaraGeometry, tawaraMaterial);
+  tawara.position.y = RING_HEIGHT - 0.2;
+  tawara.rotation.x = Math.PI / 2;
+  tawara.receiveShadow = true;
+  tawara.castShadow = true;
+  scene.add(tawara);
 
-  // Markings with increased opacity
-  const markingsGeometry = new THREE.CircleGeometry(RING_RADIUS * 0.8, 32);
-  const markingsMaterial = new THREE.MeshBasicMaterial({ 
+  // Create shikirisen (starting lines)
+  const lineWidth = 0.1;
+  const lineDepth = RING_RADIUS * 0.6;
+  const lineGeometry = new THREE.BoxGeometry(lineWidth, 0.02, lineDepth);
+  const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+  
+  // Create two starting lines
+  const line1 = new THREE.Mesh(lineGeometry, lineMaterial);
+  line1.position.set(-0.75, RING_HEIGHT + 0.01, 0);
+  scene.add(line1);
+  
+  const line2 = new THREE.Mesh(lineGeometry, lineMaterial);
+  line2.position.set(0.75, RING_HEIGHT + 0.01, 0);
+  scene.add(line2);
+
+  // Create center circle (nakabashira)
+  const centerCircleGeometry = new THREE.CircleGeometry(0.5, 32);
+  const centerCircleMaterial = new THREE.MeshBasicMaterial({ 
     color: 0xFFFFFF,
     transparent: true,
-    opacity: 0.5, // Increased from 0.3 to 0.5
+    opacity: 0.7,
     side: THREE.DoubleSide
   });
-  const markings = new THREE.Mesh(markingsGeometry, markingsMaterial);
-  markings.rotation.x = Math.PI / 2;
-  markings.position.y = RING_HEIGHT + 0.02;
-  scene.add(markings);
+  
+  const centerCircle = new THREE.Mesh(centerCircleGeometry, centerCircleMaterial);
+  centerCircle.rotation.x = -Math.PI / 2;
+  centerCircle.position.y = RING_HEIGHT + 0.02;
+  scene.add(centerCircle);
 
-  // Floor with much brighter material
+  // Add traditional corner markers (hyoushigi)
+  const markerPositions = [
+    {x: 0, z: RING_RADIUS * 0.8}, // North
+    {x: RING_RADIUS * 0.8, z: 0}, // East
+    {x: 0, z: -RING_RADIUS * 0.8}, // South
+    {x: -RING_RADIUS * 0.8, z: 0}  // West
+  ];
+  
+  markerPositions.forEach(pos => {
+    const markerGeometry = new THREE.BoxGeometry(0.3, 0.03, 0.3);
+    const markerMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x000000,
+      roughness: 0.5,
+      metalness: 0.2
+    });
+    
+    const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+    marker.position.set(pos.x, RING_HEIGHT + 0.015, pos.z);
+    scene.add(marker);
+  });
+
+  // Floor with improved texture
   const floorGeometry = new THREE.PlaneGeometry(FLOOR_SIZE, FLOOR_SIZE);
+  const floorTexture = new THREE.CanvasTexture(createFloorTexture());
+  
   const floorMaterial = new THREE.MeshStandardMaterial({ 
     color: 0xD9A55B,
-    roughness: 0.65, // Increased from 0.5 to 0.65
-    metalness: 0.15, // Decreased from 0.2 to 0.15
+    roughness: 0.75,
+    metalness: 0.1,
+    map: floorTexture,
     side: THREE.DoubleSide
   });
+  
   const floor = new THREE.Mesh(floorGeometry, floorMaterial);
   floor.rotation.x = Math.PI / 2;
   floor.position.y = 0;
   floor.receiveShadow = true;
   scene.add(floor);
+}
+
+// Helper function to create a texture for the clay surface
+function createClayTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  
+  // Base color
+  ctx.fillStyle = '#D9B382';
+  ctx.fillRect(0, 0, 512, 512);
+  
+  // Add subtle noise for clay texture
+  for (let i = 0; i < 40000; i++) {
+    const x = Math.random() * 512;
+    const y = Math.random() * 512;
+    const radius = Math.random() * 2 + 0.5;
+    
+    // Randomly vary the clay color
+    const variation = Math.random() * 15 - 7;
+    const r = 217 + variation;
+    const g = 179 + variation;
+    const b = 130 + variation;
+    
+    ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  return canvas;
+}
+
+// Helper function to create a texture for the dohyo top surface
+function createDohyoTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 1024;
+  const ctx = canvas.getContext('2d');
+  
+  // Base color
+  ctx.fillStyle = '#D9B382';
+  ctx.fillRect(0, 0, 1024, 1024);
+  
+  // Draw circular boundary
+  ctx.strokeStyle = '#BF9E76';
+  ctx.lineWidth = 30;
+  ctx.beginPath();
+  ctx.arc(512, 512, 450, 0, Math.PI * 2);
+  ctx.stroke();
+  
+  // Add salt scatter pattern (subtle white dots)
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+  
+  for (let i = 0; i < 2000; i++) {
+    // Keep salt mostly in the center area
+    const angle = Math.random() * Math.PI * 2;
+    const distance = Math.random() * 350; // Within the ring
+    const x = 512 + Math.cos(angle) * distance;
+    const y = 512 + Math.sin(angle) * distance;
+    const radius = Math.random() * 2 + 0.5;
+    
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  // Add footprint-like marks (subtle indentations)
+  ctx.fillStyle = 'rgba(185, 152, 115, 0.3)';
+  
+  for (let i = 0; i < 40; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const distance = Math.random() * 400; // Within the ring
+    const x = 512 + Math.cos(angle) * distance;
+    const y = 512 + Math.sin(angle) * distance;
+    
+    // Create oval-shaped footprint
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.random() * Math.PI * 2);
+    ctx.scale(1, 1.5);
+    ctx.beginPath();
+    ctx.arc(0, 0, 15 + Math.random() * 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  
+  return canvas;
+}
+
+// Helper function to create a straw texture for the tawara
+function createStrawTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  
+  // Base color
+  ctx.fillStyle = '#C9A165';
+  ctx.fillRect(0, 0, 256, 256);
+  
+  // Draw straw-like lines
+  for (let i = 0; i < 200; i++) {
+    const x = Math.random() * 256;
+    ctx.strokeStyle = `rgba(${150 + Math.random() * 60}, ${110 + Math.random() * 50}, ${40 + Math.random() * 40}, 0.7)`;
+    ctx.lineWidth = 1 + Math.random();
+    
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, 256);
+    ctx.stroke();
+  }
+  
+  // Add horizontal bindings
+  for (let i = 0; i < 10; i++) {
+    const y = i * 25 + Math.random() * 10;
+    ctx.strokeStyle = '#5D4037';
+    ctx.lineWidth = 3 + Math.random() * 2;
+    
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(256, y);
+    ctx.stroke();
+  }
+  
+  const texture = new THREE.CanvasTexture(canvas);
+  return texture;
+}
+
+// Helper function to create a texture for the floor
+function createFloorTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 1024;
+  const ctx = canvas.getContext('2d');
+  
+  // Base color
+  ctx.fillStyle = '#D9A55B';
+  ctx.fillRect(0, 0, 1024, 1024);
+  
+  // Add wood grain pattern
+  for (let i = 0; i < 30; i++) {
+    const y = i * 35 + Math.random() * 10;
+    const colorVariation = Math.random() * 20 - 10;
+    
+    ctx.strokeStyle = `rgba(${185 + colorVariation}, ${140 + colorVariation}, ${70 + colorVariation}, 0.4)`;
+    ctx.lineWidth = 20 + Math.random() * 10;
+    
+    // Create wavy line for wood grain
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    
+    let x = 0;
+    while (x < 1024) {
+      const nextX = x + 50 + Math.random() * 50;
+      const nextY = y + Math.random() * 10 - 5;
+      ctx.lineTo(nextX, nextY);
+      x = nextX;
+    }
+    
+    ctx.stroke();
+  }
+  
+  return canvas;
 }
 
 /**
