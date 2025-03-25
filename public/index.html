@@ -406,16 +406,18 @@
         
         // Use the debounced version for event listeners
         window.addEventListener('playerMessageReceived', function(e) {
-            if (e.detail && e.detail.id && e.detail.message) {
-                if (e.detail.id === window.gameState.myId) return;
+            if (e.detail && e.detail.id) {
+                // Add null check for gameState
+                if (!window.gameState?.myId || e.detail.id === window.gameState.myId) return;
                 const username = e.detail.username || e.detail.id.substring(0, 6);
                 debouncedAddMessage(username, e.detail.message);
             }
         });
         
         window.addEventListener('playerEmoteReceived', function(e) {
-            if (e.detail && e.detail.id && e.detail.emote) {
-                if (e.detail.id === window.gameState.myId) return;
+            if (e.detail && e.detail.id) {
+                // Add null check for gameState
+                if (!window.gameState?.myId || e.detail.id === window.gameState.myId) return;
                 const username = e.detail.username || e.detail.id.substring(0, 6);
                 debouncedAddMessage(username, e.detail.emote);
             }
