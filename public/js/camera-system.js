@@ -347,7 +347,7 @@ class CameraSystem {
     this.camera.lookAt(eyePosition);
     
     // Add a slight upward tilt for a more dramatic look
-    const cameraUp = new THREE.Vector3(0, 1, 0);
+    const cameraUp = new THREE.Vector3(0, 0.5, 0);
     const rightVector = new THREE.Vector3().crossVectors(directionToTarget, cameraUp).normalize();
     
     // Tilt the camera slightly based on an offset from the perfect center
