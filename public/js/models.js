@@ -34,6 +34,20 @@ const MODEL_CONSTANTS = {
     EMOTE_SIZE: 1,
     TEXT_BUBBLE_WIDTH: 2.4,
     TEXT_BUBBLE_HEIGHT: 1.2
+  },
+  STADIUM: {
+    FLOOR_SIZE: RING_RADIUS * 8, // Extend floor size
+    WALL_HEIGHT: 16, // Increased from 10 to 16
+    WALL_THICKNESS: 2,
+    COLUMN_RADIUS: 0.8,
+    COLUMN_HEIGHT: 18, // Increased from 12 to 18
+    COLUMN_SEGMENTS: 12,
+    BEAM_HEIGHT: 1.5, // Increased from 1.2 to 1.5
+    BEAM_DEPTH: 0.8,
+    WALL_COLOR: 0x8B4513, // Dark wood color
+    COLUMN_COLOR: 0xA0522D, // Brown
+    BEAM_COLOR: 0x654321, // Dark brown
+    TRIM_COLOR: 0xBC8F8F  // Light wood color for trim
   }
 };
 
@@ -320,6 +334,388 @@ class ModelFactory {
   }
 }
 
+class StadiumFactory {
+  /**
+   * Creates the walls and structural elements of the stadium
+   * @param {number} ringRadius - The radius of the sumo ring for scaling
+   * @param {number} seatingDistance - Distance to last row of seating
+   * @returns {THREE.Group} A group containing all stadium wall elements
+   */
+  static createStadiumWalls(ringRadius, seatingDistance) {
+    const s = MODEL_CONSTANTS.STADIUM;
+    const stadiumGroup = new THREE.Group();
+    
+    // Calculate wall placement - should be after the last row of seating
+    const wallDistance = seatingDistance + 5; // 5 units beyond last row
+    
+    // Create the four walls (North, East, South, West)
+    const wallPositions = [
+      {x: 0, z: -wallDistance, rotation: 0}, // North
+      {x: wallDistance, z: 0, rotation: Math.PI / 2}, // East
+      {x: 0, z: wallDistance, rotation: Math.PI}, // South
+      {x: -wallDistance, z: 0, rotation: -Math.PI / 2} // West
+    ];
+    
+    // Wall length - slightly larger than the distance between opposite walls
+    const wallLength = wallDistance * 2 + 10;
+    
+    // Create each wall
+    wallPositions.forEach(pos => {
+      // Wall base
+      const wallGeometry = new THREE.BoxGeometry(wallLength, s.WALL_HEIGHT, s.WALL_THICKNESS);
+      const wallMaterial = new THREE.MeshStandardMaterial({
+        color: s.WALL_COLOR,
+        roughness: 0.8,
+        metalness: 0.2
+      });
+      
+      const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+      wall.position.set(pos.x, s.WALL_HEIGHT / 2, pos.z);
+      wall.rotation.y = pos.rotation;
+      wall.castShadow = true;
+      wall.receiveShadow = true;
+      
+      stadiumGroup.add(wall);
+      
+      // Add decorative trim at top of wall
+      const trimGeometry = new THREE.BoxGeometry(wallLength, 0.8, s.WALL_THICKNESS + 0.4);
+      const trimMaterial = new THREE.MeshStandardMaterial({
+        color: s.TRIM_COLOR,
+        roughness: 0.7,
+        metalness: 0.3
+      });
+      
+      const trim = new THREE.Mesh(trimGeometry, trimMaterial);
+      trim.position.set(pos.x, s.WALL_HEIGHT + 0.4, pos.z);
+      trim.rotation.y = pos.rotation;
+      trim.castShadow = true;
+      trim.receiveShadow = true;
+      
+      stadiumGroup.add(trim);
+      
+      // Add support columns along the wall
+      const numColumns = 5; // Number of columns along each wall
+      const columnSpacing = wallLength / (numColumns + 1);
+      
+      for (let i = 1; i <= numColumns; i++) {
+        const offset = (i * columnSpacing) - (wallLength / 2);
+        let columnX = pos.x;
+        let columnZ = pos.z;
+        
+        // Adjust position based on wall orientation
+        if (pos.rotation === 0 || pos.rotation === Math.PI) {
+          columnX += offset;
+        } else {
+          columnZ += offset;
+        }
+        
+        // Adjust the column position to be against the wall
+        if (pos.rotation === 0) columnZ += s.WALL_THICKNESS / 2;
+        else if (pos.rotation === Math.PI) columnZ -= s.WALL_THICKNESS / 2;
+        else if (pos.rotation === Math.PI / 2) columnX -= s.WALL_THICKNESS / 2;
+        else if (pos.rotation === -Math.PI / 2) columnX += s.WALL_THICKNESS / 2;
+        
+        // Create column
+        const columnGeometry = new THREE.CylinderGeometry(
+          s.COLUMN_RADIUS, s.COLUMN_RADIUS * 1.2, s.COLUMN_HEIGHT, s.COLUMN_SEGMENTS
+        );
+        const columnMaterial = new THREE.MeshStandardMaterial({
+          color: s.COLUMN_COLOR,
+          roughness: 0.7,
+          metalness: 0.2
+        });
+        
+        const column = new THREE.Mesh(columnGeometry, columnMaterial);
+        column.position.set(columnX, s.COLUMN_HEIGHT / 2, columnZ);
+        column.castShadow = true;
+        column.receiveShadow = true;
+        
+        stadiumGroup.add(column);
+        
+        // Add horizontal support beam on top of the column
+        const beamGeometry = new THREE.BoxGeometry(s.COLUMN_RADIUS * 4, s.BEAM_HEIGHT, s.BEAM_DEPTH);
+        const beamMaterial = new THREE.MeshStandardMaterial({
+          color: s.BEAM_COLOR,
+          roughness: 0.8,
+          metalness: 0.1
+        });
+        
+        const beam = new THREE.Mesh(beamGeometry, beamMaterial);
+        beam.position.set(columnX, s.COLUMN_HEIGHT + (s.BEAM_HEIGHT / 2), columnZ);
+        beam.rotation.y = pos.rotation + Math.PI / 2; // Rotate beam to align with wall
+        beam.castShadow = true;
+        beam.receiveShadow = true;
+        
+        stadiumGroup.add(beam);
+      }
+    });
+    
+    // Create corners with decorative elements
+    const cornerPositions = [
+      {x: wallDistance, z: -wallDistance}, // NE
+      {x: wallDistance, z: wallDistance},  // SE
+      {x: -wallDistance, z: wallDistance}, // SW
+      {x: -wallDistance, z: -wallDistance} // NW
+    ];
+    
+    cornerPositions.forEach(pos => {
+      // Large corner column
+      const cornerGeometry = new THREE.CylinderGeometry(
+        s.COLUMN_RADIUS * 1.5, s.COLUMN_RADIUS * 1.8, s.COLUMN_HEIGHT * 1.2, s.COLUMN_SEGMENTS
+      );
+      const cornerMaterial = new THREE.MeshStandardMaterial({
+        color: s.COLUMN_COLOR,
+        roughness: 0.7,
+        metalness: 0.2
+      });
+      
+      const cornerColumn = new THREE.Mesh(cornerGeometry, cornerMaterial);
+      cornerColumn.position.set(pos.x, s.COLUMN_HEIGHT * 0.6, pos.z);
+      cornerColumn.castShadow = true;
+      cornerColumn.receiveShadow = true;
+      
+      stadiumGroup.add(cornerColumn);
+      
+      // Decorative top cap for corner
+      const capGeometry = new THREE.CylinderGeometry(
+        s.COLUMN_RADIUS * 2, s.COLUMN_RADIUS * 1.5, s.BEAM_HEIGHT, s.COLUMN_SEGMENTS
+      );
+      const capMaterial = new THREE.MeshStandardMaterial({
+        color: s.TRIM_COLOR,
+        roughness: 0.6,
+        metalness: 0.3
+      });
+      
+      const cornerCap = new THREE.Mesh(capGeometry, capMaterial);
+      cornerCap.position.set(pos.x, s.COLUMN_HEIGHT * 1.2, pos.z);
+      cornerCap.castShadow = true;
+      cornerCap.receiveShadow = true;
+      
+      stadiumGroup.add(cornerCap);
+    });
+    
+    // Create the extended floor to match the walls
+    const floorSize = wallDistance * 2 + 10; // Match wall dimensions
+    const floorGeometry = new THREE.PlaneGeometry(floorSize, floorSize);
+    const floorTexture = StadiumFactory.createFloorTexture();
+    
+    const floorMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0xD9A55B,
+      roughness: 0.75,
+      metalness: 0.1,
+      map: floorTexture,
+      side: THREE.DoubleSide
+    });
+    
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = Math.PI / 2;
+    floor.position.y = -0.01; // Slightly below current floor to avoid z-fighting
+    floor.receiveShadow = true;
+    
+    stadiumGroup.add(floor);
+    
+    // Add roof structure
+    const roofDistance = wallDistance - 2; // Slightly inset from walls
+    const roofHeight = s.WALL_HEIGHT + 2;
+    const roofStructure = this.createRoofStructure(roofDistance, roofHeight);
+    stadiumGroup.add(roofStructure);
+    
+    return stadiumGroup;
+  }
+  
+  /**
+   * Creates a wood floor texture
+   * @returns {THREE.Texture} Canvas texture for floor
+   */
+  static createFloorTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 1024;
+    const ctx = canvas.getContext('2d');
+    
+    // Base color
+    ctx.fillStyle = '#D9A55B';
+    ctx.fillRect(0, 0, 1024, 1024);
+    
+    // Add wood grain pattern
+    for (let i = 0; i < 40; i++) {
+      const y = i * 26 + Math.random() * 10;
+      const colorVariation = Math.random() * 20 - 10;
+      
+      ctx.strokeStyle = `rgba(${185 + colorVariation}, ${140 + colorVariation}, ${70 + colorVariation}, 0.4)`;
+      ctx.lineWidth = 15 + Math.random() * 10;
+      
+      // Create wavy line for wood grain
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      
+      let x = 0;
+      while (x < 1024) {
+        const nextX = x + 50 + Math.random() * 50;
+        const nextY = y + Math.random() * 10 - 5;
+        ctx.lineTo(nextX, nextY);
+        x = nextX;
+      }
+      
+      ctx.stroke();
+    }
+    
+    // Add some subtle knots in the wood
+    for (let i = 0; i < 15; i++) {
+      const x = Math.random() * 1024;
+      const y = Math.random() * 1024;
+      const radius = 5 + Math.random() * 15;
+      
+      const gradient = ctx.createRadialGradient(x, y, 1, x, y, radius);
+      gradient.addColorStop(0, 'rgba(100, 70, 40, 0.7)');
+      gradient.addColorStop(1, 'rgba(190, 150, 100, 0)');
+      
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  /**
+   * Creates a roof structure for the stadium
+   * @param {number} distance - Distance from center to roof edge
+   * @param {number} height - Height of the roof from ground
+   * @returns {THREE.Group} The roof structure
+   */
+  static createRoofStructure(distance, height) {
+    const s = MODEL_CONSTANTS.STADIUM;
+    const roofGroup = new THREE.Group();
+    
+    // Create a large pyramid-like roof
+    const roofSize = distance * 2 + 10;
+    const roofPeakHeight = 8; // How tall the roof peak is from its base
+    
+    // Create each of the four sloped roof sections
+    const roofSections = [
+      {x: 0, z: -distance, rotation: Math.PI}, // North
+      {x: distance, z: 0, rotation: Math.PI / 2}, // East
+      {x: 0, z: distance, rotation: 0}, // South
+      {x: -distance, z: 0, rotation: -Math.PI / 2} // West
+    ];
+    
+    roofSections.forEach(section => {
+      // Create a triangular roof section
+      const roofGeometry = new THREE.BufferGeometry();
+      
+      // Define roof vertices for this section (triangular shape)
+      const halfWidth = roofSize / 2;
+      const vertices = new Float32Array([
+        // Base of the triangle
+        -halfWidth, 0, 0,
+        halfWidth, 0, 0,
+        // Peak of the triangle
+        0, roofPeakHeight, -distance,
+      ]);
+      
+      roofGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+      roofGeometry.computeVertexNormals();
+      
+      // Basic indices for a triangle
+      roofGeometry.setIndex([0, 1, 2]);
+      
+      // Roof material with wood texture
+      const roofMaterial = new THREE.MeshStandardMaterial({
+        color: 0x8B4513,
+        roughness: 0.8,
+        metalness: 0.1,
+        side: THREE.DoubleSide
+      });
+      
+      const roofSection = new THREE.Mesh(roofGeometry, roofMaterial);
+      roofSection.position.set(section.x, height, section.z);
+      roofSection.rotation.y = section.rotation;
+      roofSection.castShadow = true;
+      roofSection.receiveShadow = true;
+      
+      roofGroup.add(roofSection);
+      
+      // Add decorative ridge beams along the roof edges
+      const edgeBeamGeometry = new THREE.BoxGeometry(roofSize, 0.4, 0.6);
+      const edgeBeamMaterial = new THREE.MeshStandardMaterial({
+        color: s.TRIM_COLOR,
+        roughness: 0.6,
+        metalness: 0.2
+      });
+      
+      const edgeBeam = new THREE.Mesh(edgeBeamGeometry, edgeBeamMaterial);
+      edgeBeam.position.set(section.x, height, section.z);
+      edgeBeam.rotation.y = section.rotation;
+      
+      // Move the beam to the base edge of the roof section
+      if (section.rotation === 0) {
+        edgeBeam.position.z += 0.3;
+      } else if (section.rotation === Math.PI) {
+        edgeBeam.position.z -= 0.3;
+      } else if (section.rotation === Math.PI / 2) {
+        edgeBeam.position.x -= 0.3;
+      } else {
+        edgeBeam.position.x += 0.3;
+      }
+      
+      edgeBeam.castShadow = true;
+      edgeBeam.receiveShadow = true;
+      
+      roofGroup.add(edgeBeam);
+    });
+    
+    // Add central peak ornament
+    const peakOrnamentGeometry = new THREE.ConeGeometry(1.2, 3, 8);
+    const peakOrnamentMaterial = new THREE.MeshStandardMaterial({
+      color: 0xB22222, // Dark red ornament
+      roughness: 0.5,
+      metalness: 0.5
+    });
+    
+    const peakOrnament = new THREE.Mesh(peakOrnamentGeometry, peakOrnamentMaterial);
+    peakOrnament.position.set(0, height + roofPeakHeight + 1.5, 0);
+    peakOrnament.castShadow = true;
+    
+    roofGroup.add(peakOrnament);
+    
+    // Add additional cross-beams for structural appearance
+    const directions = [
+      {x: distance, z: 0},
+      {x: 0, z: distance},
+      {x: -distance, z: 0},
+      {x: 0, z: -distance}
+    ];
+    
+    directions.forEach(dir => {
+      const beamGeometry = new THREE.BoxGeometry(distance * 2, 0.6, 0.6);
+      const beamMaterial = new THREE.MeshStandardMaterial({
+        color: s.BEAM_COLOR,
+        roughness: 0.7,
+        metalness: 0.2
+      });
+      
+      const crossBeam = new THREE.Mesh(beamGeometry, beamMaterial);
+      
+      // Position at center of the roof
+      crossBeam.position.y = height + roofPeakHeight * 0.6;
+      
+      // Rotate and position based on direction
+      if (dir.x === 0) {
+        // North-South beam
+        crossBeam.rotation.y = Math.PI / 2;
+      }
+      
+      crossBeam.castShadow = true;
+      roofGroup.add(crossBeam);
+    });
+    
+    return roofGroup;
+  }
+}
+
 // Export the factory and constants
 window.ModelFactory = ModelFactory;
-window.MODEL_CONSTANTS = MODEL_CONSTANTS; 
+window.MODEL_CONSTANTS = MODEL_CONSTANTS;
+window.StadiumFactory = StadiumFactory; 

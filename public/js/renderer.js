@@ -103,7 +103,7 @@ function initScene(initialGameState) {
 
   // Create camera
   camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-  
+
   // Create renderer
   renderer = new THREE.WebGLRenderer({ 
     antialias: true, 
@@ -136,6 +136,9 @@ function initScene(initialGameState) {
 
   // Create the audience areas (using InstancedMesh)
   createAudienceAreas();
+  
+  // Add stadium walls after audience areas
+  createStadiumWalls();
 
   // Add all existing players to the scene
   initialGameState.fighters.forEach(fighter => {
@@ -458,24 +461,6 @@ function createRing() {
     marker.position.set(pos.x, RING_HEIGHT + 0.015, pos.z);
     scene.add(marker);
   });
-
-  // Floor with improved texture
-  const floorGeometry = new THREE.PlaneGeometry(FLOOR_SIZE, FLOOR_SIZE);
-  const floorTexture = new THREE.CanvasTexture(createFloorTexture());
-  
-  const floorMaterial = new THREE.MeshStandardMaterial({ 
-    color: 0xD9A55B,
-    roughness: 0.75,
-    metalness: 0.1,
-    map: floorTexture,
-    side: THREE.DoubleSide
-  });
-  
-  const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-  floor.rotation.x = Math.PI / 2;
-  floor.position.y = 0;
-  floor.receiveShadow = true;
-  scene.add(floor);
 }
 
 // Helper function to create a texture for the clay surface
@@ -604,43 +589,6 @@ function createStrawTexture() {
   
   const texture = new THREE.CanvasTexture(canvas);
   return texture;
-}
-
-// Helper function to create a texture for the floor
-function createFloorTexture() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 1024;
-  canvas.height = 1024;
-  const ctx = canvas.getContext('2d');
-  
-  // Base color
-  ctx.fillStyle = '#D9A55B';
-  ctx.fillRect(0, 0, 1024, 1024);
-  
-  // Add wood grain pattern
-  for (let i = 0; i < 30; i++) {
-    const y = i * 35 + Math.random() * 10;
-    const colorVariation = Math.random() * 20 - 10;
-    
-    ctx.strokeStyle = `rgba(${185 + colorVariation}, ${140 + colorVariation}, ${70 + colorVariation}, 0.4)`;
-    ctx.lineWidth = 20 + Math.random() * 10;
-    
-    // Create wavy line for wood grain
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    
-    let x = 0;
-    while (x < 1024) {
-      const nextX = x + 50 + Math.random() * 50;
-      const nextY = y + Math.random() * 10 - 5;
-      ctx.lineTo(nextX, nextY);
-      x = nextX;
-    }
-    
-    ctx.stroke();
-  }
-  
-  return canvas;
 }
 
 /**
@@ -1502,4 +1450,14 @@ function createCameraInfoDisplay() {
   
   toggleButton.addEventListener('click', toggleFreeCamera);
   return infoContainer;
+}
+
+// Add this new function to create the stadium walls
+function createStadiumWalls() {
+  // Calculate the distance to the last row of audience seating
+  const lastRowDistance = FIRST_ROW_DISTANCE + (19 * ROW_SPACING); // 20th row (index 19)
+  
+  // Create the stadium walls using the factory
+  const stadium = StadiumFactory.createStadiumWalls(RING_RADIUS, lastRowDistance);
+  scene.add(stadium);
 }
