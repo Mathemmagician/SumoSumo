@@ -146,8 +146,8 @@ function initScene(initialGameState) {
 
   createFpsDisplay();
 
-  // Create cinematic bars
-  cinematicBars = createCinematicBars();
+  // We no longer need to create cinematic bars here as they're managed by the camera system
+  cinematicBars = null;
 
   // Create camera info display
   createCameraInfoDisplay();
@@ -628,10 +628,10 @@ function onWindowResize() {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 
-  // Recreate cinematic bars to match new window size
-  if (cinematicBars) {
-    document.body.removeChild(cinematicBars.container);
-    cinematicBars = createCinematicBars();
+  // Update the camera system's cinematic bars if needed
+  if (cameraSystem && cameraSystem.ceremonyCineBars) {
+    document.body.removeChild(cameraSystem.ceremonyCineBars.container);
+    cameraSystem.ceremonyCineBars = cameraSystem.createCinematicBars();
   }
 }
 
@@ -644,15 +644,26 @@ function animate() {
 
   // Update camera system (this replaces the old camera angle code)
   if (!freeCameraMode && cameraSystem) {
-    cameraSystem.update();
-  }
-
-  // Only handle automatic camera movements if NOT in free camera mode
-  if (!freeCameraMode) {
-    // Handle ceremony camera if active
-    if (gameState.stage === 'PRE_MATCH_CEREMONY' && gameState.stageTimeRemaining) {
-      updateCeremonyCamera(gameState.stageTimeRemaining);
+    // Check if we're in the PRE_MATCH_CEREMONY stage and should switch to ceremony mode
+    if (gameState.stage === 'PRE_MATCH_CEREMONY' && gameState.stageTimeRemaining <= 5000 &&
+        cameraSystem.getCurrentMode() !== cameraSystem.MODES.CEREMONY) {
+      
+      // Get the participants for the ceremony
+      const fighter1Model = gameState.fighters[0] ? playerModels[gameState.fighters[0].id] : null;
+      const fighter2Model = gameState.fighters[1] ? playerModels[gameState.fighters[1].id] : null;
+      const refereeModel = gameState.referee ? playerModels[gameState.referee.id] : null;
+      
+      if (fighter1Model && fighter2Model && refereeModel) {
+        // Switch to ceremony mode
+        cameraSystem.setMode(cameraSystem.MODES.CEREMONY, {
+          fighter1: fighter1Model,
+          fighter2: fighter2Model,
+          referee: refereeModel
+        });
+      }
     }
+    
+    cameraSystem.update();
   }
 
   // Update FPS counter every 500ms
@@ -1127,241 +1138,7 @@ function updateSocketStats(stats) {
   statsDiv.innerHTML = html;
 }
 
-// Update the updateCeremonyCamera function
-function updateCeremonyCamera(timeRemaining) {
-  if (freeCameraMode) return; // Don't update camera if in free camera mode
-  
-  // Start sequence at 5 seconds remaining
-  if (timeRemaining <= 5000 && !ceremonyCameraActive) {
-    ceremonyCameraActive = true;
-    ceremonyStartTime = Date.now();
-    originalCameraPosition = camera.position.clone();
-    if (cinematicBars) cinematicBars.hide(); // Start with bars hidden
-  }
-
-  if (!ceremonyCameraActive) return;
-
-  const elapsedTime = Date.now() - ceremonyStartTime;
-  
-  // Get all players
-  const fighter1 = gameState.fighters[0];
-  const fighter2 = gameState.fighters[1];
-  const referee = gameState.referee;
-
-  if (!fighter1 || !fighter2 || !referee) {
-    ceremonyCameraActive = false;
-    if (cinematicBars) cinematicBars.hide();
-    return;
-  }
-
-  const fighter1Model = playerModels[fighter1.id];
-  const fighter2Model = playerModels[fighter2.id];
-  const refereeModel = playerModels[referee.id];
-
-  // Calculate camera position for all players
-  const allModels = [fighter1Model, fighter2Model, refereeModel];
-  const centerPoint = new THREE.Vector3();
-  
-  allModels.forEach(model => {
-    if (model) {
-      centerPoint.add(model.position);
-    }
-  });
-  centerPoint.divideScalar(allModels.length);
-
-  // Define transition points
-  const TRANSITION_TIME = 500; // 0.5 seconds for transitions
-  
-  // Calculate which phase we're in
-  if (elapsedTime < FIGHTER1_HOLD_TIME) {
-    // First fighter
-    const transitionIn = elapsedTime < TRANSITION_TIME;
-    const transitionOut = elapsedTime > FIGHTER1_HOLD_TIME - TRANSITION_TIME;
-    
-    if (transitionIn) {
-      if (cinematicBars) cinematicBars.show();
-    } else if (transitionOut) {
-      if (cinematicBars) cinematicBars.hide();
-    }
-    
-    setInstantCameraPosition(fighter1Model, allModels);
-  } 
-  else if (elapsedTime < FIGHTER1_HOLD_TIME + FIGHTER2_HOLD_TIME) {
-    // Second fighter
-    const phaseTime = elapsedTime - FIGHTER1_HOLD_TIME;
-    const transitionIn = phaseTime < TRANSITION_TIME;
-    const transitionOut = phaseTime > FIGHTER2_HOLD_TIME - TRANSITION_TIME;
-    
-    if (transitionIn) {
-      if (cinematicBars) cinematicBars.show();
-    } else if (transitionOut) {
-      if (cinematicBars) cinematicBars.hide();
-    }
-    
-    setInstantCameraPosition(fighter2Model, allModels);
-  } 
-  else if (elapsedTime < FIGHTER1_HOLD_TIME + FIGHTER2_HOLD_TIME + REFEREE_HOLD_TIME) {
-    // Referee
-    const phaseTime = elapsedTime - (FIGHTER1_HOLD_TIME + FIGHTER2_HOLD_TIME);
-    const transitionIn = phaseTime < TRANSITION_TIME;
-    const transitionOut = phaseTime > REFEREE_HOLD_TIME - TRANSITION_TIME;
-    
-    if (transitionIn) {
-      if (cinematicBars) cinematicBars.show();
-    } else if (transitionOut) {
-      if (cinematicBars) cinematicBars.hide();
-    }
-    
-    setInstantCameraPosition(refereeModel, allModels);
-  } 
-  else {
-    // Keep the last cinematic position
-    setInstantCameraPosition(fighter1Model, allModels);
-  }
-}
-
-// Update the setInstantCameraPosition function for smoother transitions
-function setInstantCameraPosition(targetModel, allModels) {
-  if (!targetModel) return;
-
-  // Calculate center point of all models
-  const centerPoint = new THREE.Vector3();
-  allModels.forEach(model => {
-    if (model) {
-      centerPoint.add(model.position);
-    }
-  });
-  centerPoint.divideScalar(allModels.length);
-
-  // Calculate direction from center to target
-  const modelPosition = targetModel.position.clone();
-  
-  // Set target look position to be at eye level
-  const targetEyePosition = modelPosition.clone();
-  targetEyePosition.y += 2.0; // Set to approximate eye level
-  
-  // Position camera at eye level
-  camera.position.copy(modelPosition);
-  camera.position.y = targetEyePosition.y; // Match eye level
-  
-  // Move camera back from the face
-  const direction = camera.position.clone().sub(centerPoint).normalize();
-  camera.position.add(direction.multiplyScalar(FACE_ZOOM_DISTANCE));
-  
-  // Look directly at the eyes
-  camera.lookAt(targetEyePosition);
-
-  // Add slight offset for more dramatic angle
-  const rightVector = new THREE.Vector3().crossVectors(direction, new THREE.Vector3(0, 1, 0));
-  camera.position.add(rightVector.multiplyScalar(0.5));
-  camera.lookAt(targetEyePosition);
-}
-
-// Add this new function after createFpsDisplay
-function createCinematicBars() {
-  const container = document.createElement('div');
-  container.id = 'cinematic-bars';
-  container.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 1000;
-    opacity: 0;
-    transition: opacity 0.5s ease-in-out;
-  `;
-
-  const topBar = document.createElement('div');
-  topBar.style.cssText = `
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: ${CINEMA_BAR_HEIGHT * 100}%;
-    background-color: black;
-    transform: translateY(-100%);
-    transition: transform 0.5s ease-in-out;
-  `;
-
-  const bottomBar = document.createElement('div');
-  bottomBar.style.cssText = `
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: ${CINEMA_BAR_HEIGHT * 100}%;
-    background-color: black;
-    transform: translateY(100%);
-    transition: transform 0.5s ease-in-out;
-  `;
-
-  container.appendChild(topBar);
-  container.appendChild(bottomBar);
-  document.body.appendChild(container);
-
-  return {
-    container,
-    topBar,
-    bottomBar,
-    show() {
-      container.style.opacity = '1';
-      topBar.style.transform = 'translateY(0)';
-      bottomBar.style.transform = 'translateY(0)';
-    },
-    hide() {
-      container.style.opacity = '0';
-      topBar.style.transform = 'translateY(-100%)';
-      bottomBar.style.transform = 'translateY(100%)';
-    }
-  };
-}
-
-// Add this variable near the top with other state variables
-let cinematicBars = null;
-
-// Add this function to create the camera info display
-function createCameraInfoDisplay() {
-  const infoContainer = document.createElement('div');
-  infoContainer.id = 'camera-info';
-  infoContainer.style.cssText = `
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
-    font-family: monospace;
-    font-size: 14px;
-    padding: 10px;
-    border-radius: 4px;
-    z-index: 1000;
-    display: none;
-  `;
-  
-  const toggleButton = document.createElement('button');
-  toggleButton.textContent = 'Toggle Free Camera (F)';
-  toggleButton.style.cssText = `
-    position: fixed;
-    top: 10px;
-    right: 200px;
-    padding: 5px 10px;
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
-    border: 1px solid white;
-    border-radius: 4px;
-    cursor: pointer;
-    z-index: 1000;
-  `;
-  
-  document.body.appendChild(infoContainer);
-  document.body.appendChild(toggleButton);
-  
-  toggleButton.addEventListener('click', toggleFreeCamera);
-  return infoContainer;
-}
-
-// Toggle free camera mode
+// Update the toggleFreeCamera function to clean up cinematics
 function toggleFreeCamera() {
   freeCameraMode = !freeCameraMode;
   const infoDisplay = document.getElementById('camera-info');
@@ -1411,4 +1188,48 @@ function handleKeyUp(event) {
     case 'arrowup': cameraControls.rotateUp = false; break;
     case 'arrowdown': cameraControls.rotateDown = false; break;
   }
+}
+
+/**
+ * Creates and sets up the camera information display
+ * This is used to show position and rotation information when in free camera mode
+ * @returns {HTMLElement} The info display container
+ */
+function createCameraInfoDisplay() {
+  const infoContainer = document.createElement('div');
+  infoContainer.id = 'camera-info';
+  infoContainer.style.cssText = `
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    font-family: monospace;
+    font-size: 14px;
+    padding: 10px;
+    border-radius: 4px;
+    z-index: 1000;
+    display: none;
+  `;
+  
+  const toggleButton = document.createElement('button');
+  toggleButton.textContent = 'Toggle Free Camera (F)';
+  toggleButton.style.cssText = `
+    position: fixed;
+    top: 10px;
+    right: 200px;
+    padding: 5px 10px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: 1px solid white;
+    border-radius: 4px;
+    cursor: pointer;
+    z-index: 1000;
+  `;
+  
+  document.body.appendChild(infoContainer);
+  document.body.appendChild(toggleButton);
+  
+  toggleButton.addEventListener('click', toggleFreeCamera);
+  return infoContainer;
 }
