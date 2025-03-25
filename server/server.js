@@ -189,11 +189,11 @@ function selectFighters() {
   // Set their roles & positions (no more .ready here)
   fighter1.role = 'fighter';
   fighter1.position = { x: -3, y: 2, z: 0 };
-  fighter1.rotation = -Math.PI / 2;
+  fighter1.rotation = Math.PI / 2;
 
   fighter2.role = 'fighter';
   fighter2.position = { x: 3, y: 2, z: 0 };
-  fighter2.rotation = Math.PI / 2;
+  fighter2.rotation = -Math.PI / 2;
 
   // Add them to the fighters array
   gameState.fighters.push(fighter1);
