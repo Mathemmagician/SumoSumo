@@ -7,6 +7,7 @@ window.updatePlayerInScene = updatePlayerInScene;
 
 // Three.js renderer code
 let scene, camera, renderer;
+let cameraSystem;
 let ring, playerModels = {};
 let textureLoader;
 let faceTextures = [];
@@ -50,12 +51,6 @@ let frameCount = 0;
 let fps = 0;
 let fpsUpdateInterval = 500; // Update FPS every 500ms
 let lastFpsUpdate = performance.now();
-
-// Add these near the top with other constants
-const CAMERA_ROTATION_SPEED = 0.002; // Adjust this value to change rotation speed
-const CAMERA_DISTANCE = 30; // Distance from center
-const CAMERA_HEIGHT = 15;   // Height of camera
-let cameraAngle = 0;       // Current angle of rotation
 
 // Add near the top with other constants
 const FACE_ZOOM_DISTANCE = 1.2;    // How close to zoom to faces
@@ -108,9 +103,7 @@ function initScene(initialGameState) {
 
   // Create camera
   camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(CAMERA_DISTANCE, CAMERA_HEIGHT, 0); // Start position
-  camera.lookAt(0, 0, 0);
-
+  
   // Create renderer
   renderer = new THREE.WebGLRenderer({ 
     antialias: true, 
@@ -120,6 +113,9 @@ function initScene(initialGameState) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   document.getElementById('game-container').appendChild(renderer.domElement);
+
+  // Initialize camera system
+  cameraSystem = new CameraSystem(scene, camera, renderer);
 
   // Enhanced lighting setup
   setupLighting();
@@ -646,21 +642,16 @@ function animate() {
   const currentTime = Date.now();
   frameCount++;
 
+  // Update camera system (this replaces the old camera angle code)
+  if (!freeCameraMode && cameraSystem) {
+    cameraSystem.update();
+  }
+
   // Only handle automatic camera movements if NOT in free camera mode
   if (!freeCameraMode) {
     // Handle ceremony camera if active
     if (gameState.stage === 'PRE_MATCH_CEREMONY' && gameState.stageTimeRemaining) {
       updateCeremonyCamera(gameState.stageTimeRemaining);
-    }
-
-    // Only update regular camera if ceremony camera is not active
-    if (!ceremonyCameraActive) {
-      // Update camera position
-      cameraAngle += CAMERA_ROTATION_SPEED;
-      camera.position.x = Math.cos(cameraAngle) * CAMERA_DISTANCE;
-      camera.position.z = Math.sin(cameraAngle) * CAMERA_DISTANCE;
-      camera.position.y = CAMERA_HEIGHT;
-      camera.lookAt(0, 0, 0);
     }
   }
 
@@ -1370,7 +1361,7 @@ function createCameraInfoDisplay() {
   return infoContainer;
 }
 
-// Add this function to toggle free camera mode
+// Toggle free camera mode
 function toggleFreeCamera() {
   freeCameraMode = !freeCameraMode;
   const infoDisplay = document.getElementById('camera-info');
@@ -1381,9 +1372,8 @@ function toggleFreeCamera() {
     originalCameraPosition = camera.position.clone();
     originalCameraRotation = camera.rotation.clone();
   } else {
-    // Restore original camera position
-    camera.position.copy(originalCameraPosition);
-    camera.rotation.copy(originalCameraRotation);
+    // Return control to the camera system
+    cameraSystem.updateCameraForCurrentMode(0);
   }
 }
 
