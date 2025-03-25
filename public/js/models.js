@@ -37,17 +37,20 @@ const MODEL_CONSTANTS = {
   },
   STADIUM: {
     FLOOR_SIZE: RING_RADIUS * 8, // Extend floor size
-    WALL_HEIGHT: 16, // Increased from 10 to 16
+    WALL_HEIGHT: 16,
     WALL_THICKNESS: 2,
     COLUMN_RADIUS: 0.8,
-    COLUMN_HEIGHT: 18, // Increased from 12 to 18
+    COLUMN_HEIGHT: 18,
     COLUMN_SEGMENTS: 12,
-    BEAM_HEIGHT: 1.5, // Increased from 1.2 to 1.5
+    BEAM_HEIGHT: 1.5,
     BEAM_DEPTH: 0.8,
-    WALL_COLOR: 0x8B4513, // Dark wood color
-    COLUMN_COLOR: 0xA0522D, // Brown
-    BEAM_COLOR: 0x654321, // Dark brown
-    TRIM_COLOR: 0xBC8F8F  // Light wood color for trim
+    // Darker color scheme
+    WALL_COLOR: 0x5D4037, // Darker brown for walls (was 0x8B4513)
+    COLUMN_COLOR: 0x4E342E, // Darker brown for columns (was 0xA0522D)
+    BEAM_COLOR: 0x3E2723, // Very dark brown for beams (was 0x654321)
+    TRIM_COLOR: 0x795548, // Darker wood color for trim (was 0xBC8F8F)
+    ROOF_COLOR: 0x4E342E, // Dark brown for roof
+    FLOOR_COLOR: 0xA1887F // Slightly darker floor color (was 0xD9A55B)
   }
 };
 
@@ -496,13 +499,13 @@ class StadiumFactory {
     
     // Create the extended floor to match the walls
     const floorSize = wallDistance * 2 + 10; // Match wall dimensions
-    const floorGeometry = new THREE.PlaneGeometry(floorSize, floorSize);
+    const floorGeometry = new THREE.PlaneGeometry(floorSize, floorSize); // Define floorGeometry before using it
     const floorTexture = StadiumFactory.createFloorTexture();
     
     const floorMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0xD9A55B,
-      roughness: 0.75,
-      metalness: 0.1,
+      color: s.FLOOR_COLOR,
+      roughness: 0.8,
+      metalness: 0.05,
       map: floorTexture,
       side: THREE.DoubleSide
     });
@@ -520,6 +523,9 @@ class StadiumFactory {
     const roofStructure = this.createRoofStructure(roofDistance, roofHeight);
     stadiumGroup.add(roofStructure);
     
+    // Add some lanterns for ambient lighting
+    this.addStageLighting(stadiumGroup, wallDistance);
+    
     return stadiumGroup;
   }
   
@@ -533,16 +539,17 @@ class StadiumFactory {
     canvas.height = 1024;
     const ctx = canvas.getContext('2d');
     
-    // Base color
-    ctx.fillStyle = '#D9A55B';
+    // Darker base color
+    ctx.fillStyle = '#A1887F'; // Darker floor color
     ctx.fillRect(0, 0, 1024, 1024);
     
-    // Add wood grain pattern
+    // Add darker wood grain pattern
     for (let i = 0; i < 40; i++) {
       const y = i * 26 + Math.random() * 10;
-      const colorVariation = Math.random() * 20 - 10;
+      const colorVariation = Math.random() * 15 - 7;
       
-      ctx.strokeStyle = `rgba(${185 + colorVariation}, ${140 + colorVariation}, ${70 + colorVariation}, 0.4)`;
+      // Darker wood grain
+      ctx.strokeStyle = `rgba(${145 + colorVariation}, ${110 + colorVariation}, ${60 + colorVariation}, 0.4)`;
       ctx.lineWidth = 15 + Math.random() * 10;
       
       // Create wavy line for wood grain
@@ -560,15 +567,15 @@ class StadiumFactory {
       ctx.stroke();
     }
     
-    // Add some subtle knots in the wood
+    // Add darker knots in the wood
     for (let i = 0; i < 15; i++) {
       const x = Math.random() * 1024;
       const y = Math.random() * 1024;
       const radius = 5 + Math.random() * 15;
       
       const gradient = ctx.createRadialGradient(x, y, 1, x, y, radius);
-      gradient.addColorStop(0, 'rgba(100, 70, 40, 0.7)');
-      gradient.addColorStop(1, 'rgba(190, 150, 100, 0)');
+      gradient.addColorStop(0, 'rgba(60, 40, 20, 0.8)'); // Darker center
+      gradient.addColorStop(1, 'rgba(120, 90, 70, 0)'); // Darker fade
       
       ctx.fillStyle = gradient;
       ctx.beginPath();
@@ -621,11 +628,11 @@ class StadiumFactory {
       // Basic indices for a triangle
       roofGeometry.setIndex([0, 1, 2]);
       
-      // Roof material with wood texture
+      // Roof material with darker wood texture
       const roofMaterial = new THREE.MeshStandardMaterial({
-        color: 0x8B4513,
-        roughness: 0.8,
-        metalness: 0.1,
+        color: s.ROOF_COLOR,
+        roughness: 0.9,
+        metalness: 0.05,
         side: THREE.DoubleSide
       });
       
@@ -712,6 +719,85 @@ class StadiumFactory {
     });
     
     return roofGroup;
+  }
+
+  // Add method for creating stadium lighting
+  static addStageLighting(stadiumGroup, wallDistance) {
+    const s = MODEL_CONSTANTS.STADIUM;
+    const lanternPositions = [
+      // Corners
+      {x: wallDistance * 0.7, y: s.WALL_HEIGHT * 0.6, z: -wallDistance * 0.7},
+      {x: wallDistance * 0.7, y: s.WALL_HEIGHT * 0.6, z: wallDistance * 0.7},
+      {x: -wallDistance * 0.7, y: s.WALL_HEIGHT * 0.6, z: wallDistance * 0.7},
+      {x: -wallDistance * 0.7, y: s.WALL_HEIGHT * 0.6, z: -wallDistance * 0.7},
+      // Center
+      {x: 0, y: s.WALL_HEIGHT + 10, z: 0}
+    ];
+    
+    lanternPositions.forEach((pos, index) => {
+      // Lantern body
+      const isCenter = index === lanternPositions.length - 1;
+      const lanternSize = isCenter ? 1.5 : 1.0;
+      
+      const lanternGeometry = new THREE.CylinderGeometry(
+        lanternSize * 0.6, lanternSize * 0.8, lanternSize * 1.6, 8
+      );
+      const lanternMaterial = new THREE.MeshStandardMaterial({
+        color: 0xA83232, // Dark red
+        roughness: 0.7,
+        metalness: 0.3,
+        emissive: 0x441111, // Slight glow
+        emissiveIntensity: 0.2
+      });
+      
+      const lantern = new THREE.Mesh(lanternGeometry, lanternMaterial);
+      lantern.position.set(pos.x, pos.y, pos.z);
+      lantern.castShadow = true;
+      stadiumGroup.add(lantern);
+      
+      // Add a point light inside each lantern
+      const lanternLight = new THREE.PointLight(
+        0xffaa55, // Warm light color
+        isCenter ? 0.8 : 0.4, // Intensity
+        isCenter ? 40 : 20 // Distance
+      );
+      lanternLight.position.set(pos.x, pos.y, pos.z);
+      stadiumGroup.add(lanternLight);
+      
+      // Add glow effect
+      const glowGeometry = new THREE.SphereGeometry(
+        isCenter ? 2.0 : 1.2, 16, 16
+      );
+      const glowMaterial = new THREE.MeshBasicMaterial({
+        color: 0xff9933,
+        transparent: true,
+        opacity: 0.15,
+        side: THREE.BackSide
+      });
+      
+      const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+      glow.position.set(pos.x, pos.y, pos.z);
+      stadiumGroup.add(glow);
+      
+      // For the center lantern, add a chain to hang it
+      if (isCenter) {
+        const chainHeight = 5;
+        const chainGeometry = new THREE.CylinderGeometry(0.1, 0.1, chainHeight, 8);
+        const chainMaterial = new THREE.MeshStandardMaterial({
+          color: 0x333333, // Dark metal
+          roughness: 0.7,
+          metalness: 0.8
+        });
+        
+        const chain = new THREE.Mesh(chainGeometry, chainMaterial);
+        chain.position.set(pos.x, pos.y + (chainHeight/2) + (lanternSize * 0.8), pos.z);
+        stadiumGroup.add(chain);
+      }
+    });
+    
+    // Add subtle fog to the scene
+    const fogColor = new THREE.Color(0x221813); // Very dark brown fog
+    stadiumGroup.fog = new THREE.FogExp2(fogColor, 0.008);
   }
 }
 
