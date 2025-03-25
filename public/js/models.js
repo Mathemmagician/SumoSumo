@@ -74,38 +74,59 @@ class ModelFactory {
     // Body (sphere)
     const bodyGeometry = new THREE.SphereGeometry(c.BODY_RADIUS, 32, 32);
     const bodyColor = new THREE.Color().setHSL(player.colorId * 0.1, 0.8, 0.6);
-    const bodyMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
+    const bodyMaterial = new THREE.MeshStandardMaterial({ 
+      color: bodyColor,
+      roughness: 0.8,
+      metalness: 0.2
+    });
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
     body.castShadow = true;
+    body.receiveShadow = true;
     model.add(body);
 
     // Head with face
     this.addHead(model, player);
 
-    // Arms
+    // Make sure all limbs cast shadows
     const armGeometry = new THREE.CylinderGeometry(c.ARM_RADIUS, c.ARM_RADIUS, c.ARM_LENGTH, 32);
-    const armMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
+    const armMaterial = new THREE.MeshStandardMaterial({ 
+      color: bodyColor,
+      roughness: 0.8,
+      metalness: 0.2 
+    });
     
     const leftArm = new THREE.Mesh(armGeometry, armMaterial);
     leftArm.position.set(-0.8, 0.2, 0);
     leftArm.rotation.z = Math.PI / 4;
+    leftArm.castShadow = true;
+    leftArm.receiveShadow = true;
     model.add(leftArm);
 
     const rightArm = new THREE.Mesh(armGeometry, armMaterial);
     rightArm.position.set(0.8, 0.2, 0);
     rightArm.rotation.z = -Math.PI / 4;
+    rightArm.castShadow = true;
+    rightArm.receiveShadow = true;
     model.add(rightArm);
 
     // Legs
     const legGeometry = new THREE.CylinderGeometry(c.LEG_RADIUS, c.LEG_RADIUS, c.LEG_LENGTH, 32);
-    const legMaterial = new THREE.MeshStandardMaterial({ color: bodyColor });
+    const legMaterial = new THREE.MeshStandardMaterial({ 
+      color: bodyColor,
+      roughness: 0.8,
+      metalness: 0.2
+    });
     
     const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
     leftLeg.position.set(-0.4, -0.8, 0);
+    leftLeg.castShadow = true;
+    leftLeg.receiveShadow = true;
     model.add(leftLeg);
     
     const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
     rightLeg.position.set(0.4, -0.8, 0);
+    rightLeg.castShadow = true;
+    rightLeg.receiveShadow = true;
     model.add(rightLeg);
   }
 

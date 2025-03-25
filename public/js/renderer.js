@@ -99,7 +99,7 @@ function initScene(initialGameState) {
 
   // Create scene
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87CEEB); // Sky blue background
+  scene.background = new THREE.Color(0x5CB8EB); // Slightly darker blue than before
 
   // Create camera
   camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -112,6 +112,10 @@ function initScene(initialGameState) {
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.physicallyCorrectLights = true;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.3; // Reduced from 1.5 to 1.3 for a slightly darker scene
   document.getElementById('game-container').appendChild(renderer.domElement);
 
   // Initialize camera system
@@ -163,46 +167,79 @@ function initScene(initialGameState) {
   window.addEventListener('resize', onWindowResize);
 }
 
-// Setup lighting
+// Setup lighting with moderate brightness
 function setupLighting() {
-  const ambientLight = new THREE.AmbientLight(0xf5e1c0, 0.4);
+  // Reduce ambient light intensity
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); // Reduced from 0.8 to 0.6
   scene.add(ambientLight);
 
-  // Main spotlight
-  const mainSpotlight = new THREE.SpotLight(0xffffff, 1.0);
+  // Main spotlight with balanced intensity
+  const mainSpotlight = new THREE.SpotLight(0xffffff, 1.5); // Reduced from 1.8 to 1.5
   mainSpotlight.position.set(0, 30, 0);
-  mainSpotlight.angle = Math.PI / 6;
+  mainSpotlight.angle = Math.PI / 5.5; // Slightly narrower angle
   mainSpotlight.penumbra = 0.3;
-  mainSpotlight.decay = 1.5;
-  mainSpotlight.distance = 50;
+  mainSpotlight.decay = 1.5; // Slightly more decay
+  mainSpotlight.distance = 60;
+  
+  // Shadow settings
   mainSpotlight.castShadow = true;
-  mainSpotlight.shadow.mapSize.width = 1024;
-  mainSpotlight.shadow.mapSize.height = 1024;
+  mainSpotlight.shadow.mapSize.width = 2048;
+  mainSpotlight.shadow.mapSize.height = 2048;
   mainSpotlight.shadow.camera.near = 10;
-  mainSpotlight.shadow.camera.far = 50;
+  mainSpotlight.shadow.camera.far = 60;
+  mainSpotlight.shadow.bias = -0.0003; 
+  mainSpotlight.shadow.normalBias = 0.01;
+  
   mainSpotlight.target.position.set(0, 0, 0);
   scene.add(mainSpotlight);
   scene.add(mainSpotlight.target);
 
-  // Fill light
-  const fillLight = new THREE.DirectionalLight(0xffcc88, 0.6);
-  fillLight.position.set(RING_RADIUS * 2, RING_RADIUS, RING_RADIUS * 2);
+  // Fill light with reduced intensity
+  const fillLight = new THREE.DirectionalLight(0xffeedd, 0.9); // Reduced from 1.2 to 0.9
+  fillLight.position.set(RING_RADIUS * 2, RING_RADIUS * 1.5, RING_RADIUS * 2);
   fillLight.castShadow = true;
   fillLight.shadow.mapSize.width = 1024;
   fillLight.shadow.mapSize.height = 1024;
+  fillLight.shadow.camera.left = -15;
+  fillLight.shadow.camera.right = 15;
+  fillLight.shadow.camera.top = 15;
+  fillLight.shadow.camera.bottom = -15;
+  fillLight.shadow.camera.far = 50;
+  fillLight.shadow.bias = -0.0003;
   scene.add(fillLight);
 
-  // Rim light
-  const rimLight = new THREE.DirectionalLight(0x8888ff, 0.5);
-  rimLight.position.set(-RING_RADIUS * 2, RING_RADIUS, -RING_RADIUS * 2);
+  // Key light with reduced intensity
+  const keyLight = new THREE.DirectionalLight(0xffffee, 0.7); // Reduced from 1.0 to 0.7
+  keyLight.position.set(0, RING_RADIUS * 2, RING_RADIUS * 3);
+  keyLight.lookAt(0, 0, 0);
+  scene.add(keyLight);
+
+  // Rim light with reduced intensity
+  const rimLight = new THREE.DirectionalLight(0xaaccff, 0.7); // Reduced from 1.0 to 0.7
+  rimLight.position.set(-RING_RADIUS * 2, RING_RADIUS * 1.5, -RING_RADIUS * 2);
   scene.add(rimLight);
 
-  // Bounce light
-  const bounceLight = new THREE.DirectionalLight(0xffffcc, 0.2);
-  bounceLight.position.set(0, -5, 0);
-  bounceLight.target.position.set(0, 0, 0);
+  // Bounce light with reduced intensity
+  const bounceLight = new THREE.DirectionalLight(0xffffcc, 0.5); // Reduced from 0.7 to 0.5
+  bounceLight.position.set(0, -2, 0);
+  bounceLight.target.position.set(0, 2, 0);
   scene.add(bounceLight);
   scene.add(bounceLight.target);
+  
+  // Add a subtle shadow-only light to enhance shadows slightly
+  const shadowLight = new THREE.DirectionalLight(0x000000, 0.03);
+  shadowLight.position.set(5, 20, 5);
+  shadowLight.castShadow = true;
+  shadowLight.shadow.mapSize.width = 1024;
+  shadowLight.shadow.mapSize.height = 1024;
+  shadowLight.shadow.camera.near = 1;
+  shadowLight.shadow.camera.far = 50;
+  shadowLight.shadow.camera.left = -15;
+  shadowLight.shadow.camera.right = 15;
+  shadowLight.shadow.camera.top = 15;
+  shadowLight.shadow.camera.bottom = -15;
+  shadowLight.shadow.bias = -0.0003;
+  scene.add(shadowLight);
 }
 
 // Generate face textures
@@ -324,21 +361,34 @@ function createRing() {
     3,7,4, 3,4,0     // left vertical
   ]);
   squareBase.computeVertexNormals();
-  scene.add(new THREE.Mesh(squareBase, new THREE.MeshLambertMaterial({ color: 0xD2B48C })));
+  const baseMesh = new THREE.Mesh(squareBase, new THREE.MeshStandardMaterial({ 
+    color: 0xE5C8A0, // Lighter tan color
+    roughness: 0.5,
+    metalness: 0.2
+  }));
+  baseMesh.castShadow = true;
+  baseMesh.receiveShadow = true;
+  scene.add(baseMesh);
 
-  // Dohyo cylinder
+  // Dohyo cylinder with even brighter material
   const ringGeometry = new THREE.CylinderGeometry(RING_RADIUS, RING_RADIUS, RING_HEIGHT, 32);
-  const ringMaterial = new THREE.MeshLambertMaterial({ color: 0xD2B48C });
+  const ringMaterial = new THREE.MeshStandardMaterial({ 
+    color: 0xE5C8A0, 
+    roughness: 0.6, // Increased from 0.5 to 0.6
+    metalness: 0.15  // Decreased from 0.2 to 0.15
+  });
   ring = new THREE.Mesh(ringGeometry, ringMaterial);
   ring.position.y = RING_HEIGHT / 2;
   ring.castShadow = true;
   ring.receiveShadow = true;
   scene.add(ring);
 
-  // Border
+  // Border with brighter material
   const borderGeometry = new THREE.RingGeometry(RING_RADIUS, RING_RADIUS + 0.5, 32);
-  const borderMaterial = new THREE.MeshLambertMaterial({ 
-    color: 0x8B4513,
+  const borderMaterial = new THREE.MeshStandardMaterial({ 
+    color: 0xA05A2C, // Lighter brown
+    roughness: 0.5,
+    metalness: 0.2,
     side: THREE.DoubleSide
   });
   const border = new THREE.Mesh(borderGeometry, borderMaterial);
@@ -347,12 +397,12 @@ function createRing() {
   border.receiveShadow = true;
   scene.add(border);
 
-  // Markings
+  // Markings with increased opacity
   const markingsGeometry = new THREE.CircleGeometry(RING_RADIUS * 0.8, 32);
   const markingsMaterial = new THREE.MeshBasicMaterial({ 
     color: 0xFFFFFF,
     transparent: true,
-    opacity: 0.3,
+    opacity: 0.5, // Increased from 0.3 to 0.5
     side: THREE.DoubleSide
   });
   const markings = new THREE.Mesh(markingsGeometry, markingsMaterial);
@@ -360,10 +410,12 @@ function createRing() {
   markings.position.y = RING_HEIGHT + 0.02;
   scene.add(markings);
 
-  // Floor
+  // Floor with much brighter material
   const floorGeometry = new THREE.PlaneGeometry(FLOOR_SIZE, FLOOR_SIZE);
-  const floorMaterial = new THREE.MeshLambertMaterial({ 
-    color: 0xBF924A,
+  const floorMaterial = new THREE.MeshStandardMaterial({ 
+    color: 0xD9A55B,
+    roughness: 0.65, // Increased from 0.5 to 0.65
+    metalness: 0.15, // Decreased from 0.2 to 0.15
     side: THREE.DoubleSide
   });
   const floor = new THREE.Mesh(floorGeometry, floorMaterial);
