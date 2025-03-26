@@ -61,6 +61,11 @@ function connectToServer() {
     updateSocketStats(socketStats);
     console.log('Received game state:', state);
 
+    // Clean up all existing models first
+    if (typeof cleanupAllModels === 'function') {
+      cleanupAllModels();
+    }
+
     // Replace our local state with the server state
     gameState.fighters = state.fighters || [];
     gameState.viewers = state.viewers || [];
@@ -72,7 +77,17 @@ function connectToServer() {
     determineMyRole();
 
     // Initialize the 3D scene with the game state
-    initScene(gameState);
+    if (!sceneInitialized) {
+      initScene(gameState);
+    } else {
+      // Add all players to the scene with correct models
+      gameState.fighters.forEach(fighter => addPlayerToScene(fighter));
+      gameState.viewers.forEach(viewer => addPlayerToScene(viewer));
+      if (gameState.referee) {
+        addPlayerToScene(gameState.referee);
+      }
+    }
+
     updateUI();
     updateStageDisplay();
 
@@ -89,8 +104,21 @@ function connectToServer() {
     socketStats.stageChange++;
     updateSocketStats(socketStats);
     console.log('Stage changed:', data);
+    
+    const oldStage = gameState.stage;
     gameState.stage = data.stage;
     gameState.stageTimeRemaining = data.duration;
+
+    // Clean up models when transitioning to certain stages
+    if (data.stage === 'FIGHTER_SELECTION' || data.stage === 'WAITING_FOR_PLAYERS') {
+      cleanupAllModels();
+      // Re-add all current players with correct models
+      gameState.fighters.forEach(fighter => addPlayerToScene(fighter));
+      gameState.viewers.forEach(viewer => addPlayerToScene(viewer));
+      if (gameState.referee) {
+        addPlayerToScene(gameState.referee);
+      }
+    }
 
     updateStageDisplay();
 
@@ -105,7 +133,6 @@ function connectToServer() {
       startStageTimer(data.duration);
     }
 
-    // Handle stage-specific UI updates
     handleStageChange(data.stage);
   });
 
@@ -276,6 +303,9 @@ function connectToServer() {
     updateSocketStats(socketStats);
     console.log('Game state reset received');
 
+    // Clean up all models
+    cleanupAllModels();
+
     const allPlayers = [
       ...gameState.fighters,
       ...gameState.viewers
@@ -291,10 +321,12 @@ function connectToServer() {
       return player;
     });
 
+    // Re-add all players as viewers
+    gameState.viewers.forEach(viewer => addPlayerToScene(viewer));
+
     gameState.myRole = 'viewer';
     updateUI();
     updateStageDisplay();
-    updateScene();
   });
 
   // Player role changed

@@ -703,11 +703,24 @@ function createAudienceAreas() {
 
 // Add player to scene
 function addPlayerToScene(player) {
+  // First remove any existing model for this player
+  if (playerModels[player.id]) {
+    removePlayerFromScene(player.id);
+  }
+
   const model = createSumoModel(player);
   if (!model) {
     console.error('Failed to create model for player:', player);
     return;
   }
+  
+  // Store the player's role in the model's userData
+  model.userData = {
+    ...model.userData,
+    id: player.id,
+    role: player.role
+  };
+  
   playerModels[player.id] = model;
   updatePlayerInScene(player);
   scene.add(model);
@@ -730,36 +743,31 @@ function createSumoModel(player) {
 // Update player in scene
 function updatePlayerInScene(player) {
   const model = playerModels[player.id];
-  if (!model) return;
+  if (!model) {
+    // If no model exists, create one
+    addPlayerToScene(player);
+    return;
+  }
 
   // Check if role changed
   if (model.userData.role !== player.role) {
-    // Remove old model
-    scene.remove(model);
-    
-    // Create new model with updated role
-    const newModel = createSumoModel(player);
-    playerModels[player.id] = newModel;
-    scene.add(newModel);
-    
-    // Update position based on new role
-    if (player.role === 'viewer') {
-      positionViewer(newModel, player.seed);
-    } else {
-      newModel.position.set(player.position.x, player.position.y, player.position.z);
-      newModel.rotation.y = player.rotation || 0;
-    }
-    
-    return; // Exit early since we've handled everything for the new model
+    // Remove old model and create new one with correct role
+    removePlayerFromScene(player.id);
+    addPlayerToScene(player);
+    return;
   }
 
-  // If role hasn't changed, just update position & rotation
+  // Update position & rotation
   if (player.role === 'viewer') {
     positionViewer(model, player.seed);
   } else {
-    model.position.set(player.position.x, player.position.y, player.position.z);
+    model.position.set(
+      player.position.x,
+      player.position.y,
+      player.position.z !== undefined ? player.position.z : 0
+    );
+    model.rotation.y = player.rotation || 0;
   }
-  model.rotation.y = player.rotation || 0;
 }
 
 // REMOVED: updateFighterReadyState(...) entirely
@@ -1124,6 +1132,19 @@ function removePlayerFromScene(playerId) {
   const model = playerModels[playerId];
   if (model) {
     scene.remove(model);
+    // Properly dispose of geometries and materials
+    if (model.geometry) model.geometry.dispose();
+    if (model.material) {
+      if (Array.isArray(model.material)) {
+        model.material.forEach(mat => mat.dispose());
+      } else {
+        model.material.dispose();
+      }
+    }
+    // Remove any textures
+    if (model.userData.textures) {
+      model.userData.textures.forEach(texture => texture.dispose());
+    }
     delete playerModels[playerId];
   }
 }
@@ -1478,4 +1499,28 @@ function updatePlayerPosition(playerId, position, rotation) {
   if (rotation !== undefined) {
     playerModel.rotation.y = rotation;
   }
+}
+
+// Add this function to properly clean up all models
+function cleanupAllModels() {
+  // Remove all existing models from the scene
+  Object.entries(playerModels).forEach(([playerId, model]) => {
+    scene.remove(model);
+    // Properly dispose of geometries and materials
+    if (model.geometry) model.geometry.dispose();
+    if (model.material) {
+      if (Array.isArray(model.material)) {
+        model.material.forEach(mat => mat.dispose());
+      } else {
+        model.material.dispose();
+      }
+    }
+    // Remove any textures
+    if (model.userData.textures) {
+      model.userData.textures.forEach(texture => texture.dispose());
+    }
+  });
+  
+  // Clear the playerModels object
+  playerModels = {};
 }
