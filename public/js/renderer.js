@@ -1506,7 +1506,7 @@ function createFpsDisplay() {
   statsContainer.id = 'stats-container';
   statsContainer.style.cssText = `
     position: fixed;
-    top: 10px;
+    bottom: 10px;
     left: 10px;
     background-color: rgba(0, 0, 0, 0.5);
     color: white;
