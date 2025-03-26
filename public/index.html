@@ -298,6 +298,57 @@
                 box-shadow: 0 0 20px rgba(255, 215, 0, 1);
             }
         }
+        
+        /* Viewer Only Toggle Styles */
+        .viewer-only-container {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .viewer-only-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .viewer-only-label input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #9c6644;
+            border-radius: 4px;
+            margin-right: 8px;
+            position: relative;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .viewer-only-label input[type="checkbox"]:checked {
+            background: #9c6644;
+        }
+
+        .viewer-only-label input[type="checkbox"]:checked::after {
+            content: '✓';
+            position: absolute;
+            color: white;
+            font-size: 14px;
+            left: 4px;
+            top: 0px;
+        }
+
+        .viewer-only-text {
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .viewer-only-description {
+            font-size: 0.8em;
+            opacity: 0.8;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -307,6 +358,13 @@
             <h1 class="game-title">SumoSumo!</h1>
             <p class="role-info">Your Role: <span id="player-role">Viewer</span> <span id="role-badge" class="role-badge role-viewer">Viewer</span></p>
             <p class="player-count">Players: <span id="player-count">0</span></p>
+            <div class="viewer-only-container">
+                <label class="viewer-only-label">
+                    <input type="checkbox" id="viewer-only-toggle" onchange="toggleViewerOnly(this)">
+                    <span class="viewer-only-text">Viewer Only</span>
+                    <span class="viewer-only-description">Won't be selected as fighter/referee</span>
+                </label>
+            </div>
         </div>
         
         <!-- Improved Match Info Panel -->

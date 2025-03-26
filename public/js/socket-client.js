@@ -393,6 +393,15 @@ function connectToServer() {
 
     updateUI();
   });
+
+  // Viewer only updated
+  socket.on('viewerOnlyUpdated', (isViewerOnly) => {
+    // Update the checkbox state
+    const checkbox = document.getElementById('viewer-only-toggle');
+    if (checkbox) {
+      checkbox.checked = isViewerOnly;
+    }
+  });
 }
 
 // Determine my role
@@ -587,4 +596,9 @@ function findPlayerUsername(id) {
     return player.name || id.substring(0, 6);
   }
   return id.substring(0, 6);
+}
+
+// Add this function to handle the toggle
+function toggleViewerOnly(checkbox) {
+  socket.emit('toggleViewerOnly', checkbox.checked);
 }

@@ -165,9 +165,12 @@ function selectFighters() {
   // Always start with empty fighters array
   gameState.fighters = [];
 
-  // Require at least 3 watchers to pick 2 fighters + 1 referee
-  if (gameState.viewers.length < 3) {
-    console.log("Not enough viewers to select fighters + referee");
+  // Filter out viewer-only players
+  const eligibleViewers = gameState.viewers.filter(viewer => !viewer.viewerOnly);
+
+  // Require at least 3 eligible viewers to pick 2 fighters + 1 referee
+  if (eligibleViewers.length < 3) {
+    console.log("Not enough eligible viewers to select fighters + referee");
     changeGameStage(GAME_STAGES.WAITING_FOR_PLAYERS);
     return;
   }
@@ -179,12 +182,18 @@ function selectFighters() {
     gameState.referee = null;
   }
 
-  // Select 2 random viewers to be fighters
-  const fighter1Index = Math.floor(Math.random() * gameState.viewers.length);
-  const fighter1 = gameState.viewers.splice(fighter1Index, 1)[0];
+  // Select 2 random eligible viewers to be fighters
+  const fighter1Index = Math.floor(Math.random() * eligibleViewers.length);
+  const fighter1 = eligibleViewers.splice(fighter1Index, 1)[0];
+  
+  // Remove fighter1 from viewers array
+  gameState.viewers = gameState.viewers.filter(v => v.id !== fighter1.id);
 
-  const fighter2Index = Math.floor(Math.random() * gameState.viewers.length);
-  const fighter2 = gameState.viewers.splice(fighter2Index, 1)[0];
+  const fighter2Index = Math.floor(Math.random() * eligibleViewers.length);
+  const fighter2 = eligibleViewers.splice(fighter2Index, 1)[0];
+  
+  // Remove fighter2 from viewers array
+  gameState.viewers = gameState.viewers.filter(v => v.id !== fighter2.id);
 
   // Set their roles & positions with Z coordinate
   fighter1.role = 'fighter';
@@ -199,11 +208,20 @@ function selectFighters() {
   gameState.fighters.push(fighter1);
   gameState.fighters.push(fighter2);
 
-  // Select a referee from the remaining viewers
-  const refereeIndex = Math.floor(Math.random() * gameState.viewers.length);
-  gameState.referee = gameState.viewers.splice(refereeIndex, 1)[0];
-  gameState.referee.role = 'referee';
-  gameState.referee.position = { x: 0, y: 2, z: -2 }; // Place referee at north side
+  // Select a referee from the remaining eligible viewers
+  const eligibleForReferee = eligibleViewers.filter(v => !v.viewerOnly);
+  if (eligibleForReferee.length > 0) {
+    const refereeIndex = Math.floor(Math.random() * eligibleForReferee.length);
+    gameState.referee = eligibleForReferee.splice(refereeIndex, 1)[0];
+    // Remove referee from viewers array
+    gameState.viewers = gameState.viewers.filter(v => v.id !== gameState.referee.id);
+    gameState.referee.role = 'referee';
+    gameState.referee.position = { x: 0, y: 2, z: -2 }; // Place referee at north side
+  } else {
+    console.log("No eligible viewers for referee role");
+    changeGameStage(GAME_STAGES.WAITING_FOR_PLAYERS);
+    return;
+  }
 
   // Announce fighter selection
   io.emit('fightersSelected', {
@@ -357,7 +375,8 @@ io.on('connection', (socket) => {
     rotation: 0,
     faceId: Math.floor(Math.random() * 10),  // 0-9 inclusive
     colorId: Math.floor(Math.random() * 10), // 0-9 inclusive
-    seed: Math.floor(Math.random() * 1000000) // Random seed for any future randomization needs
+    seed: Math.floor(Math.random() * 1000000), // Random seed for any future randomization needs
+    viewerOnly: false  // New field, default false
   };
 
   // Add to viewers
@@ -616,6 +635,20 @@ io.on('connection', (socket) => {
     // Check if we need to return to WAITING_FOR_PLAYERS
     if ((gameState.viewers.length + gameState.fighters.length) < 2) {
       changeGameStage(GAME_STAGES.WAITING_FOR_PLAYERS);
+    }
+  });
+
+  // Add a new socket event handler for toggling viewer-only status
+  socket.on('toggleViewerOnly', (value) => {
+    // Find the player in any of the possible arrays
+    let player = gameState.viewers.find(v => v.id === socket.id) ||
+                 gameState.fighters.find(f => f.id === socket.id) ||
+                 (gameState.referee && gameState.referee.id === socket.id ? gameState.referee : null);
+
+    if (player) {
+      player.viewerOnly = !!value; // Convert to boolean
+      // Notify the client that the change was successful
+      socket.emit('viewerOnlyUpdated', player.viewerOnly);
     }
   });
 });
