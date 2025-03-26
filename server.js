@@ -74,7 +74,7 @@ const FAKE_USERS = {
   count: 0,
   users: new Map(), // Store fake user data
   intervals: new Map(), // Store intervals for each fake user
-  targetCount: 20, // Set the target count for fake users
+  targetCount: 0, // Set the target count for fake users
   disconnectInterval: null,
   reconnectInterval: null
 };
@@ -872,7 +872,7 @@ function stopFakeUserSystem() {
 }
 
 // Start the server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Socket.io ready for connections`);
