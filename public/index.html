@@ -47,9 +47,7 @@
         }
         
         #match-info {
-            top: 20px;
-            right: 20px;
-            text-align: right;
+            display: none;
         }
         
         .game-title {
@@ -64,7 +62,7 @@
         }
         
         .role-info {
-            font-size: 1.4rem;
+            font-size: 1.2rem;
             margin: 5px 0;
         }
         
@@ -349,6 +347,56 @@
             opacity: 0.8;
             font-style: italic;
         }
+
+        .game-state-info {
+            display: none;
+        }
+
+        .state-line {
+            font-size: 1.2rem;
+            margin: 0px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #game-state, #game-time {
+            color: white;
+            font-weight: normal;
+        }
+
+        .time-separator {
+            color: rgba(255, 255, 255, 0.5);
+            margin: 0 5px;
+        }
+
+        /* Remove the old state-text and time-text styles */
+        .state-text, .time-text {
+            display: none;
+        }
+
+        /* Add new game-status-line style */
+        .game-status-line {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Remove the time separator styles since we're not using it anymore */
+        .time-separator {
+            display: none;
+        }
+
+        /* Remove the colon from player count by hiding the original text */
+        .player-count > span:first-child {
+            color: white;
+            font-weight: normal;
+        }
+
+        #player-count {
+            color: white;
+            font-weight: normal;
+        }
     </style>
 </head>
 <body>
@@ -357,22 +405,21 @@
         <div id="game-info" class="ui-panel">
             <h1 class="game-title">SumoSumo!</h1>
             <p class="role-info">Your Role: <span id="role-badge" class="role-badge role-viewer">Viewer</span></p>
-            <p class="player-count">Players: <span id="player-count">0</span></p>
+            <p class="player-count game-status-line">
+                <span>Players Online</span>
+                <span id="player-count">0</span>
+            </p>
+            <p class="player-count game-status-line">
+                <span id="game-state">Waiting</span>
+                <span id="game-time">0s</span>
+            </p>
+            
             <div class="viewer-only-container">
                 <label class="viewer-only-label">
                     <input type="checkbox" id="viewer-only-toggle" onchange="toggleViewerOnly(this)">
                     <span class="viewer-only-text">Viewer Only</span>
                 </label>
             </div>
-        </div>
-        
-        <!-- Improved Match Info Panel -->
-        <div id="match-info" class="ui-panel">
-            <div class="match-status">
-                <span id="status-indicator" class="status-indicator status-in-progress"></span>
-                <span id="match-status">Match in Progress</span>
-            </div>
-            <div class="match-timer" id="match-timer">0s</div>
         </div>
         
         <!-- Add sponsor banner -->
@@ -505,23 +552,22 @@
             roleBadge.textContent = role.charAt(0).toUpperCase() + role.slice(1);
         }
         
-        // Update match status indicator
+        // Update match status indicator - modify to work with new UI
         function updateMatchStatus(status, timeLeft) {
-            const matchStatus = document.getElementById('match-status');
-            const statusIndicator = document.getElementById('status-indicator');
-            const matchTimer = document.getElementById('match-timer');
+            const gameState = document.getElementById('game-state');
+            const gameTime = document.getElementById('game-time');
             
-            matchStatus.textContent = status;
-            matchTimer.textContent = timeLeft + 's';
+            gameState.textContent = status;
+            gameTime.textContent = timeLeft + 's';
             
-            statusIndicator.className = 'status-indicator';
-            
+            // Optional: Add visual indicators based on state
+            gameState.className = '';
             if (status === 'Match in Progress') {
-                statusIndicator.classList.add('status-in-progress');
+                gameState.classList.add('state-active');
             } else if (status === 'Waiting for Players') {
-                statusIndicator.classList.add('status-waiting');
+                gameState.classList.add('state-waiting');
             } else {
-                statusIndicator.classList.add('status-ended');
+                gameState.classList.add('state-ended');
             }
         }
         
