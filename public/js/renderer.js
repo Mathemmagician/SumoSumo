@@ -92,7 +92,9 @@ const FALL_PHYSICS = {
   GRAVITY: 0.015,
   INITIAL_UPWARD_VELOCITY: 0.1,
   ROTATION_SPEED: 0.05,
-  FORWARD_MOMENTUM: 0.1
+  FORWARD_MOMENTUM: 0.1,
+  BOUNCE_DAMPING: 0.4,  // How much bounce energy is retained (0-1)
+  MIN_BOUNCE_VELOCITY: 0.05  // Minimum velocity to continue bouncing
 };
 
 /**
@@ -1094,7 +1096,7 @@ function showMatchEndAnimation(winnerId, loserId, reason) {
   }, 5000);
 }
 
-// Add this new function to handle the falling animation
+// Update the startLoserFallAnimation function
 function startLoserFallAnimation(loserModel) {
   // Store initial position and rotation for reference
   const initialPos = loserModel.position.clone();
@@ -1112,69 +1114,95 @@ function startLoserFallAnimation(loserModel) {
     verticalVelocity: FALL_PHYSICS.INITIAL_UPWARD_VELOCITY,
     rotationX: 0,
     rotationZ: 0,
-    time: 0
+    time: 0,
+    isResting: false
   };
   
   // Create an animation function
   function animateLoserFall() {
-    // Update vertical position with gravity
-    fallState.verticalVelocity -= FALL_PHYSICS.GRAVITY;
-    loserModel.position.y += fallState.verticalVelocity;
-    
-    // Move outward from ring
-    loserModel.position.x += directionOut.x * FALL_PHYSICS.FORWARD_MOMENTUM;
-    loserModel.position.z += directionOut.z * FALL_PHYSICS.FORWARD_MOMENTUM;
-    
-    // Add tumbling rotation
-    fallState.rotationX += FALL_PHYSICS.ROTATION_SPEED * (1 + Math.sin(fallState.time));
-    fallState.rotationZ += FALL_PHYSICS.ROTATION_SPEED * (1 + Math.cos(fallState.time));
-    
-    // Apply rotations
-    loserModel.rotation.x = initialRot.x + fallState.rotationX;
-    loserModel.rotation.z = initialRot.z + fallState.rotationZ;
-    
-    // Update time
-    fallState.time += 0.1;
-    
-    // Continue animation until fighter falls below certain height
-    if (loserModel.position.y > -10) {
+    if (!fallState.isResting) {
+      // Update vertical position with gravity
+      fallState.verticalVelocity -= FALL_PHYSICS.GRAVITY;
+      loserModel.position.y += fallState.verticalVelocity;
+      
+      // Check for floor collision
+      if (loserModel.position.y < 0) {
+        loserModel.position.y = 0;  // Prevent going below floor
+        
+        // Handle bounce
+        if (Math.abs(fallState.verticalVelocity) > FALL_PHYSICS.MIN_BOUNCE_VELOCITY) {
+          fallState.verticalVelocity = -fallState.verticalVelocity * FALL_PHYSICS.BOUNCE_DAMPING;
+          
+          // Create bounce particles
+          createBounceParticles(loserModel.position);
+        } else {
+          // Come to rest
+          fallState.isResting = true;
+          fallState.verticalVelocity = 0;
+          loserModel.position.y = 0;
+          
+          // Create final impact particles
+          createBounceParticles(loserModel.position, true);
+          return;  // Stop animation when resting
+        }
+      }
+      
+      // Move outward from ring
+      loserModel.position.x += directionOut.x * FALL_PHYSICS.FORWARD_MOMENTUM;
+      loserModel.position.z += directionOut.z * FALL_PHYSICS.FORWARD_MOMENTUM;
+      
+      // Add tumbling rotation (reduced when on ground)
+      const rotationMultiplier = loserModel.position.y < 0.5 ? 0.5 : 1;
+      fallState.rotationX += FALL_PHYSICS.ROTATION_SPEED * (1 + Math.sin(fallState.time)) * rotationMultiplier;
+      fallState.rotationZ += FALL_PHYSICS.ROTATION_SPEED * (1 + Math.cos(fallState.time)) * rotationMultiplier;
+      
+      // Apply rotations
+      loserModel.rotation.x = initialRot.x + fallState.rotationX;
+      loserModel.rotation.z = initialRot.z + fallState.rotationZ;
+      
+      // Update time
+      fallState.time += 0.1;
+      
+      // Continue animation
       requestAnimationFrame(animateLoserFall);
     }
   }
   
   // Add dramatic pause before starting fall
-      setTimeout(() => {
+  setTimeout(() => {
     // Optional: Add a small upward bump before falling
     loserModel.position.y += 0.2;
     
     // Start the falling animation
     animateLoserFall();
     
-    // Optional: Add particle effects for dramatic effect
+    // Create initial fall particles
     createFallParticles(loserModel);
   }, 500); // Half second delay before fall starts
 }
 
-// Add particle effects for the fall
-function createFallParticles(loserModel) {
-  // Create a particle system for dust/debris
-  const particleCount = 50;
+// Add a new function for bounce particles
+function createBounceParticles(position, isFinal = false) {
+  const particleCount = isFinal ? 30 : 15;
   const particles = new THREE.BufferGeometry();
   
   const positions = new Float32Array(particleCount * 3);
   const velocities = [];
   
-  // Initialize particles around the fighter's position
+  // Initialize particles around the impact point
   for (let i = 0; i < particleCount; i++) {
     const i3 = i * 3;
-    positions[i3] = loserModel.position.x + (Math.random() - 0.5);
-    positions[i3 + 1] = loserModel.position.y + Math.random();
-    positions[i3 + 2] = loserModel.position.z + (Math.random() - 0.5);
+    positions[i3] = position.x;
+    positions[i3 + 1] = 0.1; // Slightly above ground
+    positions[i3 + 2] = position.z;
     
+    // Radial velocity for bounce particles
+    const angle = (Math.random() * Math.PI * 2);
+    const speed = 0.1 + Math.random() * 0.1;
     velocities.push({
-      x: (Math.random() - 0.5) * 0.1,
-      y: Math.random() * 0.2,
-      z: (Math.random() - 0.5) * 0.1
+      x: Math.cos(angle) * speed,
+      y: 0.1 + Math.random() * 0.1,
+      z: Math.sin(angle) * speed
     });
   }
   
@@ -1183,7 +1211,7 @@ function createFallParticles(loserModel) {
   // Create particle material
   const particleMaterial = new THREE.PointsMaterial({
     color: 0xCCCCCC,
-    size: 0.1,
+    size: 0.05,
     opacity: 0.8,
     transparent: true
   });
@@ -1207,8 +1235,14 @@ function createFallParticles(loserModel) {
       // Add gravity effect
       velocities[i].y -= 0.01;
       
-      // Fade out by reducing opacity
-      particleMaterial.opacity *= 0.99;
+      // Ground collision
+      if (positions[i3 + 1] < 0) {
+        positions[i3 + 1] = 0;
+        velocities[i].y = 0;
+      }
+      
+      // Fade out
+      particleMaterial.opacity *= 0.98;
     }
     
     particles.attributes.position.needsUpdate = true;
