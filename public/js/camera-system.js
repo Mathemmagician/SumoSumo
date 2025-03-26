@@ -77,24 +77,29 @@ class CameraSystem {
    * @param {Object} params - Optional parameters for the mode
    */
   setMode(modeName, params = {}) {
-    if (!this.MODES[modeName] && !Object.values(this.MODES).includes(modeName)) {
-      console.error(`Invalid camera mode: ${modeName}`);
-      return;
+    // For now, only allow WAITING_OVERVIEW and CEREMONY modes
+    if (modeName !== this.MODES.CEREMONY) {
+      modeName = this.MODES.WAITING_OVERVIEW;
     }
-    
-    // Handle specific setup for certain modes
+
+    // Handle specific setup for ceremony mode
     if (modeName === this.MODES.CEREMONY) {
-      this.setupCeremonyMode(params);
+      if (!params.fighter1 || !params.fighter2 || !params.referee) {
+        console.warn('Ceremony mode missing required params, falling back to overview');
+        modeName = this.MODES.WAITING_OVERVIEW;
+      } else {
+        this.setupCeremonyMode(params);
+      }
     }
-    
+
     // Store the previous position and target for transitions
     this.transitionStartTime = Date.now();
     this.transitionFromPosition = this.camera.position.clone();
     this.transitionFromTarget = this.getTargetFromCamera();
-    
+
     this.currentMode = modeName;
     this.animationStartTime = Date.now();
-    
+
     // Initialize position for this mode
     this.updateCameraForCurrentMode(0);
   }
@@ -142,6 +147,14 @@ class CameraSystem {
    * Update camera position and orientation based on current mode and time
    */
   update() {
+    // Default to WAITING_OVERVIEW for all non-ceremony stages
+    if (this.currentMode !== this.MODES.CEREMONY) {
+      if (this.currentMode !== this.MODES.WAITING_OVERVIEW) {
+        this.setMode(this.MODES.WAITING_OVERVIEW);
+        return;
+      }
+    }
+
     const elapsedTime = Date.now() - this.animationStartTime;
     this.updateCameraForCurrentMode(elapsedTime);
   }
@@ -177,6 +190,11 @@ class CameraSystem {
    * @param {number} elapsedTime - Time elapsed since mode was set
    */
   updateWaitingOverviewCamera(settings, elapsedTime) {
+    // Ensure we're not in ceremony mode
+    if (this.ceremonyCameraActive) {
+        this.cleanupCeremonyMode();
+    }
+
     // Calculate vertical bobbing
     const yOffset = Math.sin(elapsedTime * settings.bobSpeed) * settings.bobAmplitude;
     
@@ -196,9 +214,10 @@ class CameraSystem {
   updateCeremonyCamera(settings, elapsedTime) {
     // Early exit if we don't have all the required participants
     if (!settings.fighter1 || !settings.fighter2 || !settings.referee) {
-      console.warn('Ceremony mode is missing participants, falling back to overview');
-      this.setMode(this.MODES.WAITING_OVERVIEW);
-      return;
+        console.warn('Ceremony mode is missing participants, falling back to overview');
+        this.cleanupCeremonyMode();
+        this.setMode(this.MODES.WAITING_OVERVIEW);
+        return;
     }
     
     // Define the phases and their timing
@@ -258,8 +277,9 @@ class CameraSystem {
     
     switch (currentPhase) {
       case 'intro':
-        // During intro, circle around the ring from above
-        this.updateCeremonyIntroCamera(elapsedTime);
+        // Instead of rotating, just position the camera at a fixed overview position
+        this.camera.position.set(-15, 15, 15);
+        this.camera.lookAt(0, 0, 0);
         break;
         
       case 'fighter1':
@@ -272,12 +292,11 @@ class CameraSystem {
       case 'outro':
         // Transition back to waiting overview
         if (phaseProgress >= 1.0) {
-          // If outro is complete, switch back to overview mode
           if (this.currentMode === this.MODES.CEREMONY) {
+            this.cleanupCeremonyMode();
             this.setMode(this.MODES.WAITING_OVERVIEW);
           }
         } else {
-          // During outro, transition from last position to overview
           this.transitionToWaitingOverview(phaseProgress);
         }
         break;
@@ -285,9 +304,11 @@ class CameraSystem {
     
     // If we've gone through all phases, exit ceremony mode
     if (timeAccumulator + phase.time <= elapsedTime && !phase.next) {
-      if (this.currentMode === this.MODES.CEREMONY) {
-        this.setMode(this.MODES.WAITING_OVERVIEW);
-      }
+        if (this.currentMode === this.MODES.CEREMONY) {
+            this.cleanupCeremonyMode();
+            this.setMode(this.MODES.WAITING_OVERVIEW);
+        }
+        return;
     }
   }
   
@@ -473,32 +494,34 @@ class CameraSystem {
   }
   
   /**
-   * Clean up resources
+   * Clean up ceremony mode resources and reset state
    */
-  dispose() {
+  cleanupCeremonyMode() {
+    // Hide cinematic bars if they exist
     if (this.ceremonyCineBars) {
-      document.body.removeChild(this.ceremonyCineBars.container);
-      this.ceremonyCineBars = null;
+        this.ceremonyCineBars.hide();
     }
+    
+    // Reset ceremony state
+    this.ceremonyCameraActive = false;
+    this.ceremonyPhase = null;
+    
+    // Clear ceremony settings
+    const ceremonySettings = this.cameraSettings[this.MODES.CEREMONY];
+    ceremonySettings.fighter1 = null;
+    ceremonySettings.fighter2 = null;
+    ceremonySettings.referee = null;
   }
   
   /**
-   * Update camera for ceremony intro
-   * @param {number} elapsedTime - Time elapsed since mode was set
+   * Clean up resources
    */
-  updateCeremonyIntroCamera(elapsedTime) {
-    // Calculate a circle path around the ring
-    const angle = elapsedTime * 0.001; // Speed of rotation
-    const height = 10 + Math.sin(elapsedTime * 0.0015) * 2; // Bobbing height
-    const radius = 20; // Distance from center
-    
-    // Position camera on the circle
-    this.camera.position.x = Math.cos(angle) * radius;
-    this.camera.position.z = Math.sin(angle) * radius;
-    this.camera.position.y = height;
-    
-    // Look at the center of the ring
-    this.camera.lookAt(0, 0, 0);
+  dispose() {
+    this.cleanupCeremonyMode();
+    if (this.ceremonyCineBars) {
+        document.body.removeChild(this.ceremonyCineBars.container);
+        this.ceremonyCineBars = null;
+    }
   }
 }
 

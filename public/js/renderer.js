@@ -795,7 +795,7 @@ function updatePlayerInScene(player) {
       player.position?.y || 2,
       player.position?.z || 0
     );
-    model.rotation.y = player.rotation || 0;
+  model.rotation.y = player.rotation || 0;
   }
 }
 
@@ -1169,7 +1169,7 @@ function startLoserFallAnimation(loserModel) {
   }
   
   // Add dramatic pause before starting fall
-  setTimeout(() => {
+      setTimeout(() => {
     // Optional: Add a small upward bump before falling
     loserModel.position.y += 0.2;
     
