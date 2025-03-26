@@ -356,13 +356,12 @@
         <!-- Improved Game Info Panel -->
         <div id="game-info" class="ui-panel">
             <h1 class="game-title">SumoSumo!</h1>
-            <p class="role-info">Your Role: <span id="player-role">Viewer</span> <span id="role-badge" class="role-badge role-viewer">Viewer</span></p>
+            <p class="role-info">Your Role: <span id="role-badge" class="role-badge role-viewer">Viewer</span></p>
             <p class="player-count">Players: <span id="player-count">0</span></p>
             <div class="viewer-only-container">
                 <label class="viewer-only-label">
                     <input type="checkbox" id="viewer-only-toggle" onchange="toggleViewerOnly(this)">
                     <span class="viewer-only-text">Viewer Only</span>
-                    <span class="viewer-only-description">Won't be selected as fighter/referee</span>
                 </label>
             </div>
         </div>
@@ -500,9 +499,6 @@
         // Update role badge based on player role
         function updateRoleBadge(role) {
             const roleBadge = document.getElementById('role-badge');
-            const playerRoleText = document.getElementById('player-role');
-            
-            playerRoleText.textContent = role.charAt(0).toUpperCase() + role.slice(1);
             
             roleBadge.className = 'role-badge';
             roleBadge.classList.add('role-' + role.toLowerCase());
