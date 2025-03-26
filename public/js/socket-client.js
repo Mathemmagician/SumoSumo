@@ -231,11 +231,30 @@ function connectToServer() {
     socketStats.fightersSelected++;
     updateSocketStats(socketStats);
     console.log('Fighters selected:', data);
+
+    // Remove old fighter models first
+    gameState.fighters.forEach(fighter => {
+      removePlayerFromScene(fighter.id);
+    });
+
+    // Update game state with new fighters
     gameState.fighters = [data.fighter1, data.fighter2];
+    
+    // Remove old referee model if exists
+    if (gameState.referee) {
+      removePlayerFromScene(gameState.referee.id);
+    }
     gameState.referee = data.referee;
 
+    // Add new models with correct roles
+    gameState.fighters.forEach(fighter => {
+      addPlayerToScene(fighter);
+    });
+    if (gameState.referee) {
+      addPlayerToScene(gameState.referee);
+    }
+
     determineMyRole();
-    updateScene();
     updateUI();
   });
 
@@ -336,50 +355,43 @@ function connectToServer() {
     console.log('Player role changed:', data);
     const { id, role } = data;
 
-    // Remove from any existing arrays
-    if (role === 'fighter') {
-      gameState.viewers = gameState.viewers.filter(v => v.id !== id);
-      if (gameState.referee && gameState.referee.id === id) {
-        gameState.referee = null;
-      }
-      // Add to fighters if not present
-      if (!gameState.fighters.some(f => f.id === id)) {
-        const player = findPlayerInGameState(id);
-        if (player) {
-          player.role = 'fighter';
-          gameState.fighters.push(player);
-        }
-      }
-    } else if (role === 'referee') {
-      gameState.fighters = gameState.fighters.filter(f => f.id !== id);
-      gameState.viewers = gameState.viewers.filter(v => v.id !== id);
-
-      const player = findPlayerInGameState(id);
-      if (player) {
-        player.role = 'referee';
-        gameState.referee = player;
-      }
-    } else {
-      // role === 'viewer'
-      gameState.fighters = gameState.fighters.filter(f => f.id !== id);
-      if (gameState.referee && gameState.referee.id === id) {
-        gameState.referee = null;
-      }
-      if (!gameState.viewers.some(v => v.id === id)) {
-        const player = findPlayerInGameState(id);
-        if (player) {
-          player.role = 'viewer';
-          gameState.viewers.push(player);
-        }
-      }
+    // Find the player in any role
+    const player = findPlayerInGameState(id);
+    if (!player) {
+      console.error('Could not find player for role change:', id);
+      return;
     }
+
+    // Remove from current arrays and model
+    removePlayerFromScene(id);
+    gameState.fighters = gameState.fighters.filter(f => f.id !== id);
+    gameState.viewers = gameState.viewers.filter(v => v.id !== id);
+    if (gameState.referee?.id === id) {
+      gameState.referee = null;
+    }
+
+    // Update player's role and add to correct array
+    player.role = role;
+    switch (role) {
+      case 'fighter':
+        gameState.fighters.push(player);
+        break;
+      case 'referee':
+        gameState.referee = player;
+        break;
+      case 'viewer':
+        gameState.viewers.push(player);
+        break;
+    }
+
+    // Add new model with updated role
+    addPlayerToScene(player);
 
     if (id === gameState.myId) {
       gameState.myRole = role;
     }
 
     updateUI();
-    updateScene();
   });
 }
 

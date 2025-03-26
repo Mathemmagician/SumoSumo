@@ -709,11 +709,17 @@ function createAudienceAreas() {
   scene.add(matInstancedMesh);
 }
 
-// Add player to scene
+// Update the addPlayerToScene function to be more robust
 function addPlayerToScene(player) {
   // First remove any existing model for this player
   if (playerModels[player.id]) {
     removePlayerFromScene(player.id);
+  }
+
+  // Ensure we have valid player data
+  if (!player || !player.id || !player.role) {
+    console.error('Invalid player data:', player);
+    return;
   }
 
   const model = createSumoModel(player);
@@ -722,15 +728,29 @@ function addPlayerToScene(player) {
     return;
   }
   
-  // Store the player's role in the model's userData
+  // Store complete player data in model's userData
   model.userData = {
-    ...model.userData,
     id: player.id,
-    role: player.role
+    role: player.role,
+    faceId: player.faceId,
+    colorId: player.colorId,
+    seed: player.seed
   };
   
   playerModels[player.id] = model;
-  updatePlayerInScene(player);
+  
+  // Ensure proper initial positioning
+  if (player.role === 'viewer') {
+    positionViewer(model, player.seed);
+  } else {
+    model.position.set(
+      player.position?.x || 0,
+      player.position?.y || 2,
+      player.position?.z || 0
+    );
+    model.rotation.y = player.rotation || 0;
+  }
+  
   scene.add(model);
 }
 
@@ -748,31 +768,30 @@ function createSumoModel(player) {
   }
 }
 
-// Update player in scene
+// Update the updatePlayerInScene function to handle role changes properly
 function updatePlayerInScene(player) {
+  if (!player || !player.id) {
+    console.error('Invalid player data in updatePlayerInScene:', player);
+    return;
+  }
+
   const model = playerModels[player.id];
-  if (!model) {
-    // If no model exists, create one
+  
+  // If no model exists or role has changed, create a new one
+  if (!model || model.userData.role !== player.role) {
     addPlayerToScene(player);
     return;
   }
 
-  // Check if role changed
-  if (model.userData.role !== player.role) {
-    // Remove old model and create new one with correct role
-    removePlayerFromScene(player.id);
-    addPlayerToScene(player);
-    return;
-  }
-
-  // Update position & rotation
+  // Update position & rotation based on role
   if (player.role === 'viewer') {
     positionViewer(model, player.seed);
   } else {
+    // For fighters and referee, use provided position
     model.position.set(
-      player.position.x,
-      player.position.y,
-      player.position.z !== undefined ? player.position.z : 0
+      player.position?.x || 0,
+      player.position?.y || 2,
+      player.position?.z || 0
     );
     model.rotation.y = player.rotation || 0;
   }
@@ -1124,7 +1143,7 @@ function startLoserFallAnimation(loserModel) {
   }
   
   // Add dramatic pause before starting fall
-  setTimeout(() => {
+      setTimeout(() => {
     // Optional: Add a small upward bump before falling
     loserModel.position.y += 0.2;
     
