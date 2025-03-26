@@ -251,6 +251,8 @@ class ModelFactory {
     rightSleeve.position.set(0.5, 0.3, 0);
     rightSleeve.rotation.z = -Math.PI / 4;
     model.add(rightSleeve);
+
+    model.rotation.y = Math.PI / 2;
   }
 
   addViewerModel(model, player) {
