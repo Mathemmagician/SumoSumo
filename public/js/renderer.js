@@ -1330,36 +1330,60 @@ function showPlayerEmote(playerId, emoteType) {
   const model = playerModels[playerId];
   if (!model) return;
 
-  const emoteBubble = model.getObjectByName('emoteBubble');
-  if (!emoteBubble) return;
+  const textBubble = model.getObjectByName('textBubble');
+  if (!textBubble) return;
 
   if (emoteType) {
-    // Show emote
-    emoteBubble.visible = true;
-    emoteBubble.material.opacity = 1;
+    // Show emote through text bubble
+    textBubble.visible = true;
+    textBubble.material.opacity = 1;
 
+    // Use minimal canvas size to reduce whitespace
+    const canvasWidth = 480;
+    const canvasHeight = 240;
+    messageCanvas.width = canvasWidth;
+    messageCanvas.height = canvasHeight;
+    
     // Clear canvas
-    emoteCtx.clearRect(0, 0, 128, 128);
+    messageCtx.clearRect(0, 0, canvasWidth, canvasHeight);
+    
+    // Draw speech bubble - minimal padding
+    messageCtx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    roundRect(messageCtx, 2, 2, canvasWidth-4, canvasHeight-4, 20);
+    messageCtx.fill();
+    
+    // Add border
+    messageCtx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    messageCtx.lineWidth = 4;
+    roundRect(messageCtx, 2, 2, canvasWidth-4, canvasHeight-4, 20);
+    messageCtx.stroke();
 
-    // Draw emote
-    emoteCtx.fillStyle = 'white';
-    emoteCtx.fillRect(0, 0, 128, 128);
-    emoteCtx.fillStyle = 'black';
-    emoteCtx.font = 'bold 80px Arial';
-    emoteCtx.textAlign = 'center';
-    emoteCtx.textBaseline = 'middle';
-    emoteCtx.fillText(emoteType, 64, 64);
+    // Draw emote text with LARGE font
+    messageCtx.fillStyle = 'black';
+    messageCtx.font = 'bold 90px Arial'; // Very large font
+    messageCtx.textAlign = 'center';
+    messageCtx.textBaseline = 'middle';
+    
+    // Draw the emote
+    messageCtx.fillText(emoteType, canvasWidth / 2, canvasHeight / 2);
 
     // Reuse texture if possible
-    if (!emoteBubble.material.map) {
-      emoteBubble.material.map = new THREE.CanvasTexture(emoteCanvas);
+    if (!textBubble.material.map) {
+      textBubble.material.map = new THREE.CanvasTexture(messageCanvas);
     } else {
-      emoteBubble.material.map.needsUpdate = true;
+      textBubble.material.map.needsUpdate = true;
     }
+    
+    // Scale based on emote length
+    const scaleFactor = Math.min(1.5, Math.max(1.0, Math.sqrt(emoteType.length) / 6));
+    textBubble.scale.set(scaleFactor, scaleFactor, scaleFactor);
+    
+    // Make sure the bubble faces the camera
+    textBubble.lookAt(camera.position);
   } else {
     // Hide emote
-    emoteBubble.visible = false;
-    emoteBubble.material.opacity = 0;
+    textBubble.visible = false;
+    textBubble.material.opacity = 0;
   }
 }
 
