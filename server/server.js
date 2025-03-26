@@ -50,7 +50,7 @@ const FAKE_USERS = {
   count: 0,
   users: new Map(), // Store fake user data
   intervals: new Map(), // Store intervals for each fake user
-  targetCount: 50,
+  targetCount: 0,
   disconnectInterval: null,
   reconnectInterval: null
 };
@@ -186,7 +186,7 @@ function selectFighters() {
   const fighter2Index = Math.floor(Math.random() * gameState.viewers.length);
   const fighter2 = gameState.viewers.splice(fighter2Index, 1)[0];
 
-  // Set their roles & positions (no more .ready here)
+  // Set their roles & positions with Z coordinate
   fighter1.role = 'fighter';
   fighter1.position = { x: -3, y: 2, z: 0 };
   fighter1.rotation = Math.PI / 2;
@@ -203,7 +203,7 @@ function selectFighters() {
   const refereeIndex = Math.floor(Math.random() * gameState.viewers.length);
   gameState.referee = gameState.viewers.splice(refereeIndex, 1)[0];
   gameState.referee.role = 'referee';
-  gameState.referee.position = { x: 0, y: 2, z: -2 };
+  gameState.referee.position = { x: 0, y: 2, z: -2 }; // Place referee at north side
 
   // Announce fighter selection
   io.emit('fightersSelected', {
@@ -280,9 +280,12 @@ function startMatch() {
     return;
   }
 
-  // Reset fighter positions
+  // Reset fighter positions - place them on opposite sides of the ring
   gameState.fighters[0].position = { x: -3, y: 2, z: 0 };
+  gameState.fighters[0].rotation = Math.PI / 2; // Face right/east
+  
   gameState.fighters[1].position = { x: 3, y: 2, z: 0 };
+  gameState.fighters[1].rotation = -Math.PI / 2; // Face left/west
 
   // Broadcast match start
   io.emit('matchStart', {
@@ -392,33 +395,105 @@ io.on('connection', (socket) => {
     const fighter = gameState.fighters.find(f => f.id === socket.id);
     if (!fighter) return;
 
-    // Update position based on direction (left/right)
-    if (direction === 'left') {
-      fighter.position.x -= 0.2;
-      fighter.rotation = Math.PI / 2;  // Face left
-    } else if (direction === 'right') {
-      fighter.position.x += 0.2;
-      fighter.rotation = -Math.PI / 2; // Face right
+    // Get the other fighter for reference
+    const otherFighter = gameState.fighters.find(f => f.id !== socket.id);
+    if (!otherFighter) return;
+    
+    // Calculate direction vector to opponent
+    const dirToOpponent = {
+      x: otherFighter.position.x - fighter.position.x,
+      z: otherFighter.position.z - fighter.position.z
+    };
+    
+    // Normalize the direction vector
+    const length = Math.sqrt(dirToOpponent.x * dirToOpponent.x + dirToOpponent.z * dirToOpponent.z);
+    if (length > 0) {
+      dirToOpponent.x /= length;
+      dirToOpponent.z /= length;
+    }
+    
+    // Movement speed
+    const moveSpeed = 0.2;
+    
+    // Calculate movement based on direction relative to opponent
+    switch(direction) {
+      case 'forward': // Move toward opponent
+        fighter.position.x += dirToOpponent.x * moveSpeed;
+        fighter.position.z += dirToOpponent.z * moveSpeed;
+        // Set rotation to face opponent
+        fighter.rotation = Math.atan2(dirToOpponent.x, dirToOpponent.z);
+        break;
+        
+      case 'backward': // Move away from opponent
+        fighter.position.x -= dirToOpponent.x * moveSpeed;
+        fighter.position.z -= dirToOpponent.z * moveSpeed;
+        // Still face the opponent
+        fighter.rotation = Math.atan2(dirToOpponent.x, dirToOpponent.z);
+        break;
+        
+      case 'left': // Move left relative to opponent
+        // Calculate perpendicular vector (left of direction to opponent)
+        fighter.position.x += -dirToOpponent.z * moveSpeed;
+        fighter.position.z += dirToOpponent.x * moveSpeed;
+        // Update rotation
+        fighter.rotation = Math.atan2(dirToOpponent.x, dirToOpponent.z);
+        break;
+        
+      case 'right': // Move right relative to opponent
+        // Calculate perpendicular vector (right of direction to opponent)
+        fighter.position.x += dirToOpponent.z * moveSpeed;
+        fighter.position.z += -dirToOpponent.x * moveSpeed;
+        // Update rotation
+        fighter.rotation = Math.atan2(dirToOpponent.x, dirToOpponent.z);
+        break;
     }
 
-    // Simple 1D boundary check (only X-axis)
-    if (Math.abs(fighter.position.x) > gameState.ringRadius) {
+    // Boundary check - full 2D circle boundary now
+    const distanceFromCenter = Math.sqrt(
+      fighter.position.x * fighter.position.x + 
+      fighter.position.z * fighter.position.z
+    );
+    
+    if (distanceFromCenter > gameState.ringRadius) {
       // Player fell out of the ring
       endRound(fighter.id);
       return;
     }
 
     // Check for collision with other fighter
-    const otherFighter = gameState.fighters.find(f => f.id !== socket.id);
     if (otherFighter) {
-      const distance = Math.abs(fighter.position.x - otherFighter.position.x);
+      const distance = Math.sqrt(
+        Math.pow(fighter.position.x - otherFighter.position.x, 2) + 
+        Math.pow(fighter.position.z - otherFighter.position.z, 2)
+      );
+      
       if (distance < 1.5) {
-        // Simple pushing mechanic
-        const pushDirection = fighter.position.x < otherFighter.position.x ? 1 : -1;
-        otherFighter.position.x += pushDirection * 0.15;
+        // Simple pushing mechanic - push in direction of impact
+        const pushDir = {
+          x: otherFighter.position.x - fighter.position.x,
+          z: otherFighter.position.z - fighter.position.z
+        };
+        
+        // Normalize push direction
+        const pushLength = Math.sqrt(pushDir.x * pushDir.x + pushDir.z * pushDir.z);
+        if (pushLength > 0) {
+          pushDir.x /= pushLength;
+          pushDir.z /= pushLength;
+        }
+        
+        // Push strength is higher when moving toward opponent
+        const pushStrength = direction === 'forward' ? 0.25 : 0.15;
+        
+        otherFighter.position.x += pushDir.x * pushStrength;
+        otherFighter.position.z += pushDir.z * pushStrength;
 
         // Check if pushed fighter is out of the ring
-        if (Math.abs(otherFighter.position.x) > gameState.ringRadius) {
+        const otherDistanceFromCenter = Math.sqrt(
+          otherFighter.position.x * otherFighter.position.x + 
+          otherFighter.position.z * otherFighter.position.z
+        );
+        
+        if (otherDistanceFromCenter > gameState.ringRadius) {
           endRound(otherFighter.id);
           return;
         }

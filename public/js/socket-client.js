@@ -499,7 +499,12 @@ function updatePlayerPosition(playerId, position, rotation) {
 // Keyboard input
 window.addEventListener('keydown', (e) => {
   if (gameState.myRole !== 'fighter' || gameState.stage !== 'MATCH_IN_PROGRESS') return;
-  if (e.key === 'ArrowLeft' || e.key === 'a') {
+  
+  if (e.key === 'ArrowUp' || e.key === 'w') {
+    sendMovement('forward');
+  } else if (e.key === 'ArrowDown' || e.key === 's') {
+    sendMovement('backward');
+  } else if (e.key === 'ArrowLeft' || e.key === 'a') {
     sendMovement('left');
   } else if (e.key === 'ArrowRight' || e.key === 'd') {
     sendMovement('right');

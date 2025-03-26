@@ -1461,3 +1461,21 @@ function createStadiumWalls() {
   const stadium = StadiumFactory.createStadiumWalls(RING_RADIUS, lastRowDistance);
   scene.add(stadium);
 }
+
+// Update the updatePlayerPosition function to handle Z-axis movement
+function updatePlayerPosition(playerId, position, rotation) {
+  const playerModel = playerModels[playerId];
+  if (!playerModel) return;
+  
+  // Update all three position coordinates
+  playerModel.position.set(
+    position.x, 
+    position.y, 
+    position.z !== undefined ? position.z : 0 // Handle legacy data
+  );
+  
+  // Apply rotation - the server now sends the actual angle
+  if (rotation !== undefined) {
+    playerModel.rotation.y = rotation;
+  }
+}
