@@ -420,9 +420,7 @@ function determineMyRole() {
 function updateUI() {
   // Update role display
   const playerRole = gameState.myRole;
-  if (typeof updateRoleBadge === 'function') {
-    updateRoleBadge(playerRole);
-  }
+  uiManager.updateRoleBadge(playerRole);
   
   // Update player count
   const playerIds = new Set();
@@ -430,9 +428,7 @@ function updateUI() {
   if (gameState.referee) playerIds.add(gameState.referee.id);
   gameState.viewers.forEach(v => playerIds.add(v.id));
   
-  if (typeof updatePlayerCount === 'function') {
-    updatePlayerCount(playerIds.size);
-  }
+  uiManager.updatePlayerCount(playerIds.size);
 }
 
 // Update the stage display
@@ -440,9 +436,7 @@ function updateStageDisplay() {
   const displayName = STAGE_DISPLAY_NAMES[gameState.stage] || gameState.stage;
   const seconds = Math.ceil(gameState.stageTimeRemaining / 1000);
   
-  if (typeof updateMatchStatus === 'function') {
-    updateMatchStatus(displayName, seconds);
-  }
+  uiManager.updateMatchStatus(displayName, seconds);
 }
 
 // Start the stage timer
@@ -494,7 +488,7 @@ function sendEmote(emoteType) {
 
 // Send message
 function sendMessage() {
-  const messageInput = document.getElementById('message-text');
+  const messageInput = document.getElementById('chat-input');
   const message = messageInput.value.trim();
   if (message) {
     socket.emit('message', message);
@@ -581,10 +575,8 @@ window.addEventListener('load', connectToServer);
 // Expose functions to the global scope
 window.sendPlayerEmoteToServer = sendEmote;
 window.sendPlayerMessageToServer = function(message) {
-  const messageInput = document.getElementById('chat-input');
   if (message) {
     socket.emit('message', message);
-    if (messageInput) messageInput.value = '';
   }
 };
 

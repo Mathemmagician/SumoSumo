@@ -166,9 +166,6 @@ function initScene(initialGameState) {
   // We no longer need to create cinematic bars here as they're managed by the camera system
   cinematicBars = null;
 
-  // Create camera info display
-  createCameraInfoDisplay();
-  
   // Add keyboard event listeners
   window.addEventListener('keydown', handleKeyDown);
   window.addEventListener('keyup', handleKeyUp);
@@ -974,13 +971,6 @@ function animate() {
     
     // Apply the rotation
     camera.quaternion.setFromEuler(euler);
-    
-    // Update camera info display
-    const infoDisplay = document.getElementById('camera-info');
-    infoDisplay.innerHTML = `
-      camera.position.set(${camera.position.x.toFixed(2)}, ${camera.position.y.toFixed(2)}, ${camera.position.z.toFixed(2)});<br>
-      camera.rotation.set(${camera.rotation.x.toFixed(2)}, ${camera.rotation.y.toFixed(2)}, ${camera.rotation.z.toFixed(2)});      
-    `;
   }
 
   renderer.render(scene, camera);
@@ -1575,21 +1565,22 @@ function updateSocketStats(stats) {
   statsDiv.innerHTML = html;
 }
 
-// Update the toggleFreeCamera function to clean up cinematics
-function toggleFreeCamera() {
-  freeCameraMode = !freeCameraMode;
-  const infoDisplay = document.getElementById('camera-info');
-  infoDisplay.style.display = freeCameraMode ? 'block' : 'none';
-  
-  if (freeCameraMode) {
-    // Store original camera position for restoration
-    originalCameraPosition = camera.position.clone();
-    originalCameraRotation = camera.rotation.clone();
-  } else {
-    // Return control to the camera system
-    cameraSystem.updateCameraForCurrentMode(0);
-  }
+// Update the toggleFreeCamera function to accept a boolean parameter
+function toggleFreeCamera(enabled) {
+    freeCameraMode = enabled;
+    
+    if (freeCameraMode) {
+        // Store original camera position for restoration
+        originalCameraPosition = camera.position.clone();
+        originalCameraRotation = camera.rotation.clone();
+    } else {
+        // Return control to the camera system
+        cameraSystem.updateCameraForCurrentMode(0);
+    }
 }
+
+// Make sure to expose the function globally
+window.toggleFreeCamera = toggleFreeCamera;
 
 // Add these keyboard handler functions
 function handleKeyDown(event) {
@@ -1625,50 +1616,6 @@ function handleKeyUp(event) {
     case 'arrowup': cameraControls.rotateUp = false; break;
     case 'arrowdown': cameraControls.rotateDown = false; break;
   }
-}
-
-/**
- * Creates and sets up the camera information display
- * This is used to show position and rotation information when in free camera mode
- * @returns {HTMLElement} The info display container
- */
-function createCameraInfoDisplay() {
-  const infoContainer = document.createElement('div');
-  infoContainer.id = 'camera-info';
-  infoContainer.style.cssText = `
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
-    font-family: monospace;
-    font-size: 14px;
-    padding: 10px;
-    border-radius: 4px;
-    z-index: 1000;
-    display: none;
-  `;
-  
-  const toggleButton = document.createElement('button');
-  toggleButton.textContent = 'Toggle Free Camera (F)';
-  toggleButton.style.cssText = `
-    position: fixed;
-    top: 10px;
-    right: 200px;
-    padding: 5px 10px;
-    background-color: rgba(0, 0, 0, 0.7);
-    color: white;
-    border: 1px solid white;
-    border-radius: 4px;
-    cursor: pointer;
-    z-index: 1000;
-  `;
-  
-  document.body.appendChild(infoContainer);
-  document.body.appendChild(toggleButton);
-  
-  toggleButton.addEventListener('click', toggleFreeCamera);
-  return infoContainer;
 }
 
 // Add this new function to create the stadium walls
