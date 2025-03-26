@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SumoSumo!</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sawarabi+Mincho&family=Yuji+Mai&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container">
+        <!-- Improved Game Info Panel -->
+        <div id="game-info" class="ui-panel">
+            <h1 class="game-title">SumoSumo!</h1>
+            <p class="role-info">Your Role: <span id="role-badge" class="role-badge role-viewer">Viewer</span></p>
+            <p class="player-count game-status-line">
+                <span>Players Online</span>
+                <span id="player-count">0</span>
+            </p>
+            <p class="player-count game-status-line">
+                <span id="game-state">Waiting</span>
+                <span id="game-time">0s</span>
+            </p>
+            
+            <div class="viewer-only-container">
+                <label class="viewer-only-label">
+                    <input type="checkbox" id="viewer-only-toggle" onchange="toggleViewerOnly(this)">
+                    <span class="viewer-only-text">Viewer Only</span>
+                </label>
+                <label class="viewer-only-label">
+                    <input type="checkbox" id="free-camera-toggle" onchange="uiManager.toggleFreeCamera(this)">
+                    <span class="viewer-only-text">Free Camera</span>
+                </label>
+            </div>
+        </div>
+        
+        <!-- Add sponsor banner -->
+        <div id="sponsor-banner"></div>
+        
+        <!-- Reorganized Controls Panel -->
+        <div id="controls-panel">
+            <!-- Chat area on bottom right -->
+            <div class="chat-area">
+                <!-- Chat history panel -->
+                <div class="chat-history" id="chat-history">
+                    <!-- Messages will be added here dynamically -->
+                </div>
+                
+                <!-- Chat input container -->
+                <div class="chat-container">
+                    <input type="text" id="chat-input" placeholder="バイブ神..." autocomplete="off">
+                    <button id="send-btn" onclick="uiManager.sendMessage()">勝者</button>
+                </div>
+                
+                <!-- Emoji buttons below chat input -->
+                <div class="emote-container">
+                    <button class="emote-btn" onclick="uiManager.sendEmote('👏')">
+                        <span class="emote-emoji">👏</span>
+                    </button>
+                    <button class="emote-btn" onclick="uiManager.sendEmote('😂')">
+                        <span class="emote-emoji">😂</span>
+                    </button>
+                    <button class="emote-btn" onclick="uiManager.sendEmote('😮')">
+                        <span class="emote-emoji">😮</span>
+                    </button>
+                    <button class="emote-btn" onclick="uiManager.sendEmote('😠')">
+                        <span class="emote-emoji">😠</span>
+                    </button>
+                    <button class="emote-btn" onclick="uiManager.sendEmote('🙌')">
+                        <span class="emote-emoji">🙌</span>
+                    </button>
+                    <button class="emote-btn" onclick="uiManager.sendEmote('🎉')">
+                        <span class="emote-emoji">🎉</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html> 
