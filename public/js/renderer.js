@@ -87,6 +87,14 @@ let cameraControls = {
   rotateDown: false
 };
 
+// Add these physics constants for the falling animation
+const FALL_PHYSICS = {
+  GRAVITY: 0.015,
+  INITIAL_UPWARD_VELOCITY: 0.1,
+  ROTATION_SPEED: 0.05,
+  FORWARD_MOMENTUM: 0.1
+};
+
 /**
  * Initialize the 3D scene. We only want to do this once.
  */
@@ -1014,7 +1022,7 @@ function showMatchStartAnimation() {
 
 // Show match end animation
 function showMatchEndAnimation(winnerId, loserId, reason) {
-  // Create a text overlay
+  // Create the regular match end text overlay
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 256;
@@ -1040,11 +1048,9 @@ function showMatchEndAnimation(winnerId, loserId, reason) {
       ctx.font = '20px "Sawarabi Mincho", serif';
       ctx.fillText('(Opponent disconnected)', 256, 190);
     }
-  } else {
-    ctx.fillText('No winner', 256, 150);
   }
   
-  // Create a plane to display the text
+  // Create and add the text plane
   const geometry = new THREE.PlaneGeometry(10, 5);
   const texture = new THREE.CanvasTexture(canvas);
   const material = new THREE.MeshBasicMaterial({
@@ -1058,31 +1064,148 @@ function showMatchEndAnimation(winnerId, loserId, reason) {
   matchEndPlane.name = 'matchEndPlane';
   scene.add(matchEndPlane);
   
-  // Remove after a few seconds
+  // Start the loser's falling animation
+  if (loserId && playerModels[loserId]) {
+    startLoserFallAnimation(playerModels[loserId]);
+  }
+  
+  // Remove the text plane after animation
   setTimeout(() => {
     scene.remove(matchEndPlane);
   }, 5000);
+}
+
+// Add this new function to handle the falling animation
+function startLoserFallAnimation(loserModel) {
+  // Store initial position and rotation for reference
+  const initialPos = loserModel.position.clone();
+  const initialRot = loserModel.rotation.clone();
   
-  // Add crown only if we have gameState and myId
-  if (window.gameState && window.gameState.myId && winnerId === window.gameState.myId) {
-    const myModel = playerModels[window.gameState.myId];
-    if (myModel) {
-      const crownGeometry = new THREE.ConeGeometry(0.3, 0.5, 4);
-      const crownMaterial = new THREE.MeshBasicMaterial({ color: 0xFFD700 });
-      const crown = new THREE.Mesh(crownGeometry, crownMaterial);
-      crown.position.y = 1.8;
-      crown.name = 'victoryCrown';
-      myModel.add(crown);
-      
-      // Remove the crown after the victory ceremony
-      setTimeout(() => {
-        const crown = myModel.getObjectByName('victoryCrown');
-        if (crown) {
-          myModel.remove(crown);
-        }
-      }, 8000);
+  // Calculate direction vector away from ring center
+  const directionOut = new THREE.Vector3(
+    initialPos.x,
+    0,
+    initialPos.z
+  ).normalize();
+  
+  // Initialize physics state
+  const fallState = {
+    verticalVelocity: FALL_PHYSICS.INITIAL_UPWARD_VELOCITY,
+    rotationX: 0,
+    rotationZ: 0,
+    time: 0
+  };
+  
+  // Create an animation function
+  function animateLoserFall() {
+    // Update vertical position with gravity
+    fallState.verticalVelocity -= FALL_PHYSICS.GRAVITY;
+    loserModel.position.y += fallState.verticalVelocity;
+    
+    // Move outward from ring
+    loserModel.position.x += directionOut.x * FALL_PHYSICS.FORWARD_MOMENTUM;
+    loserModel.position.z += directionOut.z * FALL_PHYSICS.FORWARD_MOMENTUM;
+    
+    // Add tumbling rotation
+    fallState.rotationX += FALL_PHYSICS.ROTATION_SPEED * (1 + Math.sin(fallState.time));
+    fallState.rotationZ += FALL_PHYSICS.ROTATION_SPEED * (1 + Math.cos(fallState.time));
+    
+    // Apply rotations
+    loserModel.rotation.x = initialRot.x + fallState.rotationX;
+    loserModel.rotation.z = initialRot.z + fallState.rotationZ;
+    
+    // Update time
+    fallState.time += 0.1;
+    
+    // Continue animation until fighter falls below certain height
+    if (loserModel.position.y > -10) {
+      requestAnimationFrame(animateLoserFall);
     }
   }
+  
+  // Add dramatic pause before starting fall
+  setTimeout(() => {
+    // Optional: Add a small upward bump before falling
+    loserModel.position.y += 0.2;
+    
+    // Start the falling animation
+    animateLoserFall();
+    
+    // Optional: Add particle effects for dramatic effect
+    createFallParticles(loserModel);
+  }, 500); // Half second delay before fall starts
+}
+
+// Add particle effects for the fall
+function createFallParticles(loserModel) {
+  // Create a particle system for dust/debris
+  const particleCount = 50;
+  const particles = new THREE.BufferGeometry();
+  
+  const positions = new Float32Array(particleCount * 3);
+  const velocities = [];
+  
+  // Initialize particles around the fighter's position
+  for (let i = 0; i < particleCount; i++) {
+    const i3 = i * 3;
+    positions[i3] = loserModel.position.x + (Math.random() - 0.5);
+    positions[i3 + 1] = loserModel.position.y + Math.random();
+    positions[i3 + 2] = loserModel.position.z + (Math.random() - 0.5);
+    
+    velocities.push({
+      x: (Math.random() - 0.5) * 0.1,
+      y: Math.random() * 0.2,
+      z: (Math.random() - 0.5) * 0.1
+    });
+  }
+  
+  particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  
+  // Create particle material
+  const particleMaterial = new THREE.PointsMaterial({
+    color: 0xCCCCCC,
+    size: 0.1,
+    opacity: 0.8,
+    transparent: true
+  });
+  
+  // Create particle system
+  const particleSystem = new THREE.Points(particles, particleMaterial);
+  scene.add(particleSystem);
+  
+  // Animate particles
+  function animateParticles() {
+    const positions = particles.attributes.position.array;
+    
+    for (let i = 0; i < particleCount; i++) {
+      const i3 = i * 3;
+      
+      // Update positions
+      positions[i3] += velocities[i].x;
+      positions[i3 + 1] += velocities[i].y;
+      positions[i3 + 2] += velocities[i].z;
+      
+      // Add gravity effect
+      velocities[i].y -= 0.01;
+      
+      // Fade out by reducing opacity
+      particleMaterial.opacity *= 0.99;
+    }
+    
+    particles.attributes.position.needsUpdate = true;
+    
+    // Continue animation until particles fade out
+    if (particleMaterial.opacity > 0.1) {
+      requestAnimationFrame(animateParticles);
+    } else {
+      scene.remove(particleSystem);
+      particles.dispose();
+      particleMaterial.dispose();
+    }
+  }
+  
+  // Start particle animation
+  animateParticles();
 }
 
 // Show match draw animation
