@@ -978,10 +978,8 @@ function animate() {
     // Update camera info display
     const infoDisplay = document.getElementById('camera-info');
     infoDisplay.innerHTML = `
-      camera.position.set(${camera.position.x.toFixed(2)}, ${camera.position.y.toFixed(2)}, ${camera.position.z.toFixed(2)});
-      camera.rotation.set(${camera.rotation.x.toFixed(2)}, ${camera.rotation.y.toFixed(2)}, ${camera.rotation.z.toFixed(2)});
-      camera.lookAt(${camera.getWorldDirection(new THREE.Vector3()).x.toFixed(2)}, ${camera.getWorldDirection(new THREE.Vector3()).y.toFixed(2)}, ${camera.getWorldDirection(new THREE.Vector3()).z.toFixed(2)});
-      
+      camera.position.set(${camera.position.x.toFixed(2)}, ${camera.position.y.toFixed(2)}, ${camera.position.z.toFixed(2)});<br>
+      camera.rotation.set(${camera.rotation.x.toFixed(2)}, ${camera.rotation.y.toFixed(2)}, ${camera.rotation.z.toFixed(2)});      
     `;
   }
 
