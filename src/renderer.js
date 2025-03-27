@@ -69,12 +69,12 @@ export class Renderer {
     this.setupLighting();
     console.log('Lighting setup complete');
 
-    // Create test cube to verify rendering
-    const geometry = new THREE.BoxGeometry(5, 5, 5);
-    const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-    const cube = new THREE.Mesh(geometry, material);
-    this.scene.add(cube);
-    console.log('Test cube added');
+    // // Create test cube to verify rendering
+    // const geometry = new THREE.BoxGeometry(5, 5, 5);
+    // const material = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+    // const cube = new THREE.Mesh(geometry, material);
+    // this.scene.add(cube);
+    // console.log('Test cube added');
 
     // Create the complete stadium (includes ring)
     this.createStadium();

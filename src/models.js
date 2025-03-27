@@ -907,7 +907,7 @@ export class StadiumFactory {
   }
 
   /**
-   * Creates the sumo ring structure including the platform and border
+   * Creates the sumo ring structure with traditional elements
    * @param {number} ringRadius - The radius of the sumo ring
    * @param {number} ringHeight - The height of the ring platform
    * @returns {THREE.Group} A group containing the ring elements
@@ -915,38 +915,132 @@ export class StadiumFactory {
   static createRing(ringRadius, ringHeight) {
     const ringGroup = new THREE.Group();
 
-    // Create the main circular platform
-    const ringGeometry = new THREE.CylinderGeometry(
-      ringRadius,
-      ringRadius,
-      ringHeight,
-      32
-    );
-    const ringMaterial = new THREE.MeshStandardMaterial({
-      color: 0xD2B48C,
+    // Create base platform with sloped sides
+    const squareBase = new THREE.BufferGeometry();
+    const squareRingRadius = ringRadius + 0.3;
+    const squareBottomRadius = squareRingRadius + 0.5;
+    
+    squareBase.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+      // Bottom (y=0): 4 vertices
+      -squareBottomRadius, 0, -squareBottomRadius,  
+      squareBottomRadius, 0, -squareBottomRadius,   
+      squareBottomRadius, 0, squareBottomRadius,    
+      -squareBottomRadius, 0, squareBottomRadius,
+      // Top (y=ringHeight): 4 vertices
+      -squareRingRadius, ringHeight, -squareRingRadius,  
+      squareRingRadius, ringHeight, -squareRingRadius,   
+      squareRingRadius, ringHeight, squareRingRadius,    
+      -squareRingRadius, ringHeight, squareRingRadius
+    ]), 3));
+    
+    squareBase.setIndex([
+      0,1,2, 0,2,3,    // bottom face
+      4,6,5, 4,7,6,    // top face
+      0,4,5, 0,5,1,    // front vertical
+      1,5,6, 1,6,2,    // right vertical
+      2,6,7, 2,7,3,    // back vertical
+      3,7,4, 3,4,0     // left vertical
+    ]);
+    
+    squareBase.computeVertexNormals();
+    
+    // Create texture for clay-like material
+    const clayTexture = new THREE.CanvasTexture(this.createClayTexture());
+    
+    const baseMesh = new THREE.Mesh(squareBase, new THREE.MeshStandardMaterial({ 
+      color: 0xD9B382, // Warmer clay color
+      roughness: 0.8,
+      metalness: 0.1,
+      map: clayTexture
+    }));
+    
+    baseMesh.position.y = -0.05;
+    baseMesh.castShadow = true;
+    baseMesh.receiveShadow = true;
+    ringGroup.add(baseMesh);
+
+    // Dohyo cylinder with detailed texture
+    const ringGeometry = new THREE.CylinderGeometry(ringRadius, ringRadius, ringHeight, 64);
+    const ringTexture = new THREE.CanvasTexture(this.createDohyoTexture());
+    
+    const ringMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0xD9B382, 
       roughness: 0.7,
-      metalness: 0.1
+      metalness: 0.1,
+      map: ringTexture
     });
+    
     const ring = new THREE.Mesh(ringGeometry, ringMaterial);
     ring.position.y = ringHeight / 2;
+    ring.castShadow = true;
     ring.receiveShadow = true;
     ringGroup.add(ring);
 
-    // Create the square border
-    const borderGeometry = new THREE.BoxGeometry(
-      ringRadius * 2,
-      ringHeight * 1.2,
-      ringRadius * 2
-    );
-    const borderMaterial = new THREE.MeshStandardMaterial({
-      color: 0x8B4513,
-      roughness: 0.8,
-      metalness: 0.2
+    // Traditional straw border (tawara)
+    const tawaraGeometry = new THREE.TorusGeometry(ringRadius + 0.05, 0.25, 16, 64);
+    const tawaraMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0xC9A165, // Straw color
+      roughness: 0.9,
+      metalness: 0.0,
+      map: this.createStrawTexture()
     });
-    const border = new THREE.Mesh(borderGeometry, borderMaterial);
-    border.position.y = ringHeight / 2;
-    border.receiveShadow = true;
-    ringGroup.add(border);
+    
+    const tawara = new THREE.Mesh(tawaraGeometry, tawaraMaterial);
+    tawara.position.y = ringHeight - 0.2;
+    tawara.rotation.x = Math.PI / 2;
+    tawara.receiveShadow = true;
+    tawara.castShadow = true;
+    ringGroup.add(tawara);
+
+    // Create shikirisen (starting lines)
+    const lineWidth = 0.1;
+    const lineDepth = ringRadius * 0.6;
+    const lineGeometry = new THREE.BoxGeometry(lineWidth, 0.02, lineDepth);
+    const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+    
+    // Create two starting lines
+    const line1 = new THREE.Mesh(lineGeometry, lineMaterial);
+    line1.position.set(-0.75, ringHeight + 0.01, 0);
+    ringGroup.add(line1);
+    
+    const line2 = new THREE.Mesh(lineGeometry, lineMaterial);
+    line2.position.set(0.75, ringHeight + 0.01, 0);
+    ringGroup.add(line2);
+
+    // Create center circle (nakabashira)
+    const centerCircleGeometry = new THREE.CircleGeometry(0.5, 32);
+    const centerCircleMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0xFFFFFF,
+      transparent: true,
+      opacity: 0.7,
+      side: THREE.DoubleSide
+    });
+    
+    const centerCircle = new THREE.Mesh(centerCircleGeometry, centerCircleMaterial);
+    centerCircle.rotation.x = -Math.PI / 2;
+    centerCircle.position.y = ringHeight + 0.02;
+    ringGroup.add(centerCircle);
+
+    // Add traditional corner markers (hyoushigi)
+    const markerPositions = [
+      {x: 0, z: ringRadius * 0.8}, // North
+      {x: ringRadius * 0.8, z: 0}, // East
+      {x: 0, z: -ringRadius * 0.8}, // South
+      {x: -ringRadius * 0.8, z: 0}  // West
+    ];
+    
+    markerPositions.forEach(pos => {
+      const markerGeometry = new THREE.BoxGeometry(0.3, 0.03, 0.3);
+      const markerMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x000000,
+        roughness: 0.5,
+        metalness: 0.2
+      });
+      
+      const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+      marker.position.set(pos.x, ringHeight + 0.015, pos.z);
+      ringGroup.add(marker);
+    });
 
     // Create the floor
     const floorGeometry = new THREE.PlaneGeometry(ringRadius * 8, ringRadius * 8);
@@ -961,6 +1055,142 @@ export class StadiumFactory {
     ringGroup.add(floor);
 
     return ringGroup;
+  }
+
+  /**
+   * Creates a texture for the clay surface
+   * @returns {HTMLCanvasElement} Canvas for texture
+   */
+  static createClayTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+    
+    // Base color
+    ctx.fillStyle = '#D9B382';
+    ctx.fillRect(0, 0, 512, 512);
+    
+    // Add subtle noise for clay texture
+    for (let i = 0; i < 40000; i++) {
+      const x = Math.random() * 512;
+      const y = Math.random() * 512;
+      const radius = Math.random() * 2 + 0.5;
+      
+      // Randomly vary the clay color
+      const variation = Math.random() * 15 - 7;
+      const r = 217 + variation;
+      const g = 179 + variation;
+      const b = 130 + variation;
+      
+      ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    return canvas;
+  }
+
+  /**
+   * Creates a texture for the dohyo top surface
+   * @returns {HTMLCanvasElement} Canvas for texture
+   */
+  static createDohyoTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1024;
+    canvas.height = 1024;
+    const ctx = canvas.getContext('2d');
+    
+    // Base color
+    ctx.fillStyle = '#D9B382';
+    ctx.fillRect(0, 0, 1024, 1024);
+    
+    // Draw circular boundary
+    ctx.strokeStyle = '#BF9E76';
+    ctx.lineWidth = 30;
+    ctx.beginPath();
+    ctx.arc(512, 512, 450, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // Add salt scatter pattern (subtle white dots)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    
+    for (let i = 0; i < 2000; i++) {
+      // Keep salt mostly in the center area
+      const angle = Math.random() * Math.PI * 2;
+      const distance = Math.random() * 350; // Within the ring
+      const x = 512 + Math.cos(angle) * distance;
+      const y = 512 + Math.sin(angle) * distance;
+      const radius = Math.random() * 2 + 0.5;
+      
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // Add footprint-like marks (subtle indentations)
+    ctx.fillStyle = 'rgba(185, 152, 115, 0.3)';
+    
+    for (let i = 0; i < 40; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = Math.random() * 400; // Within the ring
+      const x = 512 + Math.cos(angle) * distance;
+      const y = 512 + Math.sin(angle) * distance;
+      
+      // Create oval-shaped footprint
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.random() * Math.PI * 2);
+      ctx.scale(1, 1.5);
+      ctx.beginPath();
+      ctx.arc(0, 0, 15 + Math.random() * 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    
+    return canvas;
+  }
+
+  /**
+   * Creates a straw texture for the tawara
+   * @returns {THREE.Texture} Canvas texture
+   */
+  static createStrawTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    
+    // Base color
+    ctx.fillStyle = '#C9A165';
+    ctx.fillRect(0, 0, 256, 256);
+    
+    // Draw straw-like lines
+    for (let i = 0; i < 200; i++) {
+      const x = Math.random() * 256;
+      ctx.strokeStyle = `rgba(${150 + Math.random() * 60}, ${110 + Math.random() * 50}, ${40 + Math.random() * 40}, 0.7)`;
+      ctx.lineWidth = 1 + Math.random();
+      
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, 256);
+      ctx.stroke();
+    }
+    
+    // Add horizontal bindings
+    for (let i = 0; i < 10; i++) {
+      const y = i * 25 + Math.random() * 10;
+      ctx.strokeStyle = '#5D4037';
+      ctx.lineWidth = 3 + Math.random() * 2;
+      
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(256, y);
+      ctx.stroke();
+    }
+    
+    return new THREE.CanvasTexture(canvas);
   }
 
   /**
