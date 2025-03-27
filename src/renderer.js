@@ -121,6 +121,11 @@ export class Renderer {
     window.addEventListener('keydown', this.handleKeyDown);
     window.addEventListener('keyup', this.handleKeyUp);
 
+    // Listen for free camera toggle from UI Manager
+    document.addEventListener('freeCameraToggled', (event) => {
+      this.toggleFreeCamera(event.detail.enabled);
+    });
+
     // Start animation loop
     this.lastFpsUpdate = performance.now();
     console.log('Starting animation loop');
@@ -148,6 +153,7 @@ export class Renderer {
     fpsDiv.id = 'fps-counter';
     fpsDiv.textContent = '0 FPS';
     
+    // Socket stats toggle
     const toggleButton = document.createElement('button');
     toggleButton.textContent = '▼ Socket Stats';
     toggleButton.style.cssText = `
@@ -344,6 +350,39 @@ export class Renderer {
       }
     }
     
+    // Update the UI checkbox and text
+    const freeCameraToggle = document.getElementById('free-camera-toggle');
+    if (freeCameraToggle) {
+      freeCameraToggle.checked = enabled;
+      
+      // Find the text span that's a sibling of the checkbox
+      const textSpan = freeCameraToggle.nextElementSibling;
+      if (textSpan && textSpan.classList.contains('viewer-only-text')) {
+        if (enabled) {
+          // Create or update controls hint element
+          let controlsHint = textSpan.querySelector('.controls-hint');
+          if (!controlsHint) {
+            controlsHint = document.createElement('span');
+            controlsHint.className = 'controls-hint';
+            controlsHint.style.cssText = `
+              font-size: 11px;
+              opacity: 0.7;
+              margin-left: 5px;
+              font-style: italic;
+            `;
+            textSpan.appendChild(controlsHint);
+          }
+          controlsHint.textContent = " WSAD/↑↓←→";
+        } else {
+          // Remove controls hint if it exists
+          const controlsHint = textSpan.querySelector('.controls-hint');
+          if (controlsHint) {
+            textSpan.removeChild(controlsHint);
+          }
+        }
+      }
+    }
+    
     console.log(`Free camera ${enabled ? 'enabled' : 'disabled'}`);
   }
 
@@ -356,8 +395,8 @@ export class Renderer {
       case 's': this.cameraMovement.backward = true; break;
       case 'a': this.cameraMovement.left = true; break;
       case 'd': this.cameraMovement.right = true; break;
-      case 'q': this.cameraMovement.up = true; break;
-      case 'e': this.cameraMovement.down = true; break;
+      case 'arrowup': this.cameraMovement.up = true; break;
+      case 'arrowdown': this.cameraMovement.down = true; break;
       case 'arrowleft': this.cameraMovement.rotateLeft = true; break;
       case 'arrowright': this.cameraMovement.rotateRight = true; break;
     }
@@ -366,10 +405,6 @@ export class Renderer {
   // Handle key up events for camera control
   handleKeyUp(event) {
     if (!this.isFreeCamera) {
-      // Toggle free camera with the F key
-      if (event.key.toLowerCase() === 'f') {
-        this.toggleFreeCamera(!this.isFreeCamera);
-      }
       return;
     }
     
@@ -378,11 +413,10 @@ export class Renderer {
       case 's': this.cameraMovement.backward = false; break;
       case 'a': this.cameraMovement.left = false; break;
       case 'd': this.cameraMovement.right = false; break;
-      case 'q': this.cameraMovement.up = false; break;
-      case 'e': this.cameraMovement.down = false; break;
+      case 'arrowup': this.cameraMovement.up = false; break;
+      case 'arrowdown': this.cameraMovement.down = false; break;
       case 'arrowleft': this.cameraMovement.rotateLeft = false; break;
       case 'arrowright': this.cameraMovement.rotateRight = false; break;
-      case 'f': this.toggleFreeCamera(!this.isFreeCamera); break;
     }
   }
 
