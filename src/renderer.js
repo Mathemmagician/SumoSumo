@@ -76,11 +76,7 @@ export class Renderer {
     this.scene.add(cube);
     console.log('Test cube added');
 
-    // Create the ring
-    this.createRing();
-    console.log('Ring created');
-
-    // Create stadium
+    // Create the complete stadium (includes ring)
     this.createStadium();
     console.log('Stadium created');
 
@@ -90,11 +86,6 @@ export class Renderer {
     // Start animation loop
     console.log('Starting animation loop');
     this.animate();
-  }
-
-  createRing() {
-    const ring = StadiumFactory.createRing(RING_RADIUS, RING_HEIGHT);
-    this.scene.add(ring);
   }
 
   setupLighting() {
@@ -131,34 +122,23 @@ export class Renderer {
   }
 
   createStadium() {
-    // Calculate total seating area
-    let currentRowSeats = SEATS_PER_FIRST_ROW;
-    let currentDistance = FIRST_ROW_DISTANCE;
-    let maxDistance = FIRST_ROW_DISTANCE;
-    let totalRows = 0;
-
-    // Calculate maximum seating distance
-    while (currentRowSeats < 30) { // Limit to reasonable number of rows
-      currentRowSeats += SEATS_INCREMENT;
-      currentDistance += ROW_SPACING;
-      maxDistance = currentDistance;
-      totalRows++;
-    }
-
-    // Create stadium walls using the factory
-    this.stadium = StadiumFactory.createStadiumWalls(RING_RADIUS, maxDistance);
-    this.scene.add(this.stadium);
-
-    // Create audience seating areas
-    const audienceSeating = StadiumFactory.createAudienceAreas({
-      totalRows,
-      seatsPerFirstRow: SEATS_PER_FIRST_ROW,
-      firstRowDistance: FIRST_ROW_DISTANCE,
-      seatsIncrement: SEATS_INCREMENT,
-      rowSpacing: ROW_SPACING,
-      elevationIncrement: ELEVATION_INCREMENT
-    });
-    this.scene.add(audienceSeating);
+    // Create complete stadium using the factory
+    const stadium = StadiumFactory.createCompleteStadium(
+      RING_RADIUS, 
+      RING_HEIGHT,
+      {
+        seatsPerFirstRow: SEATS_PER_FIRST_ROW,
+        firstRowDistance: FIRST_ROW_DISTANCE,
+        seatsIncrement: SEATS_INCREMENT,
+        rowSpacing: ROW_SPACING,
+        elevationIncrement: ELEVATION_INCREMENT
+      }
+    );
+    
+    this.scene.add(stadium);
+    
+    // Remove the separate ring creation since it's now part of the complete stadium
+    this.scene.remove(this.ring); // Remove the old ring if it exists
   }
 
   onWindowResize() {

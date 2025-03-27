@@ -61,6 +61,38 @@ export const MODEL_CONSTANTS = {
   }
 };
 
+// At the top, add these configurations
+export const MATERIALS = {
+  RING: new THREE.MeshStandardMaterial({
+    color: 0xD2B48C,
+    roughness: 0.7,
+    metalness: 0.1
+  }),
+  BORDER: new THREE.MeshStandardMaterial({
+    color: 0x8B4513,
+    roughness: 0.8,
+    metalness: 0.2
+  }),
+  FLOOR: new THREE.MeshStandardMaterial({
+    color: 0x808080,
+    roughness: 0.8,
+    metalness: 0.2
+  }),
+  BENCH: new THREE.MeshStandardMaterial({
+    color: 0x8B4513,
+    roughness: 0.8,
+    metalness: 0.2
+  })
+};
+
+// Update geometry constants
+export const GEOMETRY_SETTINGS = {
+  RING_SEGMENTS: 32,
+  FLOOR_MULTIPLIER: 8,
+  BORDER_HEIGHT_RATIO: 1.2,
+  MAX_ROW_COUNT: 30
+};
+
 export class ModelFactory {
   constructor(faceTextures) {
     this.faceTextures = faceTextures;
@@ -807,6 +839,71 @@ export class StadiumFactory {
   }
 
   /**
+   * Calculates the seating layout parameters
+   * @param {number} seatsPerFirstRow - Number of seats in the first row
+   * @param {number} firstRowDistance - Distance of first row from center
+   * @param {number} seatsIncrement - How many seats to add per row
+   * @param {number} rowSpacing - Distance between rows
+   * @param {number} maxRowCount - Maximum number of rows to generate
+   * @returns {Object} Layout parameters including totalRows and maxDistance
+   */
+  static calculateSeatingLayout(seatsPerFirstRow, firstRowDistance, seatsIncrement, rowSpacing, maxRowCount = 30) {
+    let currentRowSeats = seatsPerFirstRow;
+    let currentDistance = firstRowDistance;
+    let maxDistance = firstRowDistance;
+    let totalRows = 0;
+
+    // Calculate maximum seating distance
+    while (currentRowSeats < maxRowCount) {
+      currentRowSeats += seatsIncrement;
+      currentDistance += rowSpacing;
+      maxDistance = currentDistance;
+      totalRows++;
+    }
+
+    return {
+      totalRows,
+      maxDistance
+    };
+  }
+
+  /**
+   * Creates a complete stadium including walls, seating, and ring
+   * @param {number} ringRadius - The radius of the sumo ring
+   * @param {number} ringHeight - The height of the ring platform
+   * @param {Object} seatingOptions - Options for seating layout
+   * @returns {THREE.Group} A group containing the complete stadium
+   */
+  static createCompleteStadium(ringRadius, ringHeight, seatingOptions) {
+    const stadiumGroup = new THREE.Group();
+    
+    // Calculate seating layout
+    const { totalRows, maxDistance } = this.calculateSeatingLayout(
+      seatingOptions.seatsPerFirstRow,
+      seatingOptions.firstRowDistance,
+      seatingOptions.seatsIncrement,
+      seatingOptions.rowSpacing
+    );
+
+    // Add ring
+    const ring = this.createRing(ringRadius, ringHeight);
+    stadiumGroup.add(ring);
+    
+    // Add walls
+    const walls = this.createStadiumWalls(ringRadius, maxDistance);
+    stadiumGroup.add(walls);
+    
+    // Add seating
+    const seating = this.createAudienceAreas({
+      totalRows,
+      ...seatingOptions
+    });
+    stadiumGroup.add(seating);
+    
+    return stadiumGroup;
+  }
+
+  /**
    * Creates the sumo ring structure including the platform and border
    * @param {number} ringRadius - The radius of the sumo ring
    * @param {number} ringHeight - The height of the ring platform
@@ -834,9 +931,9 @@ export class StadiumFactory {
 
     // Create the square border
     const borderGeometry = new THREE.BoxGeometry(
-      RING_RADIUS * 2,
+      ringRadius * 2,
       ringHeight * 1.2,
-      RING_RADIUS * 2
+      ringRadius * 2
     );
     const borderMaterial = new THREE.MeshStandardMaterial({
       color: 0x8B4513,
@@ -849,7 +946,7 @@ export class StadiumFactory {
     ringGroup.add(border);
 
     // Create the floor
-    const floorGeometry = new THREE.PlaneGeometry(RING_RADIUS * 8, RING_RADIUS * 8);
+    const floorGeometry = new THREE.PlaneGeometry(ringRadius * 8, ringRadius * 8);
     const floorMaterial = new THREE.MeshStandardMaterial({
       color: 0x808080,
       roughness: 0.8,
