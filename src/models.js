@@ -725,37 +725,6 @@ export class StadiumFactory {
     
     roofGroup.add(peakOrnament);
     
-    // Add additional cross-beams for structural appearance
-    const directions = [
-      {x: distance, z: 0},
-      {x: 0, z: distance},
-      {x: -distance, z: 0},
-      {x: 0, z: -distance}
-    ];
-    
-    directions.forEach(dir => {
-      const beamGeometry = new THREE.BoxGeometry(distance * 2, 0.6, 0.6);
-      const beamMaterial = new THREE.MeshStandardMaterial({
-        color: s.BEAM_COLOR,
-        roughness: 0.7,
-        metalness: 0.2
-      });
-      
-      const crossBeam = new THREE.Mesh(beamGeometry, beamMaterial);
-      
-      // Position at center of the roof
-      crossBeam.position.y = height + roofPeakHeight * 0.6;
-      
-      // Rotate and position based on direction
-      if (dir.x === 0) {
-        // North-South beam
-        crossBeam.rotation.y = Math.PI / 2;
-      }
-      
-      crossBeam.castShadow = true;
-      roofGroup.add(crossBeam);
-    });
-    
     return roofGroup;
   }
 

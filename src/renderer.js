@@ -9,7 +9,9 @@ import {
   SEATS_PER_FIRST_ROW,
   SEATS_INCREMENT,
   ELEVATION_INCREMENT,
-  ROW_SPACING
+  ROW_SPACING,
+  CAMERA_MOVE_SPEED,
+  CAMERA_ROTATE_SPEED
 } from './constants';
 
 export class Renderer {
@@ -27,9 +29,26 @@ export class Renderer {
     this.fpsUpdateInterval = 500; // Update FPS every 500ms
     this.lastFpsUpdate = 0;
     
+    // Add these new properties for camera control
+    this.isFreeCamera = false;
+    this.cameraMovement = {
+      forward: false,
+      backward: false,
+      left: false,
+      right: false,
+      up: false,
+      down: false,
+      rotateLeft: false,
+      rotateRight: false
+    };
+    
     // Bind methods
     this.animate = this.animate.bind(this);
     this.onWindowResize = this.onWindowResize.bind(this);
+    // Bind additional methods
+    this.handleKeyDown = this.handleKeyDown.bind(this);
+    this.handleKeyUp = this.handleKeyUp.bind(this);
+    this.toggleFreeCamera = this.toggleFreeCamera.bind(this);
   }
 
   initialize() {
@@ -98,6 +117,9 @@ export class Renderer {
 
     // Add event listeners
     window.addEventListener('resize', this.onWindowResize);
+    // Add keyboard event listeners
+    window.addEventListener('keydown', this.handleKeyDown);
+    window.addEventListener('keyup', this.handleKeyUp);
 
     // Start animation loop
     this.lastFpsUpdate = performance.now();
@@ -292,14 +314,119 @@ export class Renderer {
       this.lastFpsUpdate = currentTime;
     }
     
+    // Handle camera movement if free camera is enabled
+    if (this.isFreeCamera) {
+      this.updateCameraPosition();
+    } else {
+      this.controls.update();
+    }
+    
     // Log first frame render
     if (!this._hasLoggedFirstFrame) {
       console.log('First frame rendering');
       this._hasLoggedFirstFrame = true;
     }
     
-    this.controls.update();
     this.renderer.render(this.scene, this.camera);
+  }
+
+  // Add free camera toggle
+  toggleFreeCamera(enabled) {
+    this.isFreeCamera = enabled;
+    
+    // Enable/disable orbit controls when switching camera modes
+    this.controls.enabled = !enabled;
+    
+    // Reset camera movement when disabling free camera
+    if (!enabled) {
+      for (const key in this.cameraMovement) {
+        this.cameraMovement[key] = false;
+      }
+    }
+    
+    console.log(`Free camera ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+  // Handle key down events for camera control
+  handleKeyDown(event) {
+    if (!this.isFreeCamera) return;
+    
+    switch (event.key.toLowerCase()) {
+      case 'w': this.cameraMovement.forward = true; break;
+      case 's': this.cameraMovement.backward = true; break;
+      case 'a': this.cameraMovement.left = true; break;
+      case 'd': this.cameraMovement.right = true; break;
+      case 'q': this.cameraMovement.up = true; break;
+      case 'e': this.cameraMovement.down = true; break;
+      case 'arrowleft': this.cameraMovement.rotateLeft = true; break;
+      case 'arrowright': this.cameraMovement.rotateRight = true; break;
+    }
+  }
+
+  // Handle key up events for camera control
+  handleKeyUp(event) {
+    if (!this.isFreeCamera) {
+      // Toggle free camera with the F key
+      if (event.key.toLowerCase() === 'f') {
+        this.toggleFreeCamera(!this.isFreeCamera);
+      }
+      return;
+    }
+    
+    switch (event.key.toLowerCase()) {
+      case 'w': this.cameraMovement.forward = false; break;
+      case 's': this.cameraMovement.backward = false; break;
+      case 'a': this.cameraMovement.left = false; break;
+      case 'd': this.cameraMovement.right = false; break;
+      case 'q': this.cameraMovement.up = false; break;
+      case 'e': this.cameraMovement.down = false; break;
+      case 'arrowleft': this.cameraMovement.rotateLeft = false; break;
+      case 'arrowright': this.cameraMovement.rotateRight = false; break;
+      case 'f': this.toggleFreeCamera(!this.isFreeCamera); break;
+    }
+  }
+
+  // Add a method to update camera position based on movement state
+  updateCameraPosition() {
+    // Create a vector for the camera's forward direction
+    const direction = new THREE.Vector3();
+    this.camera.getWorldDirection(direction);
+    
+    // Create right vector by crossing forward with up
+    const right = new THREE.Vector3();
+    right.crossVectors(direction, new THREE.Vector3(0, 1, 0)).normalize();
+    
+    // Forward/backward movement
+    if (this.cameraMovement.forward) {
+      this.camera.position.addScaledVector(direction, CAMERA_MOVE_SPEED);
+    }
+    if (this.cameraMovement.backward) {
+      this.camera.position.addScaledVector(direction, -CAMERA_MOVE_SPEED);
+    }
+    
+    // Left/right movement
+    if (this.cameraMovement.left) {
+      this.camera.position.addScaledVector(right, -CAMERA_MOVE_SPEED);
+    }
+    if (this.cameraMovement.right) {
+      this.camera.position.addScaledVector(right, CAMERA_MOVE_SPEED);
+    }
+    
+    // Up/down movement
+    if (this.cameraMovement.up) {
+      this.camera.position.y += CAMERA_MOVE_SPEED;
+    }
+    if (this.cameraMovement.down) {
+      this.camera.position.y -= CAMERA_MOVE_SPEED;
+    }
+    
+    // Camera rotation
+    if (this.cameraMovement.rotateLeft) {
+      this.camera.rotateY(CAMERA_ROTATE_SPEED);
+    }
+    if (this.cameraMovement.rotateRight) {
+      this.camera.rotateY(-CAMERA_ROTATE_SPEED);
+    }
   }
 }
 
