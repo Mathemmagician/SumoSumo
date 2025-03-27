@@ -1,5 +1,13 @@
 import * as THREE from 'three';
-import { RING_RADIUS } from './constants';
+import { 
+  RING_RADIUS,
+  RING_HEIGHT,
+  FLOOR_SIZE,
+  SQUARE_RING_RADIUS,
+  BENCH_WIDTH,
+  BENCH_HEIGHT,
+  BENCH_DEPTH
+} from './constants';
 
 // Model dimension constants
 export const MODEL_CONSTANTS = {
@@ -796,5 +804,121 @@ export class StadiumFactory {
     // Add subtle fog to the scene
     const fogColor = new THREE.Color(0x221813); // Very dark brown fog
     stadiumGroup.fog = new THREE.FogExp2(fogColor, 0.008);
+  }
+
+  /**
+   * Creates the sumo ring structure including the platform and border
+   * @param {number} ringRadius - The radius of the sumo ring
+   * @param {number} ringHeight - The height of the ring platform
+   * @returns {THREE.Group} A group containing the ring elements
+   */
+  static createRing(ringRadius, ringHeight) {
+    const ringGroup = new THREE.Group();
+
+    // Create the main circular platform
+    const ringGeometry = new THREE.CylinderGeometry(
+      ringRadius,
+      ringRadius,
+      ringHeight,
+      32
+    );
+    const ringMaterial = new THREE.MeshStandardMaterial({
+      color: 0xD2B48C,
+      roughness: 0.7,
+      metalness: 0.1
+    });
+    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+    ring.position.y = ringHeight / 2;
+    ring.receiveShadow = true;
+    ringGroup.add(ring);
+
+    // Create the square border
+    const borderGeometry = new THREE.BoxGeometry(
+      RING_RADIUS * 2,
+      ringHeight * 1.2,
+      RING_RADIUS * 2
+    );
+    const borderMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8B4513,
+      roughness: 0.8,
+      metalness: 0.2
+    });
+    const border = new THREE.Mesh(borderGeometry, borderMaterial);
+    border.position.y = ringHeight / 2;
+    border.receiveShadow = true;
+    ringGroup.add(border);
+
+    // Create the floor
+    const floorGeometry = new THREE.PlaneGeometry(RING_RADIUS * 8, RING_RADIUS * 8);
+    const floorMaterial = new THREE.MeshStandardMaterial({
+      color: 0x808080,
+      roughness: 0.8,
+      metalness: 0.2
+    });
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = true;
+    ringGroup.add(floor);
+
+    return ringGroup;
+  }
+
+  /**
+   * Creates the audience seating areas around the ring
+   * @param {number} totalRows - Number of seating rows
+   * @param {number} seatsPerFirstRow - Number of seats in the first row
+   * @param {number} firstRowDistance - Distance of first row from center
+   * @param {number} seatsIncrement - How many seats to add per row
+   * @param {number} rowSpacing - Distance between rows
+   * @param {number} elevationIncrement - Height increase per row
+   * @returns {THREE.Group} A group containing all seating elements
+   */
+  static createAudienceAreas({
+    totalRows,
+    seatsPerFirstRow,
+    firstRowDistance,
+    seatsIncrement,
+    rowSpacing,
+    elevationIncrement
+  }) {
+    const audienceGroup = new THREE.Group();
+
+    const benchGeometry = new THREE.BoxGeometry(BENCH_WIDTH, BENCH_HEIGHT, BENCH_DEPTH);
+    const benchMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x8B4513,
+      roughness: 0.8,
+      metalness: 0.2
+    });
+
+    let currentRowSeats = seatsPerFirstRow;
+    let currentDistance = firstRowDistance;
+    let currentElevation = 0;
+
+    for (let row = 0; row < totalRows; row++) {
+      const rowAngleStep = (Math.PI * 2) / currentRowSeats;
+      
+      for (let seat = 0; seat < currentRowSeats; seat++) {
+        const angle = rowAngleStep * seat;
+        
+        const bench = new THREE.Mesh(benchGeometry, benchMaterial);
+        
+        bench.position.x = Math.sin(angle) * currentDistance;
+        bench.position.y = currentElevation;
+        bench.position.z = Math.cos(angle) * currentDistance;
+        
+        bench.rotation.y = angle + Math.PI / 2;
+        
+        bench.castShadow = true;
+        bench.receiveShadow = true;
+        
+        audienceGroup.add(bench);
+      }
+      
+      currentRowSeats += seatsIncrement;
+      currentDistance += rowSpacing;
+      currentElevation += elevationIncrement;
+    }
+
+    return audienceGroup;
   }
 } 
