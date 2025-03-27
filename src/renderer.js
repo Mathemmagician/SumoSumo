@@ -89,36 +89,77 @@ export class Renderer {
   }
 
   setupLighting() {
-    // Ambient light
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    // Ambient light with moderate intensity
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     this.scene.add(ambientLight);
 
-    // Main directional light (sun)
-    const sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    sunLight.position.set(-50, 50, -30);
-    sunLight.castShadow = true;
+    // Main spotlight (instead of directional light)
+    const mainSpotlight = new THREE.SpotLight(0xffffff, 1.5);
+    mainSpotlight.position.set(0, 30, 0);
+    mainSpotlight.angle = Math.PI / 5.5;
+    mainSpotlight.penumbra = 0.3;
+    mainSpotlight.decay = 1.5;
+    mainSpotlight.distance = 60;
     
-    // Adjust shadow properties
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
-    sunLight.shadow.camera.near = 0.5;
-    sunLight.shadow.camera.far = 150;
-    sunLight.shadow.camera.left = -50;
-    sunLight.shadow.camera.right = 50;
-    sunLight.shadow.camera.top = 50;
-    sunLight.shadow.camera.bottom = -50;
-    sunLight.shadow.bias = -0.0005;
+    // Shadow settings
+    mainSpotlight.castShadow = true;
+    mainSpotlight.shadow.mapSize.width = 2048;
+    mainSpotlight.shadow.mapSize.height = 2048;
+    mainSpotlight.shadow.camera.near = 10;
+    mainSpotlight.shadow.camera.far = 60;
+    mainSpotlight.shadow.bias = -0.0003;
+    mainSpotlight.shadow.normalBias = 0.01;
     
-    this.scene.add(sunLight);
+    mainSpotlight.target.position.set(0, 0, 0);
+    this.scene.add(mainSpotlight);
+    this.scene.add(mainSpotlight.target);
 
-    // Add some fill lights
-    const fillLight1 = new THREE.DirectionalLight(0xffffff, 0.3);
-    fillLight1.position.set(50, 30, 50);
-    this.scene.add(fillLight1);
+    // Fill light with warm color
+    const fillLight = new THREE.DirectionalLight(0xffeedd, 0.9);
+    fillLight.position.set(RING_RADIUS * 2, RING_RADIUS * 1.5, RING_RADIUS * 2);
+    fillLight.castShadow = true;
+    fillLight.shadow.mapSize.width = 1024;
+    fillLight.shadow.mapSize.height = 1024;
+    fillLight.shadow.camera.left = -15;
+    fillLight.shadow.camera.right = 15;
+    fillLight.shadow.camera.top = 15;
+    fillLight.shadow.camera.bottom = -15;
+    fillLight.shadow.camera.far = 50;
+    fillLight.shadow.bias = -0.0003;
+    this.scene.add(fillLight);
 
-    const fillLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
-    fillLight2.position.set(-50, 30, 50);
-    this.scene.add(fillLight2);
+    // Key light with slight yellow tint
+    const keyLight = new THREE.DirectionalLight(0xffffee, 0.7);
+    keyLight.position.set(0, RING_RADIUS * 2, RING_RADIUS * 3);
+    keyLight.lookAt(0, 0, 0);
+    this.scene.add(keyLight);
+
+    // Rim light with blue tint
+    const rimLight = new THREE.DirectionalLight(0xaaccff, 0.7);
+    rimLight.position.set(-RING_RADIUS * 2, RING_RADIUS * 1.5, -RING_RADIUS * 2);
+    this.scene.add(rimLight);
+
+    // Bounce light from below
+    const bounceLight = new THREE.DirectionalLight(0xffffcc, 0.5);
+    bounceLight.position.set(0, -2, 0);
+    bounceLight.target.position.set(0, 2, 0);
+    this.scene.add(bounceLight);
+    this.scene.add(bounceLight.target);
+    
+    // Subtle shadow-only light
+    const shadowLight = new THREE.DirectionalLight(0x000000, 0.03);
+    shadowLight.position.set(5, 20, 5);
+    shadowLight.castShadow = true;
+    shadowLight.shadow.mapSize.width = 1024;
+    shadowLight.shadow.mapSize.height = 1024;
+    shadowLight.shadow.camera.near = 1;
+    shadowLight.shadow.camera.far = 50;
+    shadowLight.shadow.camera.left = -15;
+    shadowLight.shadow.camera.right = 15;
+    shadowLight.shadow.camera.top = 15;
+    shadowLight.shadow.camera.bottom = -15;
+    shadowLight.shadow.bias = -0.0003;
+    this.scene.add(shadowLight);
   }
 
   createStadium() {
