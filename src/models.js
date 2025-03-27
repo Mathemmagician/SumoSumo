@@ -872,18 +872,21 @@ export class StadiumFactory {
    * @param {number} ringRadius - The radius of the sumo ring
    * @param {number} ringHeight - The height of the ring platform
    * @param {Object} seatingOptions - Options for seating layout
+   * @param {number} [fixedRows=20] - Use a fixed number of rows instead of calculating
    * @returns {THREE.Group} A group containing the complete stadium
    */
-  static createCompleteStadium(ringRadius, ringHeight, seatingOptions) {
+  static createCompleteStadium(ringRadius, ringHeight, seatingOptions, fixedRows = 20) {
     const stadiumGroup = new THREE.Group();
     
-    // Calculate seating layout
-    const { totalRows, maxDistance } = this.calculateSeatingLayout(
-      seatingOptions.seatsPerFirstRow,
-      seatingOptions.firstRowDistance,
-      seatingOptions.seatsIncrement,
-      seatingOptions.rowSpacing
-    );
+    // Calculate seating layout (or use fixed rows)
+    const { totalRows, maxDistance } = fixedRows ? 
+      { totalRows: fixedRows, maxDistance: seatingOptions.firstRowDistance + (fixedRows * seatingOptions.rowSpacing) } :
+      this.calculateSeatingLayout(
+        seatingOptions.seatsPerFirstRow,
+        seatingOptions.firstRowDistance,
+        seatingOptions.seatsIncrement,
+        seatingOptions.rowSpacing
+      );
 
     // Add ring
     const ring = this.createRing(ringRadius, ringHeight);
@@ -961,7 +964,7 @@ export class StadiumFactory {
   }
 
   /**
-   * Creates the audience seating areas around the ring
+   * Creates the audience seating areas around the ring using InstancedMesh for better performance
    * @param {number} totalRows - Number of seating rows
    * @param {number} seatsPerFirstRow - Number of seats in the first row
    * @param {number} firstRowDistance - Distance of first row from center
@@ -979,43 +982,120 @@ export class StadiumFactory {
     elevationIncrement
   }) {
     const audienceGroup = new THREE.Group();
-
-    const benchGeometry = new THREE.BoxGeometry(BENCH_WIDTH, BENCH_HEIGHT, BENCH_DEPTH);
-    const benchMaterial = new THREE.MeshStandardMaterial({ 
-      color: 0x8B4513,
-      roughness: 0.8,
-      metalness: 0.2
+    
+    // Use a consistent number of rows if not specified
+    const NUM_ROWS = totalRows || 20;
+    
+    // Materials for benches/mats
+    const benchMaterial = MATERIALS.BENCH;
+    const matMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0xAA0000, 
+      roughness: 0.7,
+      metalness: 0.2 
     });
-
-    let currentRowSeats = seatsPerFirstRow;
-    let currentDistance = firstRowDistance;
-    let currentElevation = 0;
-
-    for (let row = 0; row < totalRows; row++) {
-      const rowAngleStep = (Math.PI * 2) / currentRowSeats;
-      
-      for (let seat = 0; seat < currentRowSeats; seat++) {
-        const angle = rowAngleStep * seat;
-        
-        const bench = new THREE.Mesh(benchGeometry, benchMaterial);
-        
-        bench.position.x = Math.sin(angle) * currentDistance;
-        bench.position.y = currentElevation;
-        bench.position.z = Math.cos(angle) * currentDistance;
-        
-        bench.rotation.y = angle + Math.PI / 2;
-        
-        bench.castShadow = true;
-        bench.receiveShadow = true;
-        
-        audienceGroup.add(bench);
+    
+    // Single geometry for bench and mat
+    const benchGeometry = new THREE.BoxGeometry(BENCH_WIDTH * 0.9, BENCH_HEIGHT, BENCH_DEPTH * 0.9);
+    const matGeometry = new THREE.BoxGeometry(BENCH_WIDTH * 0.8, 0.05, BENCH_DEPTH * 0.8);
+    
+    // Calculate total seat count for InstancedMesh
+    let totalSeats = 0;
+    const sides = ['North', 'East', 'West', 'South'];
+    sides.forEach(() => {
+      for (let rowIndex = 0; rowIndex < NUM_ROWS; rowIndex++) {
+        const seatsInRow = seatsPerFirstRow + (rowIndex * seatsIncrement);
+        totalSeats += seatsInRow;
       }
-      
-      currentRowSeats += seatsIncrement;
-      currentDistance += rowSpacing;
-      currentElevation += elevationIncrement;
-    }
-
+    });
+    
+    // Create InstancedMesh for benches & mats
+    const benchInstancedMesh = new THREE.InstancedMesh(benchGeometry, benchMaterial, totalSeats);
+    const matInstancedMesh = new THREE.InstancedMesh(matGeometry, matMaterial, totalSeats);
+    benchInstancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    matInstancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    
+    let seatIndex = 0;
+    
+    // Define sides for positioning
+    const sideData = [
+      { name: 'North', rotation: 0, x: 0, z: -1 },
+      { name: 'East', rotation: Math.PI / 2, x: 1, z: 0 },
+      { name: 'West', rotation: -Math.PI / 2, x: -1, z: 0 },
+      { name: 'South', rotation: Math.PI, x: 0, z: 1 }
+    ];
+    
+    sideData.forEach(side => {
+      for (let rowIndex = 0; rowIndex < NUM_ROWS; rowIndex++) {
+        // Row properties
+        const distance = firstRowDistance + (rowIndex * rowSpacing);
+        const seatsInRow = seatsPerFirstRow + (rowIndex * seatsIncrement);
+        const elevationLevel = Math.floor(rowIndex / 2);
+        const elevation = elevationLevel * elevationIncrement;
+        
+        // Create platform if elevated
+        if (elevation > 0) {
+          const platformWidth = BENCH_WIDTH * seatsInRow;
+          const platformGeometry = new THREE.BoxGeometry(
+            (side.z !== 0 ? platformWidth : BENCH_DEPTH),
+            elevation,
+            (side.x !== 0 ? platformWidth : BENCH_DEPTH)
+          );
+          const platform = new THREE.Mesh(platformGeometry, benchMaterial);
+          
+          if (side.x !== 0) {
+            platform.position.set(side.x * distance, elevation / 2, 0);
+          } else {
+            platform.position.set(0, elevation / 2, side.z * distance);
+          }
+          platform.receiveShadow = true;
+          audienceGroup.add(platform);
+        }
+        
+        for (let i = 0; i < seatsInRow; i++) {
+          // offset from center
+          const offset = (i - (seatsInRow - 1) / 2) * BENCH_WIDTH;
+          
+          let x = 0, y = BENCH_HEIGHT / 2, z = 0;
+          if (elevation > 0) y += elevation;
+          
+          if (side.x !== 0) {
+            x = side.x * distance;
+            z = offset;
+          } else {
+            x = offset;
+            z = side.z * distance;
+          }
+          
+          // Build a transform matrix for the bench
+          const benchMatrix = new THREE.Matrix4();
+          benchMatrix.makeTranslation(x, y, z);
+          benchMatrix.multiply(new THREE.Matrix4().makeRotationY(side.rotation));
+          
+          // For the mat, we place it slightly above the bench
+          const matMatrix = benchMatrix.clone();
+          // We can shift the mat up a little bit
+          const matOffset = new THREE.Matrix4().makeTranslation(0, BENCH_HEIGHT / 2 + 0.025, 0);
+          matMatrix.multiply(matOffset);
+          
+          // Set the instance matrix
+          benchInstancedMesh.setMatrixAt(seatIndex, benchMatrix);
+          matInstancedMesh.setMatrixAt(seatIndex, matMatrix);
+          
+          // Configure shadows for instances
+          benchInstancedMesh.castShadow = true;
+          benchInstancedMesh.receiveShadow = true;
+          matInstancedMesh.castShadow = true;
+          matInstancedMesh.receiveShadow = true;
+          
+          seatIndex++;
+        }
+      }
+    });
+    
+    // Add the instance meshes to the audience group
+    audienceGroup.add(benchInstancedMesh);
+    audienceGroup.add(matInstancedMesh);
+    
     return audienceGroup;
   }
 } 

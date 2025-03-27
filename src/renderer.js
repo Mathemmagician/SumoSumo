@@ -122,7 +122,7 @@ export class Renderer {
   }
 
   createStadium() {
-    // Create complete stadium using the factory
+    // Create complete stadium using the factory with a fixed number of 20 rows
     const stadium = StadiumFactory.createCompleteStadium(
       RING_RADIUS, 
       RING_HEIGHT,
@@ -132,13 +132,11 @@ export class Renderer {
         seatsIncrement: SEATS_INCREMENT,
         rowSpacing: ROW_SPACING,
         elevationIncrement: ELEVATION_INCREMENT
-      }
+      },
+      20 // Fixed number of rows
     );
     
     this.scene.add(stadium);
-    
-    // Remove the separate ring creation since it's now part of the complete stadium
-    this.scene.remove(this.ring); // Remove the old ring if it exists
   }
 
   onWindowResize() {
