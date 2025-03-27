@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { StadiumFactory } from './models';
+import { socketClient } from './socket-client';
 import { 
   RING_RADIUS,
   RING_HEIGHT,
@@ -19,6 +20,12 @@ export class Renderer {
     this.renderer = null;
     this.stadium = null;
     this.controls = null;
+    
+    // FPS counter variables
+    this.frameCount = 0;
+    this.fps = 0;
+    this.fpsUpdateInterval = 500; // Update FPS every 500ms
+    this.lastFpsUpdate = 0;
     
     // Bind methods
     this.animate = this.animate.bind(this);
@@ -80,12 +87,88 @@ export class Renderer {
     this.createStadium();
     console.log('Stadium created');
 
+    // Create FPS display
+    this.createFpsDisplay();
+    console.log('FPS display created');
+
     // Add event listeners
     window.addEventListener('resize', this.onWindowResize);
 
     // Start animation loop
+    this.lastFpsUpdate = performance.now();
     console.log('Starting animation loop');
     this.animate();
+  }
+
+  // Add FPS display with socket stats
+  createFpsDisplay() {
+    const statsContainer = document.createElement('div');
+    statsContainer.id = 'stats-container';
+    statsContainer.style.cssText = `
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      background-color: rgba(0, 0, 0, 0.5);
+      color: white;
+      font-family: monospace;
+      font-size: 14px;
+      padding: 5px 10px;
+      border-radius: 4px;
+      z-index: 1000;
+    `;
+
+    const fpsDiv = document.createElement('div');
+    fpsDiv.id = 'fps-counter';
+    fpsDiv.textContent = '0 FPS';
+    
+    const toggleButton = document.createElement('button');
+    toggleButton.textContent = '▼ Socket Stats';
+    toggleButton.style.cssText = `
+      background: none;
+      border: none;
+      color: white;
+      font-family: monospace;
+      font-size: 14px;
+      padding: 2px 0;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      margin: 5px 0;
+    `;
+    
+    const socketStatsDiv = document.createElement('div');
+    socketStatsDiv.id = 'socket-stats';
+    socketStatsDiv.style.display = 'none'; // Hidden by default
+    
+    statsContainer.appendChild(fpsDiv);
+    statsContainer.appendChild(toggleButton);
+    statsContainer.appendChild(socketStatsDiv);
+    document.body.appendChild(statsContainer);
+
+    // Toggle socket stats visibility
+    let isExpanded = false;
+    toggleButton.addEventListener('click', () => {
+      isExpanded = !isExpanded;
+      socketStatsDiv.style.display = isExpanded ? 'block' : 'none';
+      toggleButton.textContent = (isExpanded ? '▼' : '►') + ' Socket Stats';
+    });
+
+    // Listen for socket stats updates
+    socketClient.on('socketStatsUpdated', (stats) => {
+      this.updateSocketStats(stats);
+    });
+  }
+
+  // Update the socket stats display
+  updateSocketStats(stats) {
+    const statsDiv = document.getElementById('socket-stats');
+    if (!statsDiv) return;
+
+    let html = '';
+    Object.entries(stats).forEach(([event, count]) => {
+      html += `${event}: ${count}<br>`;
+    });
+    statsDiv.innerHTML = html;
   }
 
   setupLighting() {
@@ -188,6 +271,21 @@ export class Renderer {
 
   animate() {
     requestAnimationFrame(this.animate);
+    
+    // Update FPS counter
+    const currentTime = performance.now();
+    this.frameCount++;
+    
+    // Update FPS counter every 500ms
+    if (currentTime - this.lastFpsUpdate > this.fpsUpdateInterval) {
+      this.fps = Math.round((this.frameCount * 1000) / (currentTime - this.lastFpsUpdate));
+      const fpsCounter = document.getElementById('fps-counter');
+      if (fpsCounter) {
+        fpsCounter.textContent = `${this.fps} FPS`;
+      }
+      this.frameCount = 0;
+      this.lastFpsUpdate = currentTime;
+    }
     
     // Log first frame render
     if (!this._hasLoggedFirstFrame) {
