@@ -1,8 +1,8 @@
-// Import THREE if needed (if using modules)
-// import * as THREE from 'three';
+import * as THREE from 'three';
+import { RING_RADIUS } from './constants';
 
-// Constants for model dimensions
-const MODEL_CONSTANTS = {
+// Model dimension constants
+export const MODEL_CONSTANTS = {
   FIGHTER: {
     BODY_RADIUS: 1,
     ARM_RADIUS: 0.2,
@@ -36,7 +36,7 @@ const MODEL_CONSTANTS = {
     TEXT_BUBBLE_HEIGHT: 1.2
   },
   STADIUM: {
-    FLOOR_SIZE: RING_RADIUS * 8, // Extend floor size
+    FLOOR_SIZE: RING_RADIUS * 8,
     WALL_HEIGHT: 16,
     WALL_THICKNESS: 2,
     COLUMN_RADIUS: 0.8,
@@ -44,17 +44,16 @@ const MODEL_CONSTANTS = {
     COLUMN_SEGMENTS: 12,
     BEAM_HEIGHT: 1.5,
     BEAM_DEPTH: 0.8,
-    // Darker color scheme
-    WALL_COLOR: 0x5D4037, // Darker brown for walls (was 0x8B4513)
-    COLUMN_COLOR: 0x4E342E, // Darker brown for columns (was 0xA0522D)
-    BEAM_COLOR: 0x3E2723, // Very dark brown for beams (was 0x654321)
-    TRIM_COLOR: 0x795548, // Darker wood color for trim (was 0xBC8F8F)
-    ROOF_COLOR: 0x4E342E, // Dark brown for roof
-    FLOOR_COLOR: 0xA1887F // Slightly darker floor color (was 0xD9A55B)
+    WALL_COLOR: 0x5D4037,
+    COLUMN_COLOR: 0x4E342E,
+    BEAM_COLOR: 0x3E2723,
+    TRIM_COLOR: 0x795548,
+    ROOF_COLOR: 0x4E342E,
+    FLOOR_COLOR: 0xA1887F
   }
 };
 
-class ModelFactory {
+export class ModelFactory {
   constructor(faceTextures) {
     this.faceTextures = faceTextures;
   }
@@ -66,7 +65,6 @@ class ModelFactory {
       role: player.role
     };
 
-    // Create the appropriate model based on role
     if (player.role === 'fighter') {
       this.addFighterModel(model, player);
     } else if (player.role === 'referee') {
@@ -75,10 +73,8 @@ class ModelFactory {
       this.addViewerModel(model, player);
     }
 
-    // Add common elements (emote/text bubbles)
     this.addCommonElements(model);
 
-    // Set initial transform
     model.position.set(player.position.x, player.position.y, player.position.z);
     model.rotation.y = player.rotation || 0;
 
@@ -339,7 +335,7 @@ class ModelFactory {
   }
 }
 
-class StadiumFactory {
+export class StadiumFactory {
   /**
    * Creates the walls and structural elements of the stadium
    * @param {number} ringRadius - The radius of the sumo ring for scaling
@@ -801,9 +797,4 @@ class StadiumFactory {
     const fogColor = new THREE.Color(0x221813); // Very dark brown fog
     stadiumGroup.fog = new THREE.FogExp2(fogColor, 0.008);
   }
-}
-
-// Export the factory and constants
-window.ModelFactory = ModelFactory;
-window.MODEL_CONSTANTS = MODEL_CONSTANTS;
-window.StadiumFactory = StadiumFactory; 
+} 
