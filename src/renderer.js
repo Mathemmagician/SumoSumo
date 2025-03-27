@@ -154,9 +154,9 @@ export class Renderer {
     fpsDiv.textContent = '0 FPS';
     
     // Socket stats toggle
-    const toggleButton = document.createElement('button');
-    toggleButton.textContent = '▼ Socket Stats';
-    toggleButton.style.cssText = `
+    const socketToggleButton = document.createElement('button');
+    socketToggleButton.textContent = '▼ Socket Stats';
+    socketToggleButton.style.cssText = `
       background: none;
       border: none;
       color: white;
@@ -173,22 +173,57 @@ export class Renderer {
     socketStatsDiv.id = 'socket-stats';
     socketStatsDiv.style.display = 'none'; // Hidden by default
     
+    // Game state toggle
+    const gameStateToggleButton = document.createElement('button');
+    gameStateToggleButton.textContent = '▼ Game State';
+    gameStateToggleButton.style.cssText = `
+      background: none;
+      border: none;
+      color: white;
+      font-family: monospace;
+      font-size: 14px;
+      padding: 2px 0;
+      cursor: pointer;
+      width: 100%;
+      text-align: left;
+      margin: 5px 0;
+    `;
+    
+    const gameStateDiv = document.createElement('div');
+    gameStateDiv.id = 'game-state-debug';
+    gameStateDiv.style.display = 'none'; // Hidden by default
+    
     statsContainer.appendChild(fpsDiv);
-    statsContainer.appendChild(toggleButton);
+    statsContainer.appendChild(socketToggleButton);
     statsContainer.appendChild(socketStatsDiv);
+    statsContainer.appendChild(gameStateToggleButton);
+    statsContainer.appendChild(gameStateDiv);
     document.body.appendChild(statsContainer);
 
     // Toggle socket stats visibility
-    let isExpanded = false;
-    toggleButton.addEventListener('click', () => {
-      isExpanded = !isExpanded;
-      socketStatsDiv.style.display = isExpanded ? 'block' : 'none';
-      toggleButton.textContent = (isExpanded ? '▼' : '►') + ' Socket Stats';
+    let isSocketStatsExpanded = false;
+    socketToggleButton.addEventListener('click', () => {
+      isSocketStatsExpanded = !isSocketStatsExpanded;
+      socketStatsDiv.style.display = isSocketStatsExpanded ? 'block' : 'none';
+      socketToggleButton.textContent = (isSocketStatsExpanded ? '▼' : '►') + ' Socket Stats';
+    });
+
+    // Toggle game state visibility
+    let isGameStateExpanded = false;
+    gameStateToggleButton.addEventListener('click', () => {
+      isGameStateExpanded = !isGameStateExpanded;
+      gameStateDiv.style.display = isGameStateExpanded ? 'block' : 'none';
+      gameStateToggleButton.textContent = (isGameStateExpanded ? '▼' : '►') + ' Game State';
     });
 
     // Listen for socket stats updates
     socketClient.on('socketStatsUpdated', (stats) => {
       this.updateSocketStats(stats);
+    });
+    
+    // Listen for game state updates
+    socketClient.on('gameStateUpdated', (gameState) => {
+      this.updateGameStateDebug(gameState);
     });
   }
 
@@ -202,6 +237,39 @@ export class Renderer {
       html += `${event}: ${count}<br>`;
     });
     statsDiv.innerHTML = html;
+  }
+
+  // Add a new method to update the game state debug display
+  updateGameStateDebug(gameState) {
+    const gameStateDiv = document.getElementById('game-state-debug');
+    if (!gameStateDiv) return;
+
+    let html = `
+      <b>Current Stage:</b> ${gameState.stage}<br>
+      <b>My Role:</b> ${gameState.myRole}<br>
+      <b>My ID:</b> ${gameState.myId?.substring(0, 6) || 'None'}<br>
+      <b>Players:</b><br>
+    `;
+
+    // Add fighters
+    html += '  <b>Fighters:</b> ' + gameState.fighters.length + '<br>';
+    gameState.fighters.forEach(fighter => {
+      html += `  • ${fighter.id.substring(0, 6)} (pos: ${Math.round(fighter.position?.x || 0)},${Math.round(fighter.position?.z || 0)})<br>`;
+    });
+
+    // Add referee
+    html += '  <b>Referee:</b> ' + (gameState.referee ? '1' : '0') + '<br>';
+    if (gameState.referee) {
+      html += `  • ${gameState.referee.id.substring(0, 6)}<br>`;
+    }
+
+    // Add viewers
+    html += '  <b>Viewers:</b> ' + gameState.viewers.length + '<br>';
+    gameState.viewers.forEach(viewer => {
+      html += `  • ${viewer.id.substring(0, 6)}<br>`;
+    });
+
+    gameStateDiv.innerHTML = html;
   }
 
   setupLighting() {
