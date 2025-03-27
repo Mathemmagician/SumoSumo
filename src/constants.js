@@ -41,6 +41,27 @@ export const FALL_PHYSICS = {
   MIN_BOUNCE_VELOCITY: 0.05
 };
 
+// Socket statistics tracking
+export const DEFAULT_SOCKET_STATS = {
+  connect: 0,
+  gameState: 0,
+  stageChange: 0,
+  playerJoined: 0,
+  playerLeft: 0,
+  playerMoved: 0,
+  playerEmote: 0,
+  playerMessage: 0,
+  fightersSelected: 0,
+  preCeremonyStart: 0,
+  sponsorBanner: 0,
+  matchStart: 0,
+  matchEnd: 0,
+  matchDraw: 0,
+  newReferee: 0,
+  gameStateReset: 0,
+  playerRoleChanged: 0
+};
+
 // Game state store
 class GameState {
   constructor() {
