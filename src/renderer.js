@@ -52,10 +52,15 @@ export class Renderer {
     console.log('Camera created and positioned');
 
     // Create renderer
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, highPerformance: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance'  });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.outputEncoding = THREE.sRGBEncoding;
+    this.renderer.physicallyCorrectLights = true;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.3; // Reduced from 1.5 to 1.3 for a slightly darker scene
+
     
     // Add renderer to DOM
     const container = document.createElement('div');
