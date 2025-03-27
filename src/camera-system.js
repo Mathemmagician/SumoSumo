@@ -1,9 +1,11 @@
+import * as THREE from 'three';
+import { RING_HEIGHT } from './constants';
+
 /**
  * Camera System for SumoSumo
  * Manages different camera modes and transitions
  */
-
-class CameraSystem {
+export class CameraSystem {
   constructor(scene, camera, renderer) {
     this.scene = scene;
     this.camera = camera;
@@ -523,7 +525,4 @@ class CameraSystem {
         this.ceremonyCineBars = null;
     }
   }
-}
-
-// Make the camera system available globally
-window.CameraSystem = CameraSystem; 
+} 
