@@ -5,16 +5,16 @@ class SocketClient {
   constructor() {
     this.socket = null;
     this.gameState = {
-      fighters: [],
-      referee: null,
-      viewers: [],
-      myRole: 'viewer',
-      myId: null,
-      stage: 'WAITING_FOR_PLAYERS',
-      stageTimer: null,
-      stageTimeRemaining: 0
-    };
-    
+  fighters: [],
+  referee: null,
+  viewers: [],
+  myRole: 'viewer',
+  myId: null,
+  stage: 'WAITING_FOR_PLAYERS',
+  stageTimer: null,
+  stageTimeRemaining: 0
+};
+
     this.socketStats = { ...DEFAULT_SOCKET_STATS };
     this.eventHandlers = new Map();
   }
@@ -34,7 +34,7 @@ class SocketClient {
     this.socket.on('gameState', (state) => {
       this.socketStats.gameState++;
       this.updateSocketStats();
-      console.log('Received game state:', state);
+    console.log('Received game state:', state);
 
       // Update local state
       this.gameState.fighters = state.fighters || [];
@@ -173,7 +173,7 @@ class SocketClient {
       this.gameState.myRole = 'fighter';
     } else if (this.gameState.referee && this.gameState.referee.id === myId) {
       this.gameState.myRole = 'referee';
-    } else {
+  } else {
       this.gameState.myRole = 'viewer';
     }
   }
