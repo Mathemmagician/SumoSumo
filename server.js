@@ -16,14 +16,17 @@ const server = createServer(app);
 // Set up CORS for Socket.io (needed for development when frontend is on a different port)
 const io = new Server(server, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' ? false : ["http://localhost:5173", "http://127.0.0.1:5173"],
+    origin: "*", // WARNING: Only use this in development
     methods: ["GET", "POST"],
     credentials: true
   }
 });
 
 // Add CORS middleware for HTTP requests
-app.use(cors());
+app.use(cors({
+  origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
+  credentials: true
+}));
 
 // Serve static files - in production this serves the built Vite app
 if (process.env.NODE_ENV === 'production') {
