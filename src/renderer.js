@@ -141,10 +141,8 @@ export class Renderer {
     console.log('Starting animation loop');
     this.animate();
 
-    // Set up socket event listeners for player updates
-    socketClient.on('gameStateUpdated', (gameState) => this.updatePlayers(gameState));
-    socketClient.on('playerMoved', (data) => this.updatePlayerPosition(data));
-    socketClient.on('playerLeft', (playerId) => this.removePlayer(playerId));
+    // Set up more comprehensive socket event listeners for player updates
+    this.setupSocketEventListeners();
   }
 
   // Add FPS display with socket stats
@@ -523,27 +521,141 @@ export class Renderer {
     }
   }
 
+  setupSocketEventListeners() {
+    // Main game state update
+    socketClient.on('gameStateUpdated', (gameState) => {
+        console.log('Renderer received gameStateUpdated:', gameState);
+        this.updatePlayers(gameState);
+    });
+    
+    // Individual player updates
+    socketClient.on('playerMoved', (data) => {
+        console.log('Renderer received playerMoved:', data);
+        this.updatePlayerPosition(data);
+    });
+    
+    // Player removals
+    socketClient.on('playerLeft', (playerId) => {
+        console.log('Renderer received playerLeft:', playerId);
+        this.removePlayer(playerId);
+    });
+    
+    // Role changes
+    socketClient.on('playerRoleChanged', (data) => {
+        console.log('Renderer received playerRoleChanged:', data);
+        this.handlePlayerRoleChanged(data);
+    });
+    
+    // Fighter selection events
+    socketClient.on('fightersSelected', (data) => {
+        console.log('Renderer received fightersSelected:', data);
+        this.updateFightersAndReferee(data);
+    });
+    
+    // Match stage transitions
+    socketClient.on('matchStart', (data) => {
+        console.log('Renderer received matchStart:', data);
+        // Ensure fighters are in correct positions
+        if (data.fighters && data.fighters.length) {
+            data.fighters.forEach(fighter => this.updateOrCreatePlayer(fighter));
+        }
+    });
+    
+    // Handle new referee assignments
+    socketClient.on('newReferee', (referee) => {
+        console.log('Renderer received newReferee:', referee);
+        this.updateOrCreatePlayer(referee);
+    });
+    
+    // Handle pre-ceremony positioning
+    socketClient.on('preCeremonyStart', (data) => {
+        console.log('Renderer received preCeremonyStart:', data);
+        // Update fighters and referee positions
+        if (data.fighters && data.fighters.length) {
+            data.fighters.forEach(fighter => this.updateOrCreatePlayer(fighter));
+        }
+        if (data.referee) {
+            this.updateOrCreatePlayer(data.referee);
+        }
+    });
+  }
+
+  // Add a new method to handle player role changes
+  handlePlayerRoleChanged(data) {
+    const { id, role } = data;
+    
+    // Get the current game state
+    const gameState = socketClient.gameState;
+    
+    // Find the player in the game state
+    let player = null;
+    if (role === 'fighter') {
+        player = gameState.fighters.find(f => f.id === id);
+    } else if (role === 'referee') {
+        player = gameState.referee;
+    } else {
+        player = gameState.viewers.find(v => v.id === id);
+    }
+    
+    // If we found the player, update or recreate their model
+    if (player) {
+        // If the player already has a model, remove it first
+        if (this.playerModels.has(id)) {
+            this.removePlayer(id);
+        }
+        
+        // Create a new model with the correct role
+        this.updateOrCreatePlayer(player);
+    }
+  }
+
+  // Add a method to specifically handle fighter and referee selection
+  updateFightersAndReferee(data) {
+    // Update fighter models
+    if (data.fighter1) {
+        this.updateOrCreatePlayer(data.fighter1);
+    }
+    
+    if (data.fighter2) {
+        this.updateOrCreatePlayer(data.fighter2);
+    }
+    
+    // Update referee model
+    if (data.referee) {
+        this.updateOrCreatePlayer(data.referee);
+    }
+  }
+
   updatePlayers(gameState) {
     console.log('Updating players with gameState:', gameState);
-    console.log('Current player models:', this.playerModels);
-
-    // Remove any players that no longer exist
-    for (const [playerId, model] of this.playerModels) {
-      const playerExists = gameState.fighters.some(f => f.id === playerId) ||
-        (gameState.referee && gameState.referee.id === playerId) ||
-        gameState.viewers.some(v => v.id === playerId);
-      
-      if (!playerExists) {
-        console.log('Removing player:', playerId);
+    
+    // Create sets of current player IDs to efficiently track changes
+    const currentFighterIds = new Set(gameState.fighters.map(f => f.id));
+    const currentViewerIds = new Set(gameState.viewers.map(v => v.id));
+    const currentRefereeId = gameState.referee ? gameState.referee.id : null;
+    
+    // Track all current player IDs
+    const allCurrentIds = new Set([
+      ...currentFighterIds,
+      ...currentViewerIds,
+      ...(currentRefereeId ? [currentRefereeId] : [])
+    ]);
+    
+    // Remove players that no longer exist
+    for (const [playerId, model] of this.playerModels.entries()) {
+      if (!allCurrentIds.has(playerId)) {
+        console.log('Removing player that no longer exists:', playerId);
         this.removePlayer(playerId);
       }
     }
 
-    // Update or add fighters
-    gameState.fighters.forEach(fighter => {
-      console.log('Processing fighter:', fighter);
-      this.updateOrCreatePlayer(fighter);
-    });
+    // Update or add each fighter
+    if (gameState.fighters && gameState.fighters.length) {
+      gameState.fighters.forEach(fighter => {
+        console.log('Processing fighter:', fighter);
+        this.updateOrCreatePlayer(fighter);
+      });
+    }
 
     // Update or add referee
     if (gameState.referee) {
@@ -551,55 +663,165 @@ export class Renderer {
       this.updateOrCreatePlayer(gameState.referee);
     }
 
-    // Update or add viewers
-    gameState.viewers.forEach(viewer => {
-      console.log('Processing viewer:', viewer);
-      this.updateOrCreatePlayer(viewer);
-    });
+    // Update or add viewers - PLACE THEM ON SEATS IN THE ARENA
+    if (gameState.viewers && gameState.viewers.length) {
+      // Get seat positions from the stadium
+      const seatPositions = this.getStadiumSeatPositions();
+      
+      // Process each viewer
+      gameState.viewers.forEach((viewer, index) => {
+        // Clone viewer object to avoid modifying the original game state
+        const viewerWithPosition = { ...viewer };
+        
+        // If viewer doesn't have a position or is at default position, place on a seat
+        if (!viewerWithPosition.position || 
+            (viewerWithPosition.position.x === 0 && viewerWithPosition.position.z === 0)) {
+          
+          // Use seat position based on index (wrap around if more viewers than seats)
+          const seatIndex = index % seatPositions.length;
+          const seatPos = seatPositions[seatIndex];
+          
+          viewerWithPosition.position = {
+            x: seatPos.x,
+            y: seatPos.y + 0.5, // Adjust to sit on top of the seat
+            z: seatPos.z
+          };
+          
+          // Set rotation to face the ring
+          viewerWithPosition.rotation = seatPos.rotation;
+        }
+        
+        console.log('Processing viewer:', viewerWithPosition);
+        this.updateOrCreatePlayer(viewerWithPosition);
+      });
+    }
+    
+    console.log(`Total player models after update: ${this.playerModels.size}`);
+  }
+
+  // Helper method to get stadium seat positions
+  getStadiumSeatPositions() {
+    // Define the seat positions in a circular pattern around the ring
+    // These will be more realistic seat positions in the stadium
+    const positions = [];
+    
+    // Parameters for seat placement
+    const rows = 3;          // Number of audience rows
+    const startRadius = 10;  // Distance of first row from center
+    const rowSpacing = 2;    // Distance between rows
+    const seatSpacing = 2;   // Distance between seats in the same row
+    
+    // Generate seat positions for each row
+    for (let row = 0; row < rows; row++) {
+      const rowRadius = startRadius + (row * rowSpacing);
+      const circumference = 2 * Math.PI * rowRadius;
+      
+      // Calculate how many seats can fit in this row
+      const seatsInRow = Math.floor(circumference / seatSpacing);
+      
+      for (let seat = 0; seat < seatsInRow; seat++) {
+        const angle = (seat / seatsInRow) * Math.PI * 2;
+        
+        // Calculate seat position
+        const x = Math.sin(angle) * rowRadius;
+        const z = Math.cos(angle) * rowRadius;
+        
+        // Calculate seat height (higher rows are elevated)
+        const y = row * 1.5;
+        
+        // The rotation needs to be set so viewers face toward the center
+        const rotation = angle + Math.PI; // Add PI to face inward
+        
+        positions.push({ x, y, z, rotation });
+      }
+    }
+    
+    return positions;
   }
 
   updateOrCreatePlayer(player) {
     console.log('updateOrCreatePlayer called for:', player);
+    if (!player || !player.id) {
+        console.error('Invalid player data:', player);
+        return;
+    }
+    
+    // Check if we need to remove an existing model (for role changes)
+    if (this.playerModels.has(player.id)) {
+        // If role changed, remove the old model
+        const existingModel = this.playerModels.get(player.id);
+        const roleChanged = existingModel.userData.role !== player.role;
+        
+        if (roleChanged) {
+            console.log(`Role changed for player ${player.id} from ${existingModel.userData.role} to ${player.role}`);
+            this.removePlayer(player.id);
+        }
+    }
+    
+    // Create or update the player model
     if (!this.playerModels.has(player.id)) {
-      console.log('Creating new model for player:', player.id);
-      // Create new model
-      const model = this.modelFactory.createPlayerModel(player);
-      if (model) {
-        console.log('Model created successfully:', model);
-        this.scene.add(model);
-        this.playerModels.set(player.id, model);
-      } else {
-        console.error('Failed to create model for player:', player);
-      }
+        console.log('Creating new model for player:', player.id, 'with role:', player.role);
+        // Create new model
+        const model = this.modelFactory.createPlayerModel(player);
+        if (model) {
+            console.log('Model created successfully:', model);
+            // Store the player's role in the model's userData for future reference
+            model.userData = { 
+                role: player.role,
+                playerId: player.id
+            };
+            
+            // Set initial position and rotation
+            if (player.position) {
+                model.position.set(player.position.x, player.position.y, player.position.z);
+            }
+            if (player.rotation !== undefined) {
+                model.rotation.y = player.rotation;
+            }
+            
+            this.scene.add(model);
+            this.playerModels.set(player.id, model);
+            
+            console.log(`Added player model to scene. Total models: ${this.playerModels.size}`);
+        } else {
+            console.error('Failed to create model for player:', player);
+        }
     } else {
-      // Update existing model position/rotation
-      const model = this.playerModels.get(player.id);
-      if (player.position) {
-        model.position.set(player.position.x, model.position.y, player.position.z);
-      }
-      if (player.rotation !== undefined) {
-        model.rotation.y = player.rotation;
-      }
+        // Update existing model position/rotation
+        console.log('Updating existing model for player:', player.id);
+        const model = this.playerModels.get(player.id);
+        
+        if (player.position) {
+            model.position.set(player.position.x, player.position.y, player.position.z);
+        }
+        if (player.rotation !== undefined) {
+            model.rotation.y = player.rotation;
+        }
     }
   }
 
   updatePlayerPosition(data) {
     const model = this.playerModels.get(data.id);
     if (model) {
-      if (data.position) {
-        model.position.set(data.position.x, model.position.y, data.position.z);
-      }
-      if (data.rotation !== undefined) {
-        model.rotation.y = data.rotation;
-      }
+        console.log(`Updating position for ${data.id}:`, data.position);
+        if (data.position) {
+            model.position.set(data.position.x, model.position.y, data.position.z);
+        }
+        if (data.rotation !== undefined) {
+            model.rotation.y = data.rotation;
+        }
+    } else {
+        console.warn(`Tried to update position for missing player model: ${data.id}`);
     }
   }
 
   removePlayer(playerId) {
+    console.log('Removing player model:', playerId);
     const model = this.playerModels.get(playerId);
     if (model) {
-      this.scene.remove(model);
-      this.playerModels.delete(playerId);
+        this.scene.remove(model);
+        this.playerModels.delete(playerId);
+        console.log(`Removed player model. Total models: ${this.playerModels.size}`);
     }
   }
 }
