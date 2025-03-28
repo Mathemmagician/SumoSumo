@@ -522,12 +522,26 @@ export class Renderer {
       this.camera.position.y -= CAMERA_MOVE_SPEED;
     }
     
-    // Camera rotation
-    if (this.cameraMovement.rotateLeft) {
-      this.camera.rotateY(CAMERA_ROTATE_SPEED);
-    }
-    if (this.cameraMovement.rotateRight) {
-      this.camera.rotateY(-CAMERA_ROTATE_SPEED);
+    // Camera rotation around world Y axis
+    if (this.cameraMovement.rotateLeft || this.cameraMovement.rotateRight) {
+      // Get current position
+      const position = this.camera.position.clone();
+      
+      // Create rotation matrix around world Y axis
+      const rotationMatrix = new THREE.Matrix4();
+      const angle = CAMERA_ROTATE_SPEED * (this.cameraMovement.rotateLeft ? 1 : -1);
+      rotationMatrix.makeRotationY(angle);
+      
+      // Apply rotation to position
+      position.applyMatrix4(rotationMatrix);
+      this.camera.position.copy(position);
+      
+      // Ensure camera keeps looking at the same direction relative to its new position
+      const target = new THREE.Vector3();
+      this.camera.getWorldDirection(target);
+      target.multiplyScalar(10).add(this.camera.position); // Look 10 units ahead
+      target.applyMatrix4(rotationMatrix);
+      this.camera.lookAt(target);
     }
   }
 }
