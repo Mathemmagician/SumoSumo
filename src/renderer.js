@@ -524,31 +524,39 @@ export class Renderer {
       (gltf) => {
         this.sumoModel = gltf.scene;
         
-        // Scale and position the model
-        this.sumoModel.scale.set(5, 5, 5);
-        this.sumoModel.position.set(3, 2, 0);
+        // First get the original bounding box to calculate proper scaling
+        const box = new THREE.Box3().setFromObject(this.sumoModel);
+        const originalHeight = box.max.y - box.min.y;
+        
+        // Calculate scale factor to make height 2 units
+        const scaleFactor = 3 / originalHeight;
+        this.sumoModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
+        
+        // Update bounding box after scaling
+        box.setFromObject(this.sumoModel);
+        
+        // Position the model so its bottom is at y=0
+        const bottomY = box.min.y;
+        this.sumoModel.position.set(3, -bottomY+1, 0);
         this.sumoModel.rotation.set(0, -Math.PI/2, 0);
         
-        // Traverse all meshes in the model to adjust materials
+        // Material adjustments
         this.sumoModel.traverse((child) => {
           if (child.isMesh) {
-            // Enable shadows
             child.castShadow = true;
             child.receiveShadow = true;
-            
-            // If the mesh has a material, adjust its properties
             if (child.material) {
-              child.material.roughness = 0.7;  // Adjust material roughness
-              child.material.metalness = 0.3;  // Adjust material metalness
+              child.material.roughness = 0.7;
+              child.material.metalness = 0.3;
               child.material.needsUpdate = true;
             }
           }
         });
         
-        // Debug size after scaling
-        const box = new THREE.Box3().setFromObject(this.sumoModel);
-        const size = box.getSize(new THREE.Vector3());
-        console.log('Sumo model size after scaling:', size);
+        // Debug final size and position
+        const finalBox = new THREE.Box3().setFromObject(this.sumoModel);
+        console.log('Sumo model final height:', finalBox.max.y - finalBox.min.y);
+        console.log('Sumo model bottom position:', finalBox.min.y);
         
         this.scene.add(this.sumoModel);
         console.log('Sumo model loaded and added to scene');
