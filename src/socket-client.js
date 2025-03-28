@@ -96,44 +96,26 @@ class SocketClient {
       });
     });
 
-    // "playerJoined"
     this.socket.on("playerJoined", (player) => this.handlePlayerJoined(player));
-    // "playerLeft"
     this.socket.on("playerLeft", (playerId) => this.handlePlayerLeft(playerId));
-    // "playerMoved"
     this.socket.on("playerMoved", (data) => this.handlePlayerMoved(data));
-    // "playerEmote"
     this.socket.on("playerEmote", (data) => this.handlePlayerEmote(data));
-    // "playerMessage"
     this.socket.on("playerMessage", (data) => this.handlePlayerMessage(data));
-    // "playerRoleChanged"
     this.socket.on("playerRoleChanged", (data) =>
       this.handlePlayerRoleChanged(data)
     );
-
-    //
-    // Missing events from your old file
-    //
     this.socket.on("fightersSelected", (data) =>
       this.handleFightersSelected(data)
     );
-
     this.socket.on("preCeremonyStart", (data) =>
       this.handlePreCeremonyStart(data)
     );
-
     this.socket.on("sponsorBanner", (data) => this.handleSponsorBanner(data));
-
     this.socket.on("matchStart", (data) => this.handleMatchStart(data));
-
     this.socket.on("matchEnd", (data) => this.handleMatchEnd(data));
-
     this.socket.on("matchDraw", (data) => this.handleMatchDraw(data));
-
     this.socket.on("newReferee", (referee) => this.handleNewReferee(referee));
-
     this.socket.on("gameStateReset", () => this.handleGameStateReset());
-
     this.socket.on("viewerOnlyUpdated", (isViewerOnly) =>
       this.handleViewerOnlyUpdated(isViewerOnly)
     );
@@ -235,7 +217,9 @@ class SocketClient {
     if (!player) return;
 
     // Remove from current arrays
-    this.gameState.fighters = this.gameState.fighters.filter((f) => f.id !== id);
+    this.gameState.fighters = this.gameState.fighters.filter(
+      (f) => f.id !== id
+    );
     this.gameState.viewers = this.gameState.viewers.filter((v) => v.id !== id);
     if (this.gameState.referee?.id === id) {
       this.gameState.referee = null;
@@ -367,14 +351,10 @@ class SocketClient {
     this.updateSocketStats();
     console.log("Game state reset received");
 
-    // Clean up all models
     this.cleanupAllModels();
 
     // Convert everyone to viewers
-    const allPlayers = [
-      ...this.gameState.fighters,
-      ...this.gameState.viewers,
-    ];
+    const allPlayers = [...this.gameState.fighters, ...this.gameState.viewers];
     if (this.gameState.referee) {
       allPlayers.push(this.gameState.referee);
     }
@@ -387,9 +367,7 @@ class SocketClient {
     });
 
     // Re-add them as viewers
-    this.gameState.viewers.forEach((viewer) =>
-      this.addPlayerToScene(viewer)
-    );
+    this.gameState.viewers.forEach((viewer) => this.addPlayerToScene(viewer));
 
     this.gameState.myRole = "viewer";
     this.updateUI();
@@ -439,10 +417,7 @@ class SocketClient {
     const myId = this.socket.id;
     if (this.gameState.fighters.some((f) => f.id === myId)) {
       this.gameState.myRole = "fighter";
-    } else if (
-      this.gameState.referee &&
-      this.gameState.referee.id === myId
-    ) {
+    } else if (this.gameState.referee && this.gameState.referee.id === myId) {
       this.gameState.myRole = "referee";
     } else {
       this.gameState.myRole = "viewer";
