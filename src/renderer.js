@@ -13,6 +13,7 @@ import {
   CAMERA_MOVE_SPEED,
   CAMERA_ROTATE_SPEED
 } from './constants';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
 export class Renderer {
   constructor() {
@@ -49,6 +50,9 @@ export class Renderer {
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleKeyUp = this.handleKeyUp.bind(this);
     this.toggleFreeCamera = this.toggleFreeCamera.bind(this);
+    
+    // Add a property to store the sumo model
+    this.sumoModel = null;
   }
 
   initialize() {
@@ -110,6 +114,9 @@ export class Renderer {
     // Create the complete stadium (includes ring)
     this.createStadium();
     console.log('Stadium created');
+
+    // Load the sumo model after creating the stadium
+    this.loadSumoModel();
 
     // Create FPS display
     this.createFpsDisplay();
@@ -273,19 +280,18 @@ export class Renderer {
   }
 
   setupLighting() {
-    // Ambient light with moderate intensity
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    // Increase ambient light intensity
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // Increased from 0.6 to 0.8
     this.scene.add(ambientLight);
 
-    // Main spotlight (instead of directional light)
-    const mainSpotlight = new THREE.SpotLight(0xffffff, 1.5);
+    // Main spotlight with increased intensity
+    const mainSpotlight = new THREE.SpotLight(0xffffff, 2.0); // Increased from 1.5 to 2.0
     mainSpotlight.position.set(0, 30, 0);
     mainSpotlight.angle = Math.PI / 5.5;
     mainSpotlight.penumbra = 0.3;
     mainSpotlight.decay = 1.5;
     mainSpotlight.distance = 60;
     
-    // Shadow settings
     mainSpotlight.castShadow = true;
     mainSpotlight.shadow.mapSize.width = 2048;
     mainSpotlight.shadow.mapSize.height = 2048;
@@ -298,52 +304,16 @@ export class Renderer {
     this.scene.add(mainSpotlight);
     this.scene.add(mainSpotlight.target);
 
-    // Fill light with warm color
-    const fillLight = new THREE.DirectionalLight(0xffeedd, 0.9);
-    fillLight.position.set(RING_RADIUS * 2, RING_RADIUS * 1.5, RING_RADIUS * 2);
+    // Add a front-facing fill light
+    const fillLight = new THREE.DirectionalLight(0xffeedd, 1.2); // Increased intensity
+    fillLight.position.set(0, 10, 20); // Positioned more in front
     fillLight.castShadow = true;
-    fillLight.shadow.mapSize.width = 1024;
-    fillLight.shadow.mapSize.height = 1024;
-    fillLight.shadow.camera.left = -15;
-    fillLight.shadow.camera.right = 15;
-    fillLight.shadow.camera.top = 15;
-    fillLight.shadow.camera.bottom = -15;
-    fillLight.shadow.camera.far = 50;
-    fillLight.shadow.bias = -0.0003;
     this.scene.add(fillLight);
 
-    // Key light with slight yellow tint
-    const keyLight = new THREE.DirectionalLight(0xffffee, 0.7);
-    keyLight.position.set(0, RING_RADIUS * 2, RING_RADIUS * 3);
-    keyLight.lookAt(0, 0, 0);
-    this.scene.add(keyLight);
-
-    // Rim light with blue tint
-    const rimLight = new THREE.DirectionalLight(0xaaccff, 0.7);
-    rimLight.position.set(-RING_RADIUS * 2, RING_RADIUS * 1.5, -RING_RADIUS * 2);
-    this.scene.add(rimLight);
-
-    // Bounce light from below
-    const bounceLight = new THREE.DirectionalLight(0xffffcc, 0.5);
-    bounceLight.position.set(0, -2, 0);
-    bounceLight.target.position.set(0, 2, 0);
-    this.scene.add(bounceLight);
-    this.scene.add(bounceLight.target);
-    
-    // Subtle shadow-only light
-    const shadowLight = new THREE.DirectionalLight(0x000000, 0.03);
-    shadowLight.position.set(5, 20, 5);
-    shadowLight.castShadow = true;
-    shadowLight.shadow.mapSize.width = 1024;
-    shadowLight.shadow.mapSize.height = 1024;
-    shadowLight.shadow.camera.near = 1;
-    shadowLight.shadow.camera.far = 50;
-    shadowLight.shadow.camera.left = -15;
-    shadowLight.shadow.camera.right = 15;
-    shadowLight.shadow.camera.top = 15;
-    shadowLight.shadow.camera.bottom = -15;
-    shadowLight.shadow.bias = -0.0003;
-    this.scene.add(shadowLight);
+    // Add a back light to highlight the model's edges
+    const backLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    backLight.position.set(0, 10, -20);
+    this.scene.add(backLight);
   }
 
   createStadium() {
@@ -543,6 +513,53 @@ export class Renderer {
       target.applyMatrix4(rotationMatrix);
       this.camera.lookAt(target);
     }
+  }
+
+  // Add this new method to load the sumo model
+  loadSumoModel() {
+    const loader = new GLTFLoader();
+    
+    loader.load(
+      '/models3d/sumo.glb',
+      (gltf) => {
+        this.sumoModel = gltf.scene;
+        
+        // Scale and position the model
+        this.sumoModel.scale.set(5, 5, 5);
+        this.sumoModel.position.set(3, 2, 0);
+        this.sumoModel.rotation.set(0, -Math.PI/2, 0);
+        
+        // Traverse all meshes in the model to adjust materials
+        this.sumoModel.traverse((child) => {
+          if (child.isMesh) {
+            // Enable shadows
+            child.castShadow = true;
+            child.receiveShadow = true;
+            
+            // If the mesh has a material, adjust its properties
+            if (child.material) {
+              child.material.roughness = 0.7;  // Adjust material roughness
+              child.material.metalness = 0.3;  // Adjust material metalness
+              child.material.needsUpdate = true;
+            }
+          }
+        });
+        
+        // Debug size after scaling
+        const box = new THREE.Box3().setFromObject(this.sumoModel);
+        const size = box.getSize(new THREE.Vector3());
+        console.log('Sumo model size after scaling:', size);
+        
+        this.scene.add(this.sumoModel);
+        console.log('Sumo model loaded and added to scene');
+      },
+      (progress) => {
+        console.log('Loading sumo model:', (progress.loaded / progress.total * 100) + '%');
+      },
+      (error) => {
+        console.error('Error loading sumo model:', error);
+      }
+    );
   }
 }
 
