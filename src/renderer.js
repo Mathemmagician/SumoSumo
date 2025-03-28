@@ -53,6 +53,7 @@ export class Renderer {
     
     // Add a property to store the sumo model
     this.sumoModel = null;
+    this.refereeModel = null;
   }
 
   initialize() {
@@ -519,29 +520,51 @@ export class Renderer {
   loadSumoModel() {
     const loader = new GLTFLoader();
     
-    loader.load(
-      '/models3d/sumo.glb',
-      (gltf) => {
-        this.sumoModel = gltf.scene;
-        
-        // First get the original bounding box to calculate proper scaling
-        const box = new THREE.Box3().setFromObject(this.sumoModel);
-        const originalHeight = box.max.y - box.min.y;
-        
-        // Calculate scale factor to make height 2 units
-        const scaleFactor = 3 / originalHeight;
-        this.sumoModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
-        
-        // Update bounding box after scaling
-        box.setFromObject(this.sumoModel);
-        
-        // Position the model so its bottom is at y=0
-        const bottomY = box.min.y;
-        this.sumoModel.position.set(3, -bottomY+1, 0);
-        this.sumoModel.rotation.set(0, -Math.PI/2, 0);
-        
-        // Material adjustments
-        this.sumoModel.traverse((child) => {
+    // Load both models
+    Promise.all([
+      // Load sumo model
+      new Promise((resolve, reject) => {
+        loader.load(
+          '/models3d/sumo.glb',
+          (gltf) => resolve(gltf),
+          (progress) => console.log('Loading sumo model:', (progress.loaded / progress.total * 100) + '%'),
+          (error) => reject(error)
+        );
+      }),
+      // Load referee model
+      new Promise((resolve, reject) => {
+        loader.load(
+          '/models3d/referee.glb',
+          (gltf) => resolve(gltf),
+          (progress) => console.log('Loading referee model:', (progress.loaded / progress.total * 100) + '%'),
+          (error) => reject(error)
+        );
+      })
+    ]).then(([sumoGltf, refereeGltf]) => {
+      // Handle sumo model
+      this.sumoModel = sumoGltf.scene;
+      const sumoBox = new THREE.Box3().setFromObject(this.sumoModel);
+      const sumoHeight = sumoBox.max.y - sumoBox.min.y;
+      const sumoScaleFactor = 3 / sumoHeight;
+      this.sumoModel.scale.set(sumoScaleFactor, sumoScaleFactor, sumoScaleFactor);
+      sumoBox.setFromObject(this.sumoModel);
+      const sumoBottomY = sumoBox.min.y;
+      this.sumoModel.position.set(3, -sumoBottomY+1, 0);
+      this.sumoModel.rotation.set(0, -Math.PI/2, 0);
+      
+      // Handle referee model
+      this.refereeModel = refereeGltf.scene;
+      const refereeBox = new THREE.Box3().setFromObject(this.refereeModel);
+      const refereeHeight = refereeBox.max.y - refereeBox.min.y;
+      const refereeScaleFactor = 3 / refereeHeight;
+      this.refereeModel.scale.set(refereeScaleFactor, refereeScaleFactor, refereeScaleFactor);
+      refereeBox.setFromObject(this.refereeModel);
+      const refereeBottomY = refereeBox.min.y;
+      this.refereeModel.position.set(0, -refereeBottomY+1, -3);
+      
+      // Apply material adjustments to both models
+      [this.sumoModel, this.refereeModel].forEach(model => {
+        model.traverse((child) => {
           if (child.isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
@@ -552,22 +575,16 @@ export class Renderer {
             }
           }
         });
-        
-        // Debug final size and position
-        const finalBox = new THREE.Box3().setFromObject(this.sumoModel);
-        console.log('Sumo model final height:', finalBox.max.y - finalBox.min.y);
-        console.log('Sumo model bottom position:', finalBox.min.y);
-        
-        this.scene.add(this.sumoModel);
-        console.log('Sumo model loaded and added to scene');
-      },
-      (progress) => {
-        console.log('Loading sumo model:', (progress.loaded / progress.total * 100) + '%');
-      },
-      (error) => {
-        console.error('Error loading sumo model:', error);
-      }
-    );
+      });
+      
+      // Add both models to the scene
+      this.scene.add(this.sumoModel);
+      this.scene.add(this.refereeModel);
+      console.log('Models loaded and added to scene');
+      
+    }).catch(error => {
+      console.error('Error loading models:', error);
+    });
   }
 }
 
