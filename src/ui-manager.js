@@ -31,14 +31,28 @@ class UIManager {
         // Listen for game state updates
         socketClient.on('gameStateUpdated', (gameState) => {
             this.updateRoleBadge(gameState.myRole);
-            
-            // Update player count
-            const playerIds = new Set();
-            gameState.fighters.forEach(f => playerIds.add(f.id));
-            if (gameState.referee) playerIds.add(gameState.referee.id);
-            gameState.viewers.forEach(v => playerIds.add(v.id));
-            
-            this.updatePlayerCount(playerIds.size);
+            this.updatePlayerCount(this.countAllPlayers(gameState));
+        });
+        
+        // Listen to player events that affect counts
+        socketClient.on('playerJoined', () => {
+            this.updatePlayerCount(this.countAllPlayers(socketClient.gameState));
+        });
+        
+        socketClient.on('playerLeft', () => {
+            this.updatePlayerCount(this.countAllPlayers(socketClient.gameState));
+        });
+        
+        socketClient.on('playerRoleChanged', (data) => {
+            if (data.id === socketClient.gameState.myId) {
+                this.updateRoleBadge(data.role);
+            }
+            this.updatePlayerCount(this.countAllPlayers(socketClient.gameState));
+        });
+        
+        socketClient.on('fightersSelected', () => {
+            this.updateRoleBadge(socketClient.gameState.myRole);
+            this.updatePlayerCount(this.countAllPlayers(socketClient.gameState));
         });
         
         // Listen for stage changes
@@ -66,6 +80,22 @@ class UIManager {
                 this.debouncedAddMessage(username, data.message);
             }
         });
+    }
+
+    // Helper method to count all players from gameState
+    countAllPlayers(gameState) {
+        const playerIds = new Set();
+        
+        // Add fighters
+        gameState.fighters.forEach(f => playerIds.add(f.id));
+        
+        // Add referee if exists
+        if (gameState.referee) playerIds.add(gameState.referee.id);
+        
+        // Add viewers
+        gameState.viewers.forEach(v => playerIds.add(v.id));
+        
+        return playerIds.size;
     }
 
     initializeEventListeners() {
@@ -171,9 +201,14 @@ class UIManager {
         const roleBadge = document.getElementById('role-badge');
         if (!roleBadge) return;
         
+        // Apply clear role styles
         roleBadge.className = 'role-badge';
         roleBadge.classList.add('role-' + role.toLowerCase());
+        
+        // Make role title case for display
         roleBadge.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+        
+        console.log("Updated role badge to:", role);
     }
 
     updateMatchStatus(status, timeLeft) {
@@ -199,6 +234,7 @@ class UIManager {
         const playerCount = document.getElementById('player-count');
         if (playerCount) {
             playerCount.textContent = count;
+            console.log("Updated player count to:", count);
         }
     }
 
@@ -252,6 +288,4 @@ class UIManager {
 export const uiManager = new UIManager();
 
 // Make it globally available for HTML event handlers
-// We'll keep this for backward compatibility, but ideally
-// all event handlers would be set up in the class
 window.uiManager = uiManager; 
