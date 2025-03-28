@@ -8,6 +8,7 @@ import {
   BENCH_HEIGHT,
   BENCH_DEPTH
 } from './constants';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
 // Model dimension constants
 export const MODEL_CONSTANTS = {
@@ -93,12 +94,142 @@ export const GEOMETRY_SETTINGS = {
   MAX_ROW_COUNT: 30
 };
 
-export class ModelFactory {
-  constructor(faceTextures) {
-    this.faceTextures = faceTextures;
+// Add a ModelLoader class to handle 3D models
+export class ModelLoader {
+  constructor() {
+    this.loader = new GLTFLoader();
+    this.loadedModels = {
+      fighter: null,
+      referee: null
+    };
+  }
+
+  async loadModels() {
+    try {
+      const [fighterGltf, refereeGltf] = await Promise.all([
+        this.loadModel('/models3d/sumo.glb'),
+        this.loadModel('/models3d/referee.glb')
+      ]);
+
+      // Process and store the models
+      this.loadedModels.fighter = this.processModel(fighterGltf.scene);
+      this.loadedModels.referee = this.processModel(refereeGltf.scene);
+
+      console.log('All models loaded successfully');
+    } catch (error) {
+      console.error('Error loading models:', error);
+    }
+  }
+
+  processModel(model) {
+    // Apply standard material adjustments
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (child.material) {
+          child.material.roughness = 0.7;
+          child.material.metalness = 0.3;
+          child.material.needsUpdate = true;
+        }
+      }
+    });
+    return model;
+  }
+
+  loadModel(url) {
+    return new Promise((resolve, reject) => {
+      this.loader.load(
+        url,
+        (gltf) => resolve(gltf),
+        (progress) => console.log(`Loading ${url}:`, (progress.loaded / progress.total * 100) + '%'),
+        (error) => reject(error)
+      );
+    });
   }
 
   createPlayerModel(player) {
+    // Get the appropriate base model
+    const baseModel = player.role === 'fighter' ? 
+      this.loadedModels.fighter : 
+      this.loadedModels.referee;
+
+    if (!baseModel) {
+      console.error(`No model loaded for role: ${player.role}`);
+      return null;
+    }
+
+    // Clone the model
+    const model = baseModel.clone();
+
+    // Calculate scaling to make model 2 units tall
+    const box = new THREE.Box3().setFromObject(model);
+    const height = box.max.y - box.min.y;
+    const scale = 2 / height;
+    model.scale.set(scale, scale, scale);
+
+    // Position model so bottom is at y=0
+    box.setFromObject(model);
+    const bottomY = box.min.y;
+    model.position.y = -bottomY;
+
+    // Set position and rotation from player data
+    if (player.position) {
+      model.position.x = player.position.x;
+      model.position.z = player.position.z;
+    }
+    if (player.rotation !== undefined) {
+      model.rotation.y = player.rotation;
+    }
+
+    // Store player data
+    model.userData = {
+      id: player.id,
+      role: player.role
+    };
+
+    return model;
+  }
+}
+
+// Update the ModelFactory class
+export class ModelFactory {
+  constructor(faceTextures) {
+    this.faceTextures = faceTextures;
+    this.modelLoader = new ModelLoader();
+    this.initialized = false;
+  }
+
+  async initialize() {
+    await this.modelLoader.loadModels();
+    this.initialized = true;
+  }
+
+  createPlayerModel(player) {
+    if (!this.initialized) {
+      console.error('ModelFactory not initialized. Call initialize() first');
+      // Fallback to geometric models
+      return this.createGeometricPlayerModel(player);
+    }
+
+    if (player.role === 'viewer') {
+      // Use geometric model for viewers
+      return this.createGeometricPlayerModel(player);
+    }
+
+    const model = this.modelLoader.createPlayerModel(player);
+    if (!model) {
+      // Fallback to geometric model if 3D model loading failed
+      return this.createGeometricPlayerModel(player);
+    }
+
+    // Add common elements like emote/text bubbles
+    this.addCommonElements(model);
+    return model;
+  }
+
+  // Rename the old createPlayerModel to createGeometricPlayerModel
+  createGeometricPlayerModel(player) {
     const model = new THREE.Group();
     model.userData = {
       id: player.id,
@@ -115,8 +246,12 @@ export class ModelFactory {
 
     this.addCommonElements(model);
 
-    model.position.set(player.position.x, player.position.y, player.position.z);
-    model.rotation.y = player.rotation || 0;
+    if (player.position) {
+      model.position.set(player.position.x, player.position.y || 0, player.position.z);
+    }
+    if (player.rotation !== undefined) {
+      model.rotation.y = player.rotation;
+    }
 
     return model;
   }

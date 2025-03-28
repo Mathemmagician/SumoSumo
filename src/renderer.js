@@ -13,7 +13,7 @@ import {
   CAMERA_MOVE_SPEED,
   CAMERA_ROTATE_SPEED
 } from './constants';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import { ModelFactory } from './models';
 
 export class Renderer {
   constructor() {
@@ -51,13 +51,18 @@ export class Renderer {
     this.handleKeyUp = this.handleKeyUp.bind(this);
     this.toggleFreeCamera = this.toggleFreeCamera.bind(this);
     
-    // Add a property to store the sumo model
-    this.sumoModel = null;
-    this.refereeModel = null;
+    // Add ModelFactory instance
+    this.modelFactory = new ModelFactory(/* pass face textures if needed */);
+    
+    // Add a Map to store player models
+    this.playerModels = new Map();
   }
 
-  initialize() {
+  async initialize() {
     console.log('Initializing renderer');
+    
+    // Initialize ModelFactory first
+    await this.modelFactory.initialize();
     
     // Create scene
     this.scene = new THREE.Scene();
@@ -116,9 +121,6 @@ export class Renderer {
     this.createStadium();
     console.log('Stadium created');
 
-    // Load the sumo model after creating the stadium
-    this.loadSumoModel();
-
     // Create FPS display
     this.createFpsDisplay();
     console.log('FPS display created');
@@ -138,6 +140,11 @@ export class Renderer {
     this.lastFpsUpdate = performance.now();
     console.log('Starting animation loop');
     this.animate();
+
+    // Set up socket event listeners for player updates
+    socketClient.on('gameStateUpdated', (gameState) => this.updatePlayers(gameState));
+    socketClient.on('playerMoved', (data) => this.updatePlayerPosition(data));
+    socketClient.on('playerLeft', (playerId) => this.removePlayer(playerId));
   }
 
   // Add FPS display with socket stats
@@ -516,75 +523,84 @@ export class Renderer {
     }
   }
 
-  // Add this new method to load the sumo model
-  loadSumoModel() {
-    const loader = new GLTFLoader();
-    
-    // Load both models
-    Promise.all([
-      // Load sumo model
-      new Promise((resolve, reject) => {
-        loader.load(
-          '/models3d/sumo.glb',
-          (gltf) => resolve(gltf),
-          (progress) => console.log('Loading sumo model:', (progress.loaded / progress.total * 100) + '%'),
-          (error) => reject(error)
-        );
-      }),
-      // Load referee model
-      new Promise((resolve, reject) => {
-        loader.load(
-          '/models3d/referee.glb',
-          (gltf) => resolve(gltf),
-          (progress) => console.log('Loading referee model:', (progress.loaded / progress.total * 100) + '%'),
-          (error) => reject(error)
-        );
-      })
-    ]).then(([sumoGltf, refereeGltf]) => {
-      // Handle sumo model
-      this.sumoModel = sumoGltf.scene;
-      const sumoBox = new THREE.Box3().setFromObject(this.sumoModel);
-      const sumoHeight = sumoBox.max.y - sumoBox.min.y;
-      const sumoScaleFactor = 3 / sumoHeight;
-      this.sumoModel.scale.set(sumoScaleFactor, sumoScaleFactor, sumoScaleFactor);
-      sumoBox.setFromObject(this.sumoModel);
-      const sumoBottomY = sumoBox.min.y;
-      this.sumoModel.position.set(3, -sumoBottomY+1, 0);
-      this.sumoModel.rotation.set(0, -Math.PI/2, 0);
+  updatePlayers(gameState) {
+    console.log('Updating players with gameState:', gameState);
+    console.log('Current player models:', this.playerModels);
+
+    // Remove any players that no longer exist
+    for (const [playerId, model] of this.playerModels) {
+      const playerExists = gameState.fighters.some(f => f.id === playerId) ||
+        (gameState.referee && gameState.referee.id === playerId) ||
+        gameState.viewers.some(v => v.id === playerId);
       
-      // Handle referee model
-      this.refereeModel = refereeGltf.scene;
-      const refereeBox = new THREE.Box3().setFromObject(this.refereeModel);
-      const refereeHeight = refereeBox.max.y - refereeBox.min.y;
-      const refereeScaleFactor = 3 / refereeHeight;
-      this.refereeModel.scale.set(refereeScaleFactor, refereeScaleFactor, refereeScaleFactor);
-      refereeBox.setFromObject(this.refereeModel);
-      const refereeBottomY = refereeBox.min.y;
-      this.refereeModel.position.set(0, -refereeBottomY+1, -3);
-      
-      // Apply material adjustments to both models
-      [this.sumoModel, this.refereeModel].forEach(model => {
-        model.traverse((child) => {
-          if (child.isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-            if (child.material) {
-              child.material.roughness = 0.7;
-              child.material.metalness = 0.3;
-              child.material.needsUpdate = true;
-            }
-          }
-        });
-      });
-      
-      // Add both models to the scene
-      this.scene.add(this.sumoModel);
-      this.scene.add(this.refereeModel);
-      console.log('Models loaded and added to scene');
-      
-    }).catch(error => {
-      console.error('Error loading models:', error);
+      if (!playerExists) {
+        console.log('Removing player:', playerId);
+        this.removePlayer(playerId);
+      }
+    }
+
+    // Update or add fighters
+    gameState.fighters.forEach(fighter => {
+      console.log('Processing fighter:', fighter);
+      this.updateOrCreatePlayer(fighter);
     });
+
+    // Update or add referee
+    if (gameState.referee) {
+      console.log('Processing referee:', gameState.referee);
+      this.updateOrCreatePlayer(gameState.referee);
+    }
+
+    // Update or add viewers
+    gameState.viewers.forEach(viewer => {
+      console.log('Processing viewer:', viewer);
+      this.updateOrCreatePlayer(viewer);
+    });
+  }
+
+  updateOrCreatePlayer(player) {
+    console.log('updateOrCreatePlayer called for:', player);
+    if (!this.playerModels.has(player.id)) {
+      console.log('Creating new model for player:', player.id);
+      // Create new model
+      const model = this.modelFactory.createPlayerModel(player);
+      if (model) {
+        console.log('Model created successfully:', model);
+        this.scene.add(model);
+        this.playerModels.set(player.id, model);
+      } else {
+        console.error('Failed to create model for player:', player);
+      }
+    } else {
+      // Update existing model position/rotation
+      const model = this.playerModels.get(player.id);
+      if (player.position) {
+        model.position.set(player.position.x, model.position.y, player.position.z);
+      }
+      if (player.rotation !== undefined) {
+        model.rotation.y = player.rotation;
+      }
+    }
+  }
+
+  updatePlayerPosition(data) {
+    const model = this.playerModels.get(data.id);
+    if (model) {
+      if (data.position) {
+        model.position.set(data.position.x, model.position.y, data.position.z);
+      }
+      if (data.rotation !== undefined) {
+        model.rotation.y = data.rotation;
+      }
+    }
+  }
+
+  removePlayer(playerId) {
+    const model = this.playerModels.get(playerId);
+    if (model) {
+      this.scene.remove(model);
+      this.playerModels.delete(playerId);
+    }
   }
 }
 
