@@ -45,6 +45,14 @@ export class Renderer {
       rotateRight: false
     };
 
+    // Add fighter movement state
+    this.fighterMovement = {
+      forward: false,
+      backward: false,
+      left: false,
+      right: false
+    };
+
     // Bind methods
     this.animate = this.animate.bind(this);
     this.onWindowResize = this.onWindowResize.bind(this);
@@ -52,6 +60,9 @@ export class Renderer {
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleKeyUp = this.handleKeyUp.bind(this);
     this.toggleFreeCamera = this.toggleFreeCamera.bind(this);
+    this.handleFighterKeyDown = this.handleFighterKeyDown.bind(this);
+    this.handleFighterKeyUp = this.handleFighterKeyUp.bind(this);
+    this.updateFighterMovement = this.updateFighterMovement.bind(this);
 
     // Add ModelFactory instance
     this.modelFactory = new ModelFactory(/* pass face textures if needed */);
@@ -138,6 +149,8 @@ export class Renderer {
     // Add keyboard event listeners
     window.addEventListener("keydown", this.handleKeyDown);
     window.addEventListener("keyup", this.handleKeyUp);
+    window.addEventListener("keydown", this.handleFighterKeyDown);
+    window.addEventListener("keyup", this.handleFighterKeyUp);
 
     // Listen for free camera toggle from UI Manager
     document.addEventListener("freeCameraToggled", (event) => {
@@ -390,6 +403,9 @@ export class Renderer {
     } else {
       this.controls.update();
     }
+
+    // Update fighter movement
+    this.updateFighterMovement();
 
     // Log first frame render
     if (!this._hasLoggedFirstFrame) {
@@ -1046,6 +1062,8 @@ export class Renderer {
     window.removeEventListener("resize", this.onWindowResize);
     window.removeEventListener("keydown", this.handleKeyDown);
     window.removeEventListener("keyup", this.handleKeyUp);
+    window.removeEventListener("keydown", this.handleFighterKeyDown);
+    window.removeEventListener("keyup", this.handleFighterKeyUp);
 
     // Other cleanup as needed
     console.log("Renderer cleanup completed");
@@ -1082,6 +1100,83 @@ export class Renderer {
     };
     
     requestAnimationFrame(animateCamera);
+  }
+
+  // Add new methods for fighter movement
+  handleFighterKeyDown(event) {
+    // Only handle fighter movement if I am a fighter and match is in progress
+    if (socketClient.gameState.myRole !== 'fighter' || 
+        socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
+      return;
+    }
+
+    switch (event.key.toLowerCase()) {
+      case "w":
+      case "arrowup":
+        this.fighterMovement.forward = true;
+        break;
+      case "s":
+      case "arrowdown":
+        this.fighterMovement.backward = true;
+        break;
+      case "a":
+      case "arrowleft":
+        this.fighterMovement.left = true;
+        break;
+      case "d":
+      case "arrowright":
+        this.fighterMovement.right = true;
+        break;
+    }
+  }
+
+  handleFighterKeyUp(event) {
+    // Only handle fighter movement if I am a fighter and match is in progress
+    if (socketClient.gameState.myRole !== 'fighter' || 
+        socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
+      return;
+    }
+
+    switch (event.key.toLowerCase()) {
+      case "w":
+      case "arrowup":
+        this.fighterMovement.forward = false;
+        break;
+      case "s":
+      case "arrowdown":
+        this.fighterMovement.backward = false;
+        break;
+      case "a":
+      case "arrowleft":
+        this.fighterMovement.left = false;
+        break;
+      case "d":
+      case "arrowright":
+        this.fighterMovement.right = false;
+        break;
+    }
+  }
+
+  updateFighterMovement() {
+    // Only send movement if we're actually moving and are a fighter in an active match
+    if (socketClient.gameState.myRole !== 'fighter' || 
+        socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
+      return;
+    }
+
+    // Check if any movement keys are pressed
+    if (this.fighterMovement.forward) {
+      socketClient.sendMovement('forward');
+    }
+    if (this.fighterMovement.backward) {
+      socketClient.sendMovement('backward');
+    }
+    if (this.fighterMovement.left) {
+      socketClient.sendMovement('left');
+    }
+    if (this.fighterMovement.right) {
+      socketClient.sendMovement('right');
+    }
   }
 }
 
