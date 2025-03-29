@@ -700,22 +700,22 @@ export class Renderer {
 
     // Update emote handler to match socket data structure
     socketClient.on("playerEmote", (data) => {
-      console.log("Renderer received playerEmote:", data);
+      // console.log("Renderer received playerEmote:", data);
       // Check the actual data structure
       const emoteText = data.emote || data.type || data;
       if (typeof emoteText === 'string' && emoteText.length > 0) {
-        console.log("Creating emote bubble for", data.id || data.playerId, "with text:", emoteText);
+        // console.log("Creating emote bubble for", data.id || data.playerId, "with text:", emoteText);
         this.createTextBubble(data.id || data.playerId, emoteText, true);
       }
     });
 
     // Update message handler to match socket data structure
     socketClient.on("playerMessage", (data) => {
-      console.log("Renderer received playerMessage:", data);
+      // console.log("Renderer received playerMessage:", data);
       // Check the actual data structure
       const messageText = data.message || data.text || data;
       if (typeof messageText === 'string' && messageText.length > 0) {
-        console.log("Creating message bubble for", data.id || data.playerId, "with text:", messageText);
+        // console.log("Creating message bubble for", data.id || data.playerId, "with text:", messageText);
         this.createTextBubble(data.id || data.playerId, messageText, false);
       }
     });
@@ -1266,13 +1266,18 @@ export class Renderer {
 
   // Add new methods for text bubble management
   createTextBubble(playerId, text, isEmote = false) {
-    console.log(`Creating ${isEmote ? 'emote' : 'message'} bubble for ${playerId}: "${text}"`);
+    // Only log for non-NPC players
+    if (!playerId.startsWith('npc-') && !playerId.startsWith('fake-')) {
+        console.log(`Creating ${isEmote ? 'emote' : 'message'} bubble for ${playerId}: "${text}"`);
+    }
     
     this.removeTextBubble(playerId);
 
     const playerModel = this.playerModels.get(playerId);
     if (!playerModel) {
-        console.warn(`No player model found for ${playerId}`);
+        if (!playerId.startsWith('npc-') && !playerId.startsWith('fake-')) {
+            console.warn(`No player model found for ${playerId}`);
+        }
         return;
     }
 

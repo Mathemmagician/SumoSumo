@@ -150,14 +150,14 @@ class SocketClient {
   handlePlayerEmote(data) {
     this.socketStats.playerEmote++;
     this.updateSocketStats();
-    console.log("Player emote:", data);
+    // console.log("Player emote:", data);
     this.emit("playerEmote", data);
   }
 
   handlePlayerMessage(data) {
     this.socketStats.playerMessage++;
     this.updateSocketStats();
-    console.log("Player message:", data);
+    // console.log("Player message:", data);
     this.emit("playerMessage", data);
   }
 
