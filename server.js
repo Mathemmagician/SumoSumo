@@ -754,7 +754,8 @@ function addFakeUser() {
     rotation: 0,
     faceId: Math.floor(Math.random() * 10),
     colorId: Math.floor(Math.random() * 10),
-    seed: Math.floor(Math.random() * 1000000)
+    seed: Math.floor(Math.random() * 1000000),
+    viewerOnly: true
   };
 
   // Store fake user
