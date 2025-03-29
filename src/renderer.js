@@ -16,6 +16,7 @@ import {
   BENCH_HEIGHT,
 } from "./constants";
 import { ModelFactory } from "./models";
+import { CameraSystem } from './camera-system';
 
 export class Renderer {
   constructor() {
@@ -25,6 +26,7 @@ export class Renderer {
     this.renderer = null;
     this.stadium = null;
     this.controls = null;
+    this.cameraSystem = null; // Initialize as null, we'll create it later
 
     // FPS counter variables
     this.frameCount = 0;
@@ -168,6 +170,10 @@ export class Renderer {
       console.log("Processing initial game state");
       this.updatePlayers(socketClient.gameState);
     }
+
+    // Now initialize the camera system after scene, camera and renderer are created
+    this.cameraSystem = new CameraSystem(this.scene, this.camera, this.renderer);
+    console.log("Camera system initialized");
 
     // Start animation loop
     this.lastFpsUpdate = performance.now();
@@ -403,8 +409,8 @@ export class Renderer {
     // Handle camera movement if free camera is enabled
     if (this.isFreeCamera) {
       this.updateCameraPosition();
-    } else {
-      this.controls.update();
+    } else if (this.cameraSystem) {
+      this.cameraSystem.update();
     }
 
     // Update fighter movement
@@ -434,52 +440,45 @@ export class Renderer {
 
   // Add free camera toggle
   toggleFreeCamera(enabled) {
+    console.log("Toggling free camera:", enabled);
     this.isFreeCamera = enabled;
-
-    // Enable/disable orbit controls when switching camera modes
-    this.controls.enabled = !enabled;
-
-    // Reset camera movement when disabling free camera
-    if (!enabled) {
-      for (const key in this.cameraMovement) {
-        this.cameraMovement[key] = false;
+    
+    if (enabled) {
+      // Store original camera parameters
+      this.originalCameraPosition = this.camera.position.clone();
+      this.originalCameraRotation = this.camera.rotation.clone();
+      
+      // Initialize camera movement state
+      this.movementSpeed = 0.5;
+      this.cameraMovement = {
+        forward: false,
+        backward: false,
+        left: false,
+        right: false,
+        up: false,
+        down: false
+      };
+      
+      // Set up keyboard event listeners
+      document.addEventListener('keydown', this.handleKeyDown.bind(this));
+      document.addEventListener('keyup', this.handleKeyUp.bind(this));
+      
+      // Enable free camera controls
+      document.addEventListener('mousemove', this.handleMouseMove.bind(this));
+      document.body.requestPointerLock();
+    } else {
+      // Disable free camera controls
+      document.removeEventListener('keydown', this.handleKeyDown.bind(this));
+      document.removeEventListener('keyup', this.handleKeyUp.bind(this));
+      document.removeEventListener('mousemove', this.handleMouseMove.bind(this));
+      
+      if (document.pointerLockElement === document.body) {
+        document.exitPointerLock();
       }
+      
+      // Let the camera system take control again
+      this.updateCameraForGameState(socketClient.gameState);
     }
-
-    // Update the UI checkbox and text
-    const freeCameraToggle = document.getElementById("free-camera-toggle");
-    if (freeCameraToggle) {
-      freeCameraToggle.checked = enabled;
-
-      // Find the text span that's a sibling of the checkbox
-      const textSpan = freeCameraToggle.nextElementSibling;
-      if (textSpan && textSpan.classList.contains("viewer-only-text")) {
-        if (enabled) {
-          // Create or update controls hint element
-          let controlsHint = textSpan.querySelector(".controls-hint");
-          if (!controlsHint) {
-            controlsHint = document.createElement("span");
-            controlsHint.className = "controls-hint";
-            controlsHint.style.cssText = `
-              font-size: 11px;
-              opacity: 0.7;
-              margin-left: 5px;
-              font-style: italic;
-            `;
-            textSpan.appendChild(controlsHint);
-          }
-          controlsHint.textContent = " WSAD,←→,↑↓";
-        } else {
-          // Remove controls hint if it exists
-          const controlsHint = textSpan.querySelector(".controls-hint");
-          if (controlsHint) {
-            textSpan.removeChild(controlsHint);
-          }
-        }
-      }
-    }
-
-    console.log(`Free camera ${enabled ? "enabled" : "disabled"}`);
   }
 
   // Handle key down events for camera control
@@ -604,7 +603,10 @@ export class Renderer {
   setupSocketEventListeners() {
     // Main game state update
     socketClient.on("gameStateUpdated", (gameState) => {
-      console.log("Renderer received gameStateUpdated:", gameState);
+      console.log("Game state updated:", gameState);
+      // Update camera for the new game state
+      this.updateCameraForGameState(gameState);
+      
       // Always force a complete update when receiving game state
       this.updatePlayers(gameState);
     });
@@ -650,13 +652,21 @@ export class Renderer {
 
     // Handle pre-ceremony positioning
     socketClient.on("preCeremonyStart", (data) => {
-      console.log("Renderer received preCeremonyStart:", data);
-      // Update fighters and referee positions
-      if (data.fighters && data.fighters.length) {
-        data.fighters.forEach((fighter) => this.updateOrCreatePlayer(fighter));
-      }
-      if (data.referee) {
-        this.updateOrCreatePlayer(data.referee);
+      console.log("Pre-ceremony started:", data);
+      // Set camera to ceremony mode
+      if (socketClient.gameState.fighters.length === 2 && socketClient.gameState.referee) {
+        const fighter1Model = this.playerModels.get(socketClient.gameState.fighters[0].id);
+        const fighter2Model = this.playerModels.get(socketClient.gameState.fighters[1].id);
+        const refereeModel = this.playerModels.get(socketClient.gameState.referee.id);
+        
+        if (fighter1Model && fighter2Model && refereeModel) {
+          console.log("Setting ceremony camera mode for pre-ceremony");
+          this.cameraSystem.setMode(this.cameraSystem.MODES.CEREMONY, {
+            fighter1: fighter1Model,
+            fighter2: fighter2Model,
+            referee: refereeModel
+          });
+        }
       }
     });
 
@@ -1113,6 +1123,12 @@ export class Renderer {
       bubble.sprite.material.map.dispose();
     }
     this.textBubbles.clear();
+
+    // Dispose of camera system
+    if (this.cameraSystem) {
+      this.cameraSystem.dispose();
+      this.cameraSystem = null;
+    }
   }
 
   // Add a method to reset camera to a good viewing position
@@ -1476,6 +1492,46 @@ export class Renderer {
         bubble.sprite.position.y += 8;
       }
     });
+  }
+
+  // Add a method to handle game state updates for camera
+  updateCameraForGameState(gameState) {
+    // Don't update if free camera is enabled or cameraSystem is not initialized
+    if (this.isFreeCamera || !this.cameraSystem) return;
+    
+    // Get current game stage
+    const currentStage = gameState.stage;
+    
+    // Update camera mode based on game stage
+    switch (currentStage) {
+      case 'PRE_CEREMONY':
+        // Set ceremony mode with fighters and referee
+        if (gameState.fighters.length === 2 && gameState.referee) {
+          const fighter1Model = this.playerModels.get(gameState.fighters[0].id);
+          const fighter2Model = this.playerModels.get(gameState.fighters[1].id);
+          const refereeModel = this.playerModels.get(gameState.referee.id);
+          
+          if (fighter1Model && fighter2Model && refereeModel) {
+            console.log("Setting ceremony camera mode");
+            this.cameraSystem.setMode(this.cameraSystem.MODES.CEREMONY, {
+              fighter1: fighter1Model,
+              fighter2: fighter2Model,
+              referee: refereeModel
+            });
+          }
+        }
+        break;
+        
+      case 'MATCH_IN_PROGRESS':
+        // During match, use the overview camera
+        this.cameraSystem.setMode(this.cameraSystem.MODES.WAITING_OVERVIEW);
+        break;
+        
+      default:
+        // Default to waiting overview
+        this.cameraSystem.setMode(this.cameraSystem.MODES.WAITING_OVERVIEW);
+        break;
+    }
   }
 }
 

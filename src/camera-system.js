@@ -7,9 +7,21 @@ import { RING_HEIGHT } from './constants';
  */
 export class CameraSystem {
   constructor(scene, camera, renderer) {
-    this.scene = scene;
-    this.camera = camera;
-    this.renderer = renderer;
+    // Check if dependencies are provided
+    if (!scene || !camera || !renderer) {
+      console.error("CameraSystem: Missing required dependencies");
+      // Use safe defaults
+      this.scene = scene || new THREE.Scene();
+      this.camera = camera || new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      this.renderer = renderer || {};
+      // Add a flag to disable operations when improperly initialized
+      this._initialized = false;
+    } else {
+      this.scene = scene;
+      this.camera = camera;
+      this.renderer = renderer;
+      this._initialized = true;
+    }
     
     // Camera mode constants
     this.MODES = {
@@ -79,6 +91,8 @@ export class CameraSystem {
    * @param {Object} params - Optional parameters for the mode
    */
   setMode(modeName, params = {}) {
+    if (!this._initialized) return;
+    
     // For now, only allow WAITING_OVERVIEW and CEREMONY modes
     if (modeName !== this.MODES.CEREMONY) {
       modeName = this.MODES.WAITING_OVERVIEW;
@@ -149,6 +163,8 @@ export class CameraSystem {
    * Update camera position and orientation based on current mode and time
    */
   update() {
+    if (!this._initialized) return;
+    
     // Default to WAITING_OVERVIEW for all non-ceremony stages
     if (this.currentMode !== this.MODES.CEREMONY) {
       if (this.currentMode !== this.MODES.WAITING_OVERVIEW) {
