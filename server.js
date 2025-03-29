@@ -744,7 +744,7 @@ function startFakeUserSystem() {
 }
 
 function addFakeUser() {
-  const fakeId = `fake-${FAKE_USERS.count++}`;
+  const fakeId = `npc-${FAKE_USERS.count++}`;
   
   // Create fake user with random properties
   const fakeUser = {

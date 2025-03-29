@@ -842,7 +842,12 @@ export class Renderer {
     if (viewers && viewers.length) {
       // Get seat positions from the stadium
       const seatPositions = this.getStadiumSeatPositions();
-      const totalSeats = seatPositions.length;
+      
+      // Get all seats (no restriction based on position)
+      const allSeats = seatPositions;
+      
+      // Get only seats that are good for real users (not south side)
+      const realUserSeats = seatPositions.filter(seat => seat.forRealUsers);
       
       // Track which seats are already occupied
       const occupiedSeats = new Set();
@@ -852,32 +857,37 @@ export class Renderer {
         // Clone viewer object to avoid modifying the original game state
         const viewerWithPosition = { ...viewer };
         
-        // If viewer doesn't have a position or has null position (reset case),
-        // or has a default position, place on a seat
+        // Check if position needs to be assigned
         if (
           !viewerWithPosition.position ||
           viewerWithPosition.position === null || 
           (viewerWithPosition.position.x === 0 &&
            viewerWithPosition.position.z === 0)
         ) {
+          // Determine if this is a real user or an NPC/fake user
+          const isNpc = viewer.id.startsWith('npc-') || viewer.id.startsWith('fake-');
+          
+          // For NPCs, use all seats. For real users, use only seats that are good for viewing.
+          const eligibleSeats = isNpc ? allSeats : realUserSeats;
+          
           // Determine seat based on player.seed if available, otherwise use player ID
           let seatIndex;
           
           if (viewer.seed !== undefined) {
             // Use the player's seed to determine seat
-            seatIndex = Math.abs(viewer.seed) % totalSeats;
+            seatIndex = Math.abs(viewer.seed) % eligibleSeats.length;
           } else {
             // Generate a deterministic seat index from player ID
             const idSum = viewer.id.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
-            seatIndex = idSum % totalSeats;
+            seatIndex = idSum % eligibleSeats.length;
           }
           
           // If this seat is occupied, find the next available one
           let attempts = 0;
-          const maxAttempts = totalSeats; // Only try each seat once at most
+          const maxAttempts = eligibleSeats.length; // Only try each seat once at most
           
           while (occupiedSeats.has(seatIndex) && attempts < maxAttempts) {
-            seatIndex = (seatIndex + 1) % totalSeats;
+            seatIndex = (seatIndex + 1) % eligibleSeats.length;
             attempts++;
           }
           
@@ -885,18 +895,18 @@ export class Renderer {
           occupiedSeats.add(seatIndex);
           
           // Get the seat position
-          const seatPos = seatPositions[seatIndex];
+          const seatPos = eligibleSeats[seatIndex];
           
           viewerWithPosition.position = {
             x: seatPos.x,
-            y: seatPos.y, // Use the position directly from seatPos which now includes the correct height
+            y: seatPos.y,
             z: seatPos.z,
           };
           
           // Set rotation to face the ring
           viewerWithPosition.rotation = seatPos.rotation;
           
-          console.log(`Placed viewer ${viewer.id} at seat ${seatIndex} (row ${seatPos.row}, side ${seatPos.side})`);
+          console.log(`Placed ${isNpc ? 'NPC' : 'user'} ${viewer.id} at ${seatPos.side} side, row ${seatPos.row}, seat ${seatPos.seatIndex}`);
         }
         
         console.log("Processing viewer:", viewerWithPosition);
@@ -907,7 +917,7 @@ export class Renderer {
     console.log(`Total player models after update: ${this.playerModels.size}`);
   }
 
-  // Helper method to get stadium seat positions from the actual stadium geometry
+  // Helper method to get stadium seat positions with improved placement logic
   getStadiumSeatPositions() {
     // Create an array to store seat positions
     const positions = [];
@@ -922,18 +932,17 @@ export class Renderer {
     const benchHeight = BENCH_HEIGHT;
     
     // Set a proper height offset for viewers based on the model scale
-    // Let's use a multiple of the bench height
     const MODEL_HEIGHT_ABOVE_SEAT = 1.5; // This will make viewers sit properly above the bench
     
     // We'll focus on the first few rows
-    const maxRows = 3;
+    const maxRows = 8;
     
     // Define the sides of the stadium
     const sideData = [
-      { name: 'North', rotation: 0, x: 0, z: -1 },
-      { name: 'East', rotation: -Math.PI / 2, x: 1, z: 0 },
-      { name: 'West', rotation: Math.PI / 2, x: -1, z: 0 },
-      { name: 'South', rotation: Math.PI, x: 0, z: 1 }
+      { name: 'North', rotation: 0, x: 0, z: -1, forRealUsers: true },
+      { name: 'East', rotation: -Math.PI / 2, x: 1, z: 0, forRealUsers: true },
+      { name: 'West', rotation: Math.PI / 2, x: -1, z: 0, forRealUsers: true },
+      { name: 'South', rotation: Math.PI, x: 0, z: 1, forRealUsers: false } // South side is not good for real users
     ];
     
     // For each side of the stadium
@@ -965,7 +974,7 @@ export class Renderer {
             z = side.z * distance;
           }
           
-          // Add the position and rotation to our array
+          // Add the position and rotation to our array along with metadata about seat suitability
           positions.push({
             x: x,
             y: y + MODEL_HEIGHT_ABOVE_SEAT, // Sit higher above the bench
@@ -973,7 +982,8 @@ export class Renderer {
             rotation: side.rotation,
             side: side.name,
             row: rowIndex,
-            seatIndex: i
+            seatIndex: i,
+            forRealUsers: side.forRealUsers // Whether this seat is suitable for real users
           });
         }
       }

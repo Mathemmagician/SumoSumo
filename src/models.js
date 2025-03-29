@@ -518,6 +518,13 @@ export class StadiumFactory {
         mainFontSize: 55,  // Slightly smaller due to longer text
         subFontSize: 40
       },
+      {
+        text: "r3nd3r.com",
+        subtext: "The Haven't Sponsored Me Yet\nBut They Should",
+        color: 0x000000, // Almost black
+        mainFontSize: 55,  // Slightly smaller due to longer text
+        subFontSize: 35
+      },
       ...availableAdSpaces
     ];
 

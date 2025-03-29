@@ -164,7 +164,7 @@ class UIManager {
 
     debouncedAddMessage(sender, message) {
         // Skip adding messages from fake users to the chat history
-        if (sender.startsWith('fake-')) {
+        if (sender.startsWith('npc-')) {
             return;
         }
         
