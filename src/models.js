@@ -524,7 +524,7 @@ export class StadiumFactory {
         text: "BOUNCE BACK",
         subtext: "Because Sometimes\nYou Land Outside the Ring",
         color: 0x8B4513, // Saddle brown
-        mainFontSize: 68,  // Can be large due to short text
+        mainFontSize: 65,  // Can be large due to short text
         subFontSize: 42
       },
       ...availableAdSpaces

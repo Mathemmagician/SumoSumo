@@ -42,7 +42,7 @@ export class Renderer {
       up: false,
       down: false,
       rotateLeft: false,
-      rotateRight: false,
+      rotateRight: false
     };
 
     // Bind methods
@@ -436,7 +436,7 @@ export class Renderer {
             `;
             textSpan.appendChild(controlsHint);
           }
-          controlsHint.textContent = " WSAD/↑↓←→";
+          controlsHint.textContent = " WSAD,←→,↑↓";
         } else {
           // Remove controls hint if it exists
           const controlsHint = textSpan.querySelector(".controls-hint");
@@ -484,9 +484,7 @@ export class Renderer {
 
   // Handle key up events for camera control
   handleKeyUp(event) {
-    if (!this.isFreeCamera) {
-      return;
-    }
+    if (!this.isFreeCamera) return;
 
     switch (event.key.toLowerCase()) {
       case "w":
@@ -516,17 +514,19 @@ export class Renderer {
     }
   }
 
-  // Add a method to update camera position based on movement state
+  // Update the camera movement method
   updateCameraPosition() {
-    // Create a vector for the camera's forward direction
+    // Get camera's forward direction (excluding y component for level movement)
     const direction = new THREE.Vector3();
     this.camera.getWorldDirection(direction);
+    direction.y = 0; // Keep movement level
+    direction.normalize();
 
-    // Create right vector by crossing forward with up
+    // Get right vector by crossing forward with up
     const right = new THREE.Vector3();
     right.crossVectors(direction, new THREE.Vector3(0, 1, 0)).normalize();
 
-    // Forward/backward movement
+    // Forward/backward movement along camera's direction
     if (this.cameraMovement.forward) {
       this.camera.position.addScaledVector(direction, CAMERA_MOVE_SPEED);
     }
@@ -534,7 +534,7 @@ export class Renderer {
       this.camera.position.addScaledVector(direction, -CAMERA_MOVE_SPEED);
     }
 
-    // Left/right movement
+    // Left/right movement (strafe)
     if (this.cameraMovement.left) {
       this.camera.position.addScaledVector(right, -CAMERA_MOVE_SPEED);
     }
@@ -550,26 +550,21 @@ export class Renderer {
       this.camera.position.y -= CAMERA_MOVE_SPEED;
     }
 
-    // Camera rotation around world Y axis
+    // Rotation (arrow keys) - using 3x faster rotation speed
     if (this.cameraMovement.rotateLeft || this.cameraMovement.rotateRight) {
-      // Get current position
-      const position = this.camera.position.clone();
-
+      const rotationAngle = (CAMERA_ROTATE_SPEED * 3) * 
+        (this.cameraMovement.rotateLeft ? 1 : -1);
+      
       // Create rotation matrix around world Y axis
       const rotationMatrix = new THREE.Matrix4();
-      const angle =
-        CAMERA_ROTATE_SPEED * (this.cameraMovement.rotateLeft ? 1 : -1);
-      rotationMatrix.makeRotationY(angle);
-
-      // Apply rotation to position
-      position.applyMatrix4(rotationMatrix);
-      this.camera.position.copy(position);
-
-      // Ensure camera keeps looking at the same direction relative to its new position
+      rotationMatrix.makeRotationY(rotationAngle);
+      
+      // Apply rotation to camera direction
+      direction.applyMatrix4(rotationMatrix);
+      
+      // Update camera look direction
       const target = new THREE.Vector3();
-      this.camera.getWorldDirection(target);
-      target.multiplyScalar(10).add(this.camera.position); // Look 10 units ahead
-      target.applyMatrix4(rotationMatrix);
+      target.copy(this.camera.position).add(direction);
       this.camera.lookAt(target);
     }
   }
