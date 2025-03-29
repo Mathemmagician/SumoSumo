@@ -103,26 +103,58 @@ export class ModelLoader {
       referee: null,
       viewer: null
     };
+    this.isLoading = false;
+    this.loadPromise = null;
   }
 
   async loadModels() {
-    try {
-      // Load all models in parallel
-      const [fighterGltf, refereeGltf, viewerGltf] = await Promise.all([
-        this.loadModel('/models3d/sumo.glb'),
-        this.loadModel('/models3d/referee.glb'),
-        this.loadModel('/models3d/viewer_0.glb')
-      ]);
-
-      // Process and store the models
-      this.loadedModels.fighter = this.processModel(fighterGltf.scene);
-      this.loadedModels.referee = this.processModel(refereeGltf.scene);
-      this.loadedModels.viewer = this.processModel(viewerGltf.scene);
-
-      console.log('All models loaded successfully');
-    } catch (error) {
-      console.error('Error loading models:', error);
+    // Only load models once - if already loading, return the existing promise
+    if (this.isLoading) {
+      console.log('Models already loading, returning existing promise');
+      return this.loadPromise;
     }
+    
+    // If models are already loaded, return immediately
+    if (this.loadedModels.fighter && this.loadedModels.referee && this.loadedModels.viewer) {
+      console.log('Models already loaded, returning immediately');
+      return this.loadedModels;
+    }
+    
+    console.log('Starting model loading...');
+    this.isLoading = true;
+    
+    // Create a promise for the loading process
+    this.loadPromise = new Promise(async (resolve, reject) => {
+      try {
+        // Load all models in parallel
+        const [fighterGltf, refereeGltf, viewerGltf] = await Promise.all([
+          this.loadModel('/models3d/sumo.glb'),
+          this.loadModel('/models3d/referee.glb'),
+          this.loadModel('/models3d/viewer_0.glb')
+        ]);
+
+        // Process and store the models
+        this.loadedModels.fighter = this.processModel(fighterGltf.scene);
+        this.loadedModels.referee = this.processModel(refereeGltf.scene);
+        this.loadedModels.viewer = this.processModel(viewerGltf.scene);
+
+        console.log('All models loaded successfully');
+        resolve(this.loadedModels);
+      } catch (error) {
+        console.error('Error loading models:', error);
+        this.isLoading = false;
+        reject(error);
+      }
+    });
+    
+    // When loading completes, reset loading flag
+    this.loadPromise.then(() => {
+      this.isLoading = false;
+    }).catch(() => {
+      this.isLoading = false;
+    });
+    
+    return this.loadPromise;
   }
 
   processModel(model) {
@@ -192,14 +224,23 @@ export class ModelLoader {
   }
 }
 
-// Simplify ModelFactory to use the loaded 3D models
+// Create a singleton instance of ModelLoader
+const modelLoaderInstance = new ModelLoader();
+
+// Modify ModelFactory to use the singleton
 export class ModelFactory {
   constructor() {
-    this.modelLoader = new ModelLoader();
+    // Use the singleton instance
+    this.modelLoader = modelLoaderInstance;
     this.initialized = false;
   }
 
   async initialize() {
+    if (this.initialized) {
+      console.log('ModelFactory already initialized');
+      return;
+    }
+    
     await this.modelLoader.loadModels();
     this.initialized = true;
     console.log('ModelFactory initialized successfully');

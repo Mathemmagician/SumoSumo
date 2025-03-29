@@ -61,7 +61,7 @@ export class Renderer {
   async initialize() {
     console.log("Initializing renderer");
 
-    // Initialize ModelFactory first
+    // Initialize ModelFactory first - this will only load models once
     await this.modelFactory.initialize();
 
     // Create scene
