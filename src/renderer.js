@@ -12,6 +12,8 @@ import {
   ROW_SPACING,
   CAMERA_MOVE_SPEED,
   CAMERA_ROTATE_SPEED,
+  BENCH_WIDTH,
+  BENCH_HEIGHT,
 } from "./constants";
 import { ModelFactory } from "./models";
 
@@ -61,7 +63,7 @@ export class Renderer {
   async initialize() {
     console.log("Initializing renderer");
 
-    // Initialize ModelFactory first - this will only load models once
+    // Initialize ModelFactory first
     await this.modelFactory.initialize();
 
     // Create scene
@@ -142,13 +144,19 @@ export class Renderer {
       this.toggleFreeCamera(event.detail.enabled);
     });
 
+    // Set up more comprehensive socket event listeners for player updates
+    this.setupSocketEventListeners();
+    
+    // Process initial game state (if available)
+    if (socketClient.gameState) {
+      console.log("Processing initial game state");
+      this.updatePlayers(socketClient.gameState);
+    }
+
     // Start animation loop
     this.lastFpsUpdate = performance.now();
     console.log("Starting animation loop");
     this.animate();
-
-    // Set up more comprehensive socket event listeners for player updates
-    this.setupSocketEventListeners();
   }
 
   // Add FPS display with socket stats
@@ -570,6 +578,7 @@ export class Renderer {
     // Main game state update
     socketClient.on("gameStateUpdated", (gameState) => {
       console.log("Renderer received gameStateUpdated:", gameState);
+      // Always force a complete update when receiving game state
       this.updatePlayers(gameState);
     });
 
@@ -636,6 +645,21 @@ export class Renderer {
         this.resetCameraPosition();
       }
     });
+
+    // Add specific handler for player joined events
+    socketClient.on("playerJoined", (player) => {
+      console.log("Renderer received playerJoined:", player);
+      
+      // For viewers, we need to assign a seat position if they don't have one
+      if (player.role === "viewer" && 
+          (!player.position || player.position === null)) {
+        // Generate a full game state update to trigger proper seat assignment
+        this.updatePlayers(socketClient.gameState);
+      } else {
+        // For fighters and referees, we can directly create/update the model
+        this.updateOrCreatePlayer(player);
+      }
+    });
   }
 
   // Add a new method to handle player role changes
@@ -687,10 +711,23 @@ export class Renderer {
   updatePlayers(gameState) {
     console.log("Updating players with gameState:", gameState);
 
-    // Create sets of current player IDs to efficiently track changes
-    const currentFighterIds = new Set(gameState.fighters.map((f) => f.id));
-    const currentViewerIds = new Set(gameState.viewers.map((v) => v.id));
-    const currentRefereeId = gameState.referee ? gameState.referee.id : null;
+    // Don't proceed if game state is not valid
+    if (!gameState) {
+      console.warn("Invalid game state received");
+      return;
+    }
+
+    // Process fighters
+    const fighters = gameState.fighters || [];
+    // Process referee
+    const referee = gameState.referee;
+    // Process viewers
+    const viewers = gameState.viewers || [];
+
+    // Create sets of current player IDs for efficient tracking
+    const currentFighterIds = new Set(fighters.map((f) => f.id));
+    const currentViewerIds = new Set(viewers.map((v) => v.id));
+    const currentRefereeId = referee ? referee.id : null;
 
     // Track all current player IDs
     const allCurrentIds = new Set([
@@ -698,6 +735,16 @@ export class Renderer {
       ...currentViewerIds,
       ...(currentRefereeId ? [currentRefereeId] : []),
     ]);
+
+    // First, check for newly added viewers that need seat assignments
+    const newViewersNeedingSeats = viewers.filter(viewer => 
+      !this.playerModels.has(viewer.id) && 
+      (!viewer.position || viewer.position === null)
+    );
+    
+    if (newViewersNeedingSeats.length > 0) {
+      console.log(`Found ${newViewersNeedingSeats.length} new viewers needing seat assignments`);
+    }
 
     // Remove players that no longer exist
     for (const [playerId, model] of this.playerModels.entries()) {
@@ -707,52 +754,79 @@ export class Renderer {
       }
     }
 
-    // Update or add each fighter
-    if (gameState.fighters && gameState.fighters.length) {
-      gameState.fighters.forEach((fighter) => {
-        console.log("Processing fighter:", fighter);
-        this.updateOrCreatePlayer(fighter);
-      });
+    // Process fighters
+    fighters.forEach((fighter) => {
+      console.log("Processing fighter:", fighter);
+      this.updateOrCreatePlayer(fighter);
+    });
+
+    // Process referee
+    if (referee) {
+      console.log("Processing referee:", referee);
+      this.updateOrCreatePlayer(referee);
     }
 
-    // Update or add referee
-    if (gameState.referee) {
-      console.log("Processing referee:", gameState.referee);
-      this.updateOrCreatePlayer(gameState.referee);
-    }
-
-    // Update or add viewers - PLACE THEM ON SEATS IN THE ARENA
-    if (gameState.viewers && gameState.viewers.length) {
+    // Update or add viewers - PLACE THEM ON ACTUAL SEATS IN THE ARENA
+    if (viewers && viewers.length) {
       // Get seat positions from the stadium
       const seatPositions = this.getStadiumSeatPositions();
-
+      const totalSeats = seatPositions.length;
+      
+      // Track which seats are already occupied
+      const occupiedSeats = new Set();
+      
       // Process each viewer
-      gameState.viewers.forEach((viewer, index) => {
+      viewers.forEach((viewer) => {
         // Clone viewer object to avoid modifying the original game state
         const viewerWithPosition = { ...viewer };
-
+        
         // If viewer doesn't have a position or has null position (reset case),
-        // place on a seat
+        // or has a default position, place on a seat
         if (
           !viewerWithPosition.position ||
           viewerWithPosition.position === null || 
           (viewerWithPosition.position.x === 0 &&
            viewerWithPosition.position.z === 0)
         ) {
-          // Use seat position based on index (wrap around if more viewers than seats)
-          const seatIndex = index % seatPositions.length;
+          // Determine seat based on player.seed if available, otherwise use player ID
+          let seatIndex;
+          
+          if (viewer.seed !== undefined) {
+            // Use the player's seed to determine seat
+            seatIndex = Math.abs(viewer.seed) % totalSeats;
+          } else {
+            // Generate a deterministic seat index from player ID
+            const idSum = viewer.id.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+            seatIndex = idSum % totalSeats;
+          }
+          
+          // If this seat is occupied, find the next available one
+          let attempts = 0;
+          const maxAttempts = totalSeats; // Only try each seat once at most
+          
+          while (occupiedSeats.has(seatIndex) && attempts < maxAttempts) {
+            seatIndex = (seatIndex + 1) % totalSeats;
+            attempts++;
+          }
+          
+          // Mark this seat as occupied
+          occupiedSeats.add(seatIndex);
+          
+          // Get the seat position
           const seatPos = seatPositions[seatIndex];
-
+          
           viewerWithPosition.position = {
             x: seatPos.x,
-            y: seatPos.y + 0.5, // Adjust to sit on top of the seat
+            y: seatPos.y, // Use the position directly from seatPos which now includes the correct height
             z: seatPos.z,
           };
-
+          
           // Set rotation to face the ring
           viewerWithPosition.rotation = seatPos.rotation;
+          
+          console.log(`Placed viewer ${viewer.id} at seat ${seatIndex} (row ${seatPos.row}, side ${seatPos.side})`);
         }
-
+        
         console.log("Processing viewer:", viewerWithPosition);
         this.updateOrCreatePlayer(viewerWithPosition);
       });
@@ -761,43 +835,78 @@ export class Renderer {
     console.log(`Total player models after update: ${this.playerModels.size}`);
   }
 
-  // Helper method to get stadium seat positions
+  // Helper method to get stadium seat positions from the actual stadium geometry
   getStadiumSeatPositions() {
-    // Define the seat positions in a circular pattern around the ring
-    // These will be more realistic seat positions in the stadium
+    // Create an array to store seat positions
     const positions = [];
-
-    // Parameters for seat placement
-    const rows = 3; // Number of audience rows
-    const startRadius = 10; // Distance of first row from center
-    const rowSpacing = 2; // Distance between rows
-    const seatSpacing = 2; // Distance between seats in the same row
-
-    // Generate seat positions for each row
-    for (let row = 0; row < rows; row++) {
-      const rowRadius = startRadius + row * rowSpacing;
-      const circumference = 2 * Math.PI * rowRadius;
-
-      // Calculate how many seats can fit in this row
-      const seatsInRow = Math.floor(circumference / seatSpacing);
-
-      for (let seat = 0; seat < seatsInRow; seat++) {
-        const angle = (seat / seatsInRow) * Math.PI * 2;
-
-        // Calculate seat position
-        const x = Math.sin(angle) * rowRadius;
-        const z = Math.cos(angle) * rowRadius;
-
-        // Calculate seat height (higher rows are elevated)
-        const y = row * 1.5;
-
-        // The rotation needs to be set so viewers face toward the center
-        const rotation = angle + Math.PI; // Add PI to face inward
-
-        positions.push({ x, y, z, rotation });
+    
+    // Parameters based on StadiumFactory constants from constants.js
+    const firstRowDistance = FIRST_ROW_DISTANCE;
+    const rowSpacing = ROW_SPACING;
+    const seatsPerFirstRow = SEATS_PER_FIRST_ROW;
+    const seatsIncrement = SEATS_INCREMENT;
+    const elevationIncrement = ELEVATION_INCREMENT;
+    const benchWidth = BENCH_WIDTH;
+    const benchHeight = BENCH_HEIGHT;
+    
+    // Set a proper height offset for viewers based on the model scale
+    // Let's use a multiple of the bench height
+    const MODEL_HEIGHT_ABOVE_SEAT = 1.5; // This will make viewers sit properly above the bench
+    
+    // We'll focus on the first few rows
+    const maxRows = 3;
+    
+    // Define the sides of the stadium
+    const sideData = [
+      { name: 'North', rotation: 0, x: 0, z: -1 },
+      { name: 'East', rotation: -Math.PI / 2, x: 1, z: 0 },
+      { name: 'West', rotation: Math.PI / 2, x: -1, z: 0 },
+      { name: 'South', rotation: Math.PI, x: 0, z: 1 }
+    ];
+    
+    // For each side of the stadium
+    sideData.forEach(side => {
+      for (let rowIndex = 0; rowIndex < maxRows; rowIndex++) {
+        // Calculate row properties
+        const distance = firstRowDistance + (rowIndex * rowSpacing);
+        const seatsInRow = seatsPerFirstRow + (rowIndex * seatsIncrement);
+        const elevationLevel = Math.floor(rowIndex / 2);
+        const elevation = elevationLevel * elevationIncrement;
+        
+        // For each seat in the row
+        for (let i = 0; i < seatsInRow; i++) {
+          // Calculate offset from center of the row
+          const offset = (i - (seatsInRow - 1) / 2) * benchWidth;
+          
+          // Initialize position
+          let x = 0, y = benchHeight, z = 0;
+          
+          // Add elevation if the row is elevated
+          if (elevation > 0) y += elevation;
+          
+          // Position based on which side of the stadium
+          if (side.x !== 0) {
+            x = side.x * distance;
+            z = offset;
+          } else {
+            x = offset;
+            z = side.z * distance;
+          }
+          
+          // Add the position and rotation to our array
+          positions.push({
+            x: x,
+            y: y + MODEL_HEIGHT_ABOVE_SEAT, // Sit higher above the bench
+            z: z,
+            rotation: side.rotation,
+            side: side.name,
+            row: rowIndex,
+            seatIndex: i
+          });
+        }
       }
-    }
-
+    });
+    
     return positions;
   }
 
@@ -842,12 +951,23 @@ export class Renderer {
 
         // Set initial position and rotation
         if (player.position) {
+          // Position the model
           model.position.set(
             player.position.x,
             player.position.y,
             player.position.z
           );
+          
+          // For viewers, additional adjustment if needed based on role
+          if (player.role === 'viewer') {
+            // We're already handling this in getStadiumSeatPositions, 
+            // so this is just an additional safeguard
+            if (model.position.y < BENCH_HEIGHT) {
+              model.position.y = BENCH_HEIGHT + 2.0;
+            }
+          }
         }
+        
         if (player.rotation !== undefined) {
           model.rotation.y = player.rotation;
         }

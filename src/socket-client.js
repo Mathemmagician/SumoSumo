@@ -27,6 +27,10 @@ class SocketClient {
       this.updateSocketStats();
       console.log("Connected to server with ID:", this.socket.id);
       this.gameState.myId = this.socket.id;
+      
+      // When we connect, request the initial game state
+      this.socket.emit("requestGameState");
+      
       this.emit("gameStateUpdated", this.gameState);
     });
 
@@ -34,11 +38,17 @@ class SocketClient {
       this.socketStats.gameState++;
       this.updateSocketStats();
       console.log("Received game state:", state);
+      
+      // Update our game state with the server data
       this.gameState.fighters = state.fighters || [];
       this.gameState.viewers = state.viewers || [];
       this.gameState.referee = state.referee || null;
       this.gameState.stage = state.currentStage;
       this.gameState.stageTimeRemaining = state.stageTimeRemaining;
+      
+      // Assign seat positions for viewers who don't have positions
+      this.prepareViewerPositions();
+      
       this.determineMyRole();
       this.emit("gameStateUpdated", this.gameState);
     });
@@ -90,6 +100,18 @@ class SocketClient {
       this.gameState.referee = null;
     }
     
+    // Add seed to the player for consistent seat assignment
+    if (!player.seed) {
+      player.seed = this.generateSeedFromId(player.id);
+    }
+    
+    // Clear position for viewers to force seat assignment
+    if (player.role === "viewer" && 
+        (!player.position || 
+         (player.position.x === 0 && player.position.z === 0))) {
+      player.position = null;
+    }
+    
     // Now add to the appropriate list
     if (player.role === "fighter") {
       this.gameState.fighters.push(player);
@@ -99,6 +121,10 @@ class SocketClient {
       this.gameState.viewers.push(player);
     }
     
+    // Trigger a full game state update to ensure all clients render the new player
+    this.emit("gameStateUpdated", this.gameState);
+    
+    // Also emit the specific player join event
     this.emit("playerJoined", player);
   }
 
@@ -256,13 +282,18 @@ class SocketClient {
     this.gameState.fighters = [];
     this.gameState.referee = null;
     
-    // Convert all players to viewers with reset positions
+    // Convert all players to viewers with reset positions and random seeds
     this.gameState.viewers = allPlayers.map((player) => {
-      // Clear any existing position data to force re-placement in the stands
+      // Generate a random seed for each player if they don't have one
+      // Or use player.id as a deterministic seed
+      const seed = player.seed || this.generateSeedFromId(player.id);
+      
+      // Return player with viewer role, null position, and seed
       return {
         ...player,
         role: "viewer",
-        position: null  // Set position to null to trigger repositioning
+        position: null,  // Set position to null to trigger repositioning
+        seed: seed       // Add seed for deterministic seat assignment
       };
     });
     
@@ -338,6 +369,33 @@ class SocketClient {
 
   updateSocketStats() {
     this.emit("socketStatsUpdated", this.socketStats);
+  }
+
+  // Add a new method to prepare viewer positions
+  prepareViewerPositions() {
+    // Check if we have viewers that need positions
+    if (!this.gameState.viewers || this.gameState.viewers.length === 0) {
+      return;
+    }
+    
+    // For each viewer without a position, assign a seed value
+    this.gameState.viewers.forEach((viewer, index) => {
+      // Only add seed if the viewer doesn't have one and needs a position
+      if (!viewer.seed && (!viewer.position || viewer.position === null)) {
+        // Generate a deterministic seed from the player ID or index
+        viewer.seed = this.generateSeedFromId(viewer.id) || (index * 1000);
+      }
+    });
+  }
+  
+  // Helper method to generate a numeric seed from player ID
+  generateSeedFromId(id) {
+    if (!id) return Math.floor(Math.random() * 10000);
+    
+    // Convert the ID string to a number by summing character codes
+    return id.split('').reduce((sum, char, index) => {
+      return sum + (char.charCodeAt(0) * (index + 1));
+    }, 0);
   }
 }
 
