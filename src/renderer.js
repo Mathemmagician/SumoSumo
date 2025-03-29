@@ -1,8 +1,8 @@
-import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
-import { StadiumFactory } from './models';
-import { socketClient } from './socket-client';
-import { 
+import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import { StadiumFactory } from "./models";
+import { socketClient } from "./socket-client";
+import {
   RING_RADIUS,
   RING_HEIGHT,
   FIRST_ROW_DISTANCE,
@@ -11,25 +11,25 @@ import {
   ELEVATION_INCREMENT,
   ROW_SPACING,
   CAMERA_MOVE_SPEED,
-  CAMERA_ROTATE_SPEED
-} from './constants';
-import { ModelFactory } from './models';
+  CAMERA_ROTATE_SPEED,
+} from "./constants";
+import { ModelFactory } from "./models";
 
 export class Renderer {
   constructor() {
-    console.log('Renderer constructor called');
+    console.log("Renderer constructor called");
     this.scene = null;
     this.camera = null;
     this.renderer = null;
     this.stadium = null;
     this.controls = null;
-    
+
     // FPS counter variables
     this.frameCount = 0;
     this.fps = 0;
     this.fpsUpdateInterval = 500; // Update FPS every 500ms
     this.lastFpsUpdate = 0;
-    
+
     // Add these new properties for camera control
     this.isFreeCamera = false;
     this.cameraMovement = {
@@ -40,9 +40,9 @@ export class Renderer {
       up: false,
       down: false,
       rotateLeft: false,
-      rotateRight: false
+      rotateRight: false,
     };
-    
+
     // Bind methods
     this.animate = this.animate.bind(this);
     this.onWindowResize = this.onWindowResize.bind(this);
@@ -50,24 +50,24 @@ export class Renderer {
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleKeyUp = this.handleKeyUp.bind(this);
     this.toggleFreeCamera = this.toggleFreeCamera.bind(this);
-    
+
     // Add ModelFactory instance
     this.modelFactory = new ModelFactory(/* pass face textures if needed */);
-    
+
     // Add a Map to store player models
     this.playerModels = new Map();
   }
 
   async initialize() {
-    console.log('Initializing renderer');
-    
+    console.log("Initializing renderer");
+
     // Initialize ModelFactory first
     await this.modelFactory.initialize();
-    
+
     // Create scene
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x87CEEB); // Sky blue background
-    console.log('Scene created');
+    this.scene.background = new THREE.Color(0x87ceeb); // Sky blue background
+    console.log("Scene created");
 
     // Create camera
     this.camera = new THREE.PerspectiveCamera(
@@ -78,10 +78,13 @@ export class Renderer {
     );
     this.camera.position.set(-15, 15, 15);
     this.camera.lookAt(0, 0, 0);
-    console.log('Camera created and positioned');
+    console.log("Camera created and positioned");
 
     // Create renderer
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance'  });
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: "high-performance",
+    });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -90,13 +93,12 @@ export class Renderer {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.3; // Reduced from 1.5 to 1.3 for a slightly darker scene
 
-    
     // Add renderer to DOM
-    const container = document.createElement('div');
-    container.id = 'canvas-container';
+    const container = document.createElement("div");
+    container.id = "canvas-container";
     document.body.appendChild(container);
     container.appendChild(this.renderer.domElement);
-    console.log('Renderer created and added to DOM');
+    console.log("Renderer created and added to DOM");
 
     // Add orbit controls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -104,11 +106,11 @@ export class Renderer {
     this.controls.dampingFactor = 0.05;
     this.controls.minDistance = 5;
     this.controls.maxDistance = 100;
-    console.log('Orbit controls initialized');
+    console.log("Orbit controls initialized");
 
     // Set up lighting
     this.setupLighting();
-    console.log('Lighting setup complete');
+    console.log("Lighting setup complete");
 
     // // Create test cube to verify rendering
     // const geometry = new THREE.BoxGeometry(5, 5, 5);
@@ -119,26 +121,26 @@ export class Renderer {
 
     // Create the complete stadium (includes ring)
     this.createStadium();
-    console.log('Stadium created');
+    console.log("Stadium created");
 
     // Create FPS display
     this.createFpsDisplay();
-    console.log('FPS display created');
+    console.log("FPS display created");
 
     // Add event listeners
-    window.addEventListener('resize', this.onWindowResize);
+    window.addEventListener("resize", this.onWindowResize);
     // Add keyboard event listeners
-    window.addEventListener('keydown', this.handleKeyDown);
-    window.addEventListener('keyup', this.handleKeyUp);
+    window.addEventListener("keydown", this.handleKeyDown);
+    window.addEventListener("keyup", this.handleKeyUp);
 
     // Listen for free camera toggle from UI Manager
-    document.addEventListener('freeCameraToggled', (event) => {
+    document.addEventListener("freeCameraToggled", (event) => {
       this.toggleFreeCamera(event.detail.enabled);
     });
 
     // Start animation loop
     this.lastFpsUpdate = performance.now();
-    console.log('Starting animation loop');
+    console.log("Starting animation loop");
     this.animate();
 
     // Set up more comprehensive socket event listeners for player updates
@@ -147,8 +149,8 @@ export class Renderer {
 
   // Add FPS display with socket stats
   createFpsDisplay() {
-    const statsContainer = document.createElement('div');
-    statsContainer.id = 'stats-container';
+    const statsContainer = document.createElement("div");
+    statsContainer.id = "stats-container";
     statsContainer.style.cssText = `
       position: fixed;
       bottom: 10px;
@@ -162,13 +164,13 @@ export class Renderer {
       z-index: 1000;
     `;
 
-    const fpsDiv = document.createElement('div');
-    fpsDiv.id = 'fps-counter';
-    fpsDiv.textContent = '0 FPS';
-    
+    const fpsDiv = document.createElement("div");
+    fpsDiv.id = "fps-counter";
+    fpsDiv.textContent = "0 FPS";
+
     // Socket stats toggle
-    const socketToggleButton = document.createElement('button');
-    socketToggleButton.textContent = '▼ Socket Stats';
+    const socketToggleButton = document.createElement("button");
+    socketToggleButton.textContent = "▼ Socket Stats";
     socketToggleButton.style.cssText = `
       background: none;
       border: none;
@@ -181,14 +183,14 @@ export class Renderer {
       text-align: left;
       margin: 5px 0;
     `;
-    
-    const socketStatsDiv = document.createElement('div');
-    socketStatsDiv.id = 'socket-stats';
-    socketStatsDiv.style.display = 'none'; // Hidden by default
-    
+
+    const socketStatsDiv = document.createElement("div");
+    socketStatsDiv.id = "socket-stats";
+    socketStatsDiv.style.display = "none"; // Hidden by default
+
     // Game state toggle
-    const gameStateToggleButton = document.createElement('button');
-    gameStateToggleButton.textContent = '▼ Game State';
+    const gameStateToggleButton = document.createElement("button");
+    gameStateToggleButton.textContent = "▼ Game State";
     gameStateToggleButton.style.cssText = `
       background: none;
       border: none;
@@ -201,11 +203,11 @@ export class Renderer {
       text-align: left;
       margin: 5px 0;
     `;
-    
-    const gameStateDiv = document.createElement('div');
-    gameStateDiv.id = 'game-state-debug';
-    gameStateDiv.style.display = 'none'; // Hidden by default
-    
+
+    const gameStateDiv = document.createElement("div");
+    gameStateDiv.id = "game-state-debug";
+    gameStateDiv.style.display = "none"; // Hidden by default
+
     statsContainer.appendChild(fpsDiv);
     statsContainer.appendChild(socketToggleButton);
     statsContainer.appendChild(socketStatsDiv);
@@ -215,37 +217,39 @@ export class Renderer {
 
     // Toggle socket stats visibility
     let isSocketStatsExpanded = false;
-    socketToggleButton.addEventListener('click', () => {
+    socketToggleButton.addEventListener("click", () => {
       isSocketStatsExpanded = !isSocketStatsExpanded;
-      socketStatsDiv.style.display = isSocketStatsExpanded ? 'block' : 'none';
-      socketToggleButton.textContent = (isSocketStatsExpanded ? '▼' : '►') + ' Socket Stats';
+      socketStatsDiv.style.display = isSocketStatsExpanded ? "block" : "none";
+      socketToggleButton.textContent =
+        (isSocketStatsExpanded ? "▼" : "►") + " Socket Stats";
     });
 
     // Toggle game state visibility
     let isGameStateExpanded = false;
-    gameStateToggleButton.addEventListener('click', () => {
+    gameStateToggleButton.addEventListener("click", () => {
       isGameStateExpanded = !isGameStateExpanded;
-      gameStateDiv.style.display = isGameStateExpanded ? 'block' : 'none';
-      gameStateToggleButton.textContent = (isGameStateExpanded ? '▼' : '►') + ' Game State';
+      gameStateDiv.style.display = isGameStateExpanded ? "block" : "none";
+      gameStateToggleButton.textContent =
+        (isGameStateExpanded ? "▼" : "►") + " Game State";
     });
 
     // Listen for socket stats updates
-    socketClient.on('socketStatsUpdated', (stats) => {
+    socketClient.on("socketStatsUpdated", (stats) => {
       this.updateSocketStats(stats);
     });
-    
+
     // Listen for game state updates
-    socketClient.on('gameStateUpdated', (gameState) => {
+    socketClient.on("gameStateUpdated", (gameState) => {
       this.updateGameStateDebug(gameState);
     });
   }
 
   // Update the socket stats display
   updateSocketStats(stats) {
-    const statsDiv = document.getElementById('socket-stats');
+    const statsDiv = document.getElementById("socket-stats");
     if (!statsDiv) return;
 
-    let html = '';
+    let html = "";
     Object.entries(stats).forEach(([event, count]) => {
       html += `${event}: ${count}<br>`;
     });
@@ -254,31 +258,33 @@ export class Renderer {
 
   // Add a new method to update the game state debug display
   updateGameStateDebug(gameState) {
-    const gameStateDiv = document.getElementById('game-state-debug');
+    const gameStateDiv = document.getElementById("game-state-debug");
     if (!gameStateDiv) return;
 
     let html = `
       <b>Current Stage:</b> ${gameState.stage}<br>
       <b>My Role:</b> ${gameState.myRole}<br>
-      <b>My ID:</b> ${gameState.myId?.substring(0, 6) || 'None'}<br>
+      <b>My ID:</b> ${gameState.myId?.substring(0, 6) || "None"}<br>
       <b>Players:</b><br>
     `;
 
     // Add fighters
-    html += '  <b>Fighters:</b> ' + gameState.fighters.length + '<br>';
-    gameState.fighters.forEach(fighter => {
-      html += `  • ${fighter.id.substring(0, 6)} (pos: ${Math.round(fighter.position?.x || 0)},${Math.round(fighter.position?.z || 0)})<br>`;
+    html += "  <b>Fighters:</b> " + gameState.fighters.length + "<br>";
+    gameState.fighters.forEach((fighter) => {
+      html += `  • ${fighter.id.substring(0, 6)} (pos: ${Math.round(
+        fighter.position?.x || 0
+      )},${Math.round(fighter.position?.z || 0)})<br>`;
     });
 
     // Add referee
-    html += '  <b>Referee:</b> ' + (gameState.referee ? '1' : '0') + '<br>';
+    html += "  <b>Referee:</b> " + (gameState.referee ? "1" : "0") + "<br>";
     if (gameState.referee) {
       html += `  • ${gameState.referee.id.substring(0, 6)}<br>`;
     }
 
     // Add viewers
-    html += '  <b>Viewers:</b> ' + gameState.viewers.length + '<br>';
-    gameState.viewers.forEach(viewer => {
+    html += "  <b>Viewers:</b> " + gameState.viewers.length + "<br>";
+    gameState.viewers.forEach((viewer) => {
       html += `  • ${viewer.id.substring(0, 6)}<br>`;
     });
 
@@ -297,7 +303,7 @@ export class Renderer {
     mainSpotlight.penumbra = 0.3;
     mainSpotlight.decay = 1.5;
     mainSpotlight.distance = 60;
-    
+
     mainSpotlight.castShadow = true;
     mainSpotlight.shadow.mapSize.width = 2048;
     mainSpotlight.shadow.mapSize.height = 2048;
@@ -305,7 +311,7 @@ export class Renderer {
     mainSpotlight.shadow.camera.far = 60;
     mainSpotlight.shadow.bias = -0.0003;
     mainSpotlight.shadow.normalBias = 0.01;
-    
+
     mainSpotlight.target.position.set(0, 0, 0);
     this.scene.add(mainSpotlight);
     this.scene.add(mainSpotlight.target);
@@ -325,18 +331,18 @@ export class Renderer {
   createStadium() {
     // Create complete stadium using the factory with a fixed number of 20 rows
     const stadium = StadiumFactory.createCompleteStadium(
-      RING_RADIUS, 
+      RING_RADIUS,
       RING_HEIGHT,
       {
         seatsPerFirstRow: SEATS_PER_FIRST_ROW,
         firstRowDistance: FIRST_ROW_DISTANCE,
         seatsIncrement: SEATS_INCREMENT,
         rowSpacing: ROW_SPACING,
-        elevationIncrement: ELEVATION_INCREMENT
+        elevationIncrement: ELEVATION_INCREMENT,
       },
       20 // Fixed number of rows
     );
-    
+
     this.scene.add(stadium);
   }
 
@@ -348,66 +354,68 @@ export class Renderer {
 
   animate() {
     requestAnimationFrame(this.animate);
-    
+
     // Update FPS counter
     const currentTime = performance.now();
     this.frameCount++;
-    
+
     // Update FPS counter every 500ms
     if (currentTime - this.lastFpsUpdate > this.fpsUpdateInterval) {
-      this.fps = Math.round((this.frameCount * 1000) / (currentTime - this.lastFpsUpdate));
-      const fpsCounter = document.getElementById('fps-counter');
+      this.fps = Math.round(
+        (this.frameCount * 1000) / (currentTime - this.lastFpsUpdate)
+      );
+      const fpsCounter = document.getElementById("fps-counter");
       if (fpsCounter) {
         fpsCounter.textContent = `${this.fps} FPS`;
       }
       this.frameCount = 0;
       this.lastFpsUpdate = currentTime;
     }
-    
+
     // Handle camera movement if free camera is enabled
     if (this.isFreeCamera) {
       this.updateCameraPosition();
     } else {
       this.controls.update();
     }
-    
+
     // Log first frame render
     if (!this._hasLoggedFirstFrame) {
-      console.log('First frame rendering');
+      console.log("First frame rendering");
       this._hasLoggedFirstFrame = true;
     }
-    
+
     this.renderer.render(this.scene, this.camera);
   }
 
   // Add free camera toggle
   toggleFreeCamera(enabled) {
     this.isFreeCamera = enabled;
-    
+
     // Enable/disable orbit controls when switching camera modes
     this.controls.enabled = !enabled;
-    
+
     // Reset camera movement when disabling free camera
     if (!enabled) {
       for (const key in this.cameraMovement) {
         this.cameraMovement[key] = false;
       }
     }
-    
+
     // Update the UI checkbox and text
-    const freeCameraToggle = document.getElementById('free-camera-toggle');
+    const freeCameraToggle = document.getElementById("free-camera-toggle");
     if (freeCameraToggle) {
       freeCameraToggle.checked = enabled;
-      
+
       // Find the text span that's a sibling of the checkbox
       const textSpan = freeCameraToggle.nextElementSibling;
-      if (textSpan && textSpan.classList.contains('viewer-only-text')) {
+      if (textSpan && textSpan.classList.contains("viewer-only-text")) {
         if (enabled) {
           // Create or update controls hint element
-          let controlsHint = textSpan.querySelector('.controls-hint');
+          let controlsHint = textSpan.querySelector(".controls-hint");
           if (!controlsHint) {
-            controlsHint = document.createElement('span');
-            controlsHint.className = 'controls-hint';
+            controlsHint = document.createElement("span");
+            controlsHint.className = "controls-hint";
             controlsHint.style.cssText = `
               font-size: 11px;
               opacity: 0.7;
@@ -419,30 +427,46 @@ export class Renderer {
           controlsHint.textContent = " WSAD/↑↓←→";
         } else {
           // Remove controls hint if it exists
-          const controlsHint = textSpan.querySelector('.controls-hint');
+          const controlsHint = textSpan.querySelector(".controls-hint");
           if (controlsHint) {
             textSpan.removeChild(controlsHint);
           }
         }
       }
     }
-    
-    console.log(`Free camera ${enabled ? 'enabled' : 'disabled'}`);
+
+    console.log(`Free camera ${enabled ? "enabled" : "disabled"}`);
   }
 
   // Handle key down events for camera control
   handleKeyDown(event) {
     if (!this.isFreeCamera) return;
-    
+
     switch (event.key.toLowerCase()) {
-      case 'w': this.cameraMovement.forward = true; break;
-      case 's': this.cameraMovement.backward = true; break;
-      case 'a': this.cameraMovement.left = true; break;
-      case 'd': this.cameraMovement.right = true; break;
-      case 'arrowup': this.cameraMovement.up = true; break;
-      case 'arrowdown': this.cameraMovement.down = true; break;
-      case 'arrowleft': this.cameraMovement.rotateLeft = true; break;
-      case 'arrowright': this.cameraMovement.rotateRight = true; break;
+      case "w":
+        this.cameraMovement.forward = true;
+        break;
+      case "s":
+        this.cameraMovement.backward = true;
+        break;
+      case "a":
+        this.cameraMovement.left = true;
+        break;
+      case "d":
+        this.cameraMovement.right = true;
+        break;
+      case "arrowup":
+        this.cameraMovement.up = true;
+        break;
+      case "arrowdown":
+        this.cameraMovement.down = true;
+        break;
+      case "arrowleft":
+        this.cameraMovement.rotateLeft = true;
+        break;
+      case "arrowright":
+        this.cameraMovement.rotateRight = true;
+        break;
     }
   }
 
@@ -451,16 +475,32 @@ export class Renderer {
     if (!this.isFreeCamera) {
       return;
     }
-    
+
     switch (event.key.toLowerCase()) {
-      case 'w': this.cameraMovement.forward = false; break;
-      case 's': this.cameraMovement.backward = false; break;
-      case 'a': this.cameraMovement.left = false; break;
-      case 'd': this.cameraMovement.right = false; break;
-      case 'arrowup': this.cameraMovement.up = false; break;
-      case 'arrowdown': this.cameraMovement.down = false; break;
-      case 'arrowleft': this.cameraMovement.rotateLeft = false; break;
-      case 'arrowright': this.cameraMovement.rotateRight = false; break;
+      case "w":
+        this.cameraMovement.forward = false;
+        break;
+      case "s":
+        this.cameraMovement.backward = false;
+        break;
+      case "a":
+        this.cameraMovement.left = false;
+        break;
+      case "d":
+        this.cameraMovement.right = false;
+        break;
+      case "arrowup":
+        this.cameraMovement.up = false;
+        break;
+      case "arrowdown":
+        this.cameraMovement.down = false;
+        break;
+      case "arrowleft":
+        this.cameraMovement.rotateLeft = false;
+        break;
+      case "arrowright":
+        this.cameraMovement.rotateRight = false;
+        break;
     }
   }
 
@@ -469,11 +509,11 @@ export class Renderer {
     // Create a vector for the camera's forward direction
     const direction = new THREE.Vector3();
     this.camera.getWorldDirection(direction);
-    
+
     // Create right vector by crossing forward with up
     const right = new THREE.Vector3();
     right.crossVectors(direction, new THREE.Vector3(0, 1, 0)).normalize();
-    
+
     // Forward/backward movement
     if (this.cameraMovement.forward) {
       this.camera.position.addScaledVector(direction, CAMERA_MOVE_SPEED);
@@ -481,7 +521,7 @@ export class Renderer {
     if (this.cameraMovement.backward) {
       this.camera.position.addScaledVector(direction, -CAMERA_MOVE_SPEED);
     }
-    
+
     // Left/right movement
     if (this.cameraMovement.left) {
       this.camera.position.addScaledVector(right, -CAMERA_MOVE_SPEED);
@@ -489,7 +529,7 @@ export class Renderer {
     if (this.cameraMovement.right) {
       this.camera.position.addScaledVector(right, CAMERA_MOVE_SPEED);
     }
-    
+
     // Up/down movement
     if (this.cameraMovement.up) {
       this.camera.position.y += CAMERA_MOVE_SPEED;
@@ -497,21 +537,22 @@ export class Renderer {
     if (this.cameraMovement.down) {
       this.camera.position.y -= CAMERA_MOVE_SPEED;
     }
-    
+
     // Camera rotation around world Y axis
     if (this.cameraMovement.rotateLeft || this.cameraMovement.rotateRight) {
       // Get current position
       const position = this.camera.position.clone();
-      
+
       // Create rotation matrix around world Y axis
       const rotationMatrix = new THREE.Matrix4();
-      const angle = CAMERA_ROTATE_SPEED * (this.cameraMovement.rotateLeft ? 1 : -1);
+      const angle =
+        CAMERA_ROTATE_SPEED * (this.cameraMovement.rotateLeft ? 1 : -1);
       rotationMatrix.makeRotationY(angle);
-      
+
       // Apply rotation to position
       position.applyMatrix4(rotationMatrix);
       this.camera.position.copy(position);
-      
+
       // Ensure camera keeps looking at the same direction relative to its new position
       const target = new THREE.Vector3();
       this.camera.getWorldDirection(target);
@@ -523,89 +564,89 @@ export class Renderer {
 
   setupSocketEventListeners() {
     // Main game state update
-    socketClient.on('gameStateUpdated', (gameState) => {
-        console.log('Renderer received gameStateUpdated:', gameState);
-        this.updatePlayers(gameState);
+    socketClient.on("gameStateUpdated", (gameState) => {
+      console.log("Renderer received gameStateUpdated:", gameState);
+      this.updatePlayers(gameState);
     });
-    
+
     // Individual player updates
-    socketClient.on('playerMoved', (data) => {
-        console.log('Renderer received playerMoved:', data);
-        this.updatePlayerPosition(data);
+    socketClient.on("playerMoved", (data) => {
+      console.log("Renderer received playerMoved:", data);
+      this.updatePlayerPosition(data);
     });
-    
+
     // Player removals
-    socketClient.on('playerLeft', (playerId) => {
-        console.log('Renderer received playerLeft:', playerId);
-        this.removePlayer(playerId);
+    socketClient.on("playerLeft", (playerId) => {
+      console.log("Renderer received playerLeft:", playerId);
+      this.removePlayer(playerId);
     });
-    
+
     // Role changes
-    socketClient.on('playerRoleChanged', (data) => {
-        console.log('Renderer received playerRoleChanged:', data);
-        this.handlePlayerRoleChanged(data);
+    socketClient.on("playerRoleChanged", (data) => {
+      console.log("Renderer received playerRoleChanged:", data);
+      this.handlePlayerRoleChanged(data);
     });
-    
+
     // Fighter selection events
-    socketClient.on('fightersSelected', (data) => {
-        console.log('Renderer received fightersSelected:', data);
-        this.updateFightersAndReferee(data);
+    socketClient.on("fightersSelected", (data) => {
+      console.log("Renderer received fightersSelected:", data);
+      this.updateFightersAndReferee(data);
     });
-    
+
     // Match stage transitions
-    socketClient.on('matchStart', (data) => {
-        console.log('Renderer received matchStart:', data);
-        // Ensure fighters are in correct positions
-        if (data.fighters && data.fighters.length) {
-            data.fighters.forEach(fighter => this.updateOrCreatePlayer(fighter));
-        }
+    socketClient.on("matchStart", (data) => {
+      console.log("Renderer received matchStart:", data);
+      // Ensure fighters are in correct positions
+      if (data.fighters && data.fighters.length) {
+        data.fighters.forEach((fighter) => this.updateOrCreatePlayer(fighter));
+      }
     });
-    
+
     // Handle new referee assignments
-    socketClient.on('newReferee', (referee) => {
-        console.log('Renderer received newReferee:', referee);
-        this.updateOrCreatePlayer(referee);
+    socketClient.on("newReferee", (referee) => {
+      console.log("Renderer received newReferee:", referee);
+      this.updateOrCreatePlayer(referee);
     });
-    
+
     // Handle pre-ceremony positioning
-    socketClient.on('preCeremonyStart', (data) => {
-        console.log('Renderer received preCeremonyStart:', data);
-        // Update fighters and referee positions
-        if (data.fighters && data.fighters.length) {
-            data.fighters.forEach(fighter => this.updateOrCreatePlayer(fighter));
-        }
-        if (data.referee) {
-            this.updateOrCreatePlayer(data.referee);
-        }
+    socketClient.on("preCeremonyStart", (data) => {
+      console.log("Renderer received preCeremonyStart:", data);
+      // Update fighters and referee positions
+      if (data.fighters && data.fighters.length) {
+        data.fighters.forEach((fighter) => this.updateOrCreatePlayer(fighter));
+      }
+      if (data.referee) {
+        this.updateOrCreatePlayer(data.referee);
+      }
     });
   }
 
   // Add a new method to handle player role changes
   handlePlayerRoleChanged(data) {
     const { id, role } = data;
-    
+
     // Get the current game state
     const gameState = socketClient.gameState;
-    
+
     // Find the player in the game state
     let player = null;
-    if (role === 'fighter') {
-        player = gameState.fighters.find(f => f.id === id);
-    } else if (role === 'referee') {
-        player = gameState.referee;
+    if (role === "fighter") {
+      player = gameState.fighters.find((f) => f.id === id);
+    } else if (role === "referee") {
+      player = gameState.referee;
     } else {
-        player = gameState.viewers.find(v => v.id === id);
+      player = gameState.viewers.find((v) => v.id === id);
     }
-    
+
     // If we found the player, update or recreate their model
     if (player) {
-        // If the player already has a model, remove it first
-        if (this.playerModels.has(id)) {
-            this.removePlayer(id);
-        }
-        
-        // Create a new model with the correct role
-        this.updateOrCreatePlayer(player);
+      // If the player already has a model, remove it first
+      if (this.playerModels.has(id)) {
+        this.removePlayer(id);
+      }
+
+      // Create a new model with the correct role
+      this.updateOrCreatePlayer(player);
     }
   }
 
@@ -613,53 +654,53 @@ export class Renderer {
   updateFightersAndReferee(data) {
     // Update fighter models
     if (data.fighter1) {
-        this.updateOrCreatePlayer(data.fighter1);
+      this.updateOrCreatePlayer(data.fighter1);
     }
-    
+
     if (data.fighter2) {
-        this.updateOrCreatePlayer(data.fighter2);
+      this.updateOrCreatePlayer(data.fighter2);
     }
-    
+
     // Update referee model
     if (data.referee) {
-        this.updateOrCreatePlayer(data.referee);
+      this.updateOrCreatePlayer(data.referee);
     }
   }
 
   updatePlayers(gameState) {
-    console.log('Updating players with gameState:', gameState);
-    
+    console.log("Updating players with gameState:", gameState);
+
     // Create sets of current player IDs to efficiently track changes
-    const currentFighterIds = new Set(gameState.fighters.map(f => f.id));
-    const currentViewerIds = new Set(gameState.viewers.map(v => v.id));
+    const currentFighterIds = new Set(gameState.fighters.map((f) => f.id));
+    const currentViewerIds = new Set(gameState.viewers.map((v) => v.id));
     const currentRefereeId = gameState.referee ? gameState.referee.id : null;
-    
+
     // Track all current player IDs
     const allCurrentIds = new Set([
       ...currentFighterIds,
       ...currentViewerIds,
-      ...(currentRefereeId ? [currentRefereeId] : [])
+      ...(currentRefereeId ? [currentRefereeId] : []),
     ]);
-    
+
     // Remove players that no longer exist
     for (const [playerId, model] of this.playerModels.entries()) {
       if (!allCurrentIds.has(playerId)) {
-        console.log('Removing player that no longer exists:', playerId);
+        console.log("Removing player that no longer exists:", playerId);
         this.removePlayer(playerId);
       }
     }
 
     // Update or add each fighter
     if (gameState.fighters && gameState.fighters.length) {
-      gameState.fighters.forEach(fighter => {
-        console.log('Processing fighter:', fighter);
+      gameState.fighters.forEach((fighter) => {
+        console.log("Processing fighter:", fighter);
         this.updateOrCreatePlayer(fighter);
       });
     }
 
     // Update or add referee
     if (gameState.referee) {
-      console.log('Processing referee:', gameState.referee);
+      console.log("Processing referee:", gameState.referee);
       this.updateOrCreatePlayer(gameState.referee);
     }
 
@@ -667,35 +708,37 @@ export class Renderer {
     if (gameState.viewers && gameState.viewers.length) {
       // Get seat positions from the stadium
       const seatPositions = this.getStadiumSeatPositions();
-      
+
       // Process each viewer
       gameState.viewers.forEach((viewer, index) => {
         // Clone viewer object to avoid modifying the original game state
         const viewerWithPosition = { ...viewer };
-        
+
         // If viewer doesn't have a position or is at default position, place on a seat
-        if (!viewerWithPosition.position || 
-            (viewerWithPosition.position.x === 0 && viewerWithPosition.position.z === 0)) {
-          
+        if (
+          !viewerWithPosition.position ||
+          (viewerWithPosition.position.x === 0 &&
+            viewerWithPosition.position.z === 0)
+        ) {
           // Use seat position based on index (wrap around if more viewers than seats)
           const seatIndex = index % seatPositions.length;
           const seatPos = seatPositions[seatIndex];
-          
+
           viewerWithPosition.position = {
             x: seatPos.x,
             y: seatPos.y + 0.5, // Adjust to sit on top of the seat
-            z: seatPos.z
+            z: seatPos.z,
           };
-          
+
           // Set rotation to face the ring
           viewerWithPosition.rotation = seatPos.rotation;
         }
-        
-        console.log('Processing viewer:', viewerWithPosition);
+
+        console.log("Processing viewer:", viewerWithPosition);
         this.updateOrCreatePlayer(viewerWithPosition);
       });
     }
-    
+
     console.log(`Total player models after update: ${this.playerModels.size}`);
   }
 
@@ -704,124 +747,145 @@ export class Renderer {
     // Define the seat positions in a circular pattern around the ring
     // These will be more realistic seat positions in the stadium
     const positions = [];
-    
+
     // Parameters for seat placement
-    const rows = 3;          // Number of audience rows
-    const startRadius = 10;  // Distance of first row from center
-    const rowSpacing = 2;    // Distance between rows
-    const seatSpacing = 2;   // Distance between seats in the same row
-    
+    const rows = 3; // Number of audience rows
+    const startRadius = 10; // Distance of first row from center
+    const rowSpacing = 2; // Distance between rows
+    const seatSpacing = 2; // Distance between seats in the same row
+
     // Generate seat positions for each row
     for (let row = 0; row < rows; row++) {
-      const rowRadius = startRadius + (row * rowSpacing);
+      const rowRadius = startRadius + row * rowSpacing;
       const circumference = 2 * Math.PI * rowRadius;
-      
+
       // Calculate how many seats can fit in this row
       const seatsInRow = Math.floor(circumference / seatSpacing);
-      
+
       for (let seat = 0; seat < seatsInRow; seat++) {
         const angle = (seat / seatsInRow) * Math.PI * 2;
-        
+
         // Calculate seat position
         const x = Math.sin(angle) * rowRadius;
         const z = Math.cos(angle) * rowRadius;
-        
+
         // Calculate seat height (higher rows are elevated)
         const y = row * 1.5;
-        
+
         // The rotation needs to be set so viewers face toward the center
         const rotation = angle + Math.PI; // Add PI to face inward
-        
+
         positions.push({ x, y, z, rotation });
       }
     }
-    
+
     return positions;
   }
 
   updateOrCreatePlayer(player) {
-    console.log('updateOrCreatePlayer called for:', player);
+    console.log("updateOrCreatePlayer called for:", player);
     if (!player || !player.id) {
-        console.error('Invalid player data:', player);
-        return;
+      console.error("Invalid player data:", player);
+      return;
     }
-    
+
     // Check if we need to remove an existing model (for role changes)
     if (this.playerModels.has(player.id)) {
-        // If role changed, remove the old model
-        const existingModel = this.playerModels.get(player.id);
-        const roleChanged = existingModel.userData.role !== player.role;
-        
-        if (roleChanged) {
-            console.log(`Role changed for player ${player.id} from ${existingModel.userData.role} to ${player.role}`);
-            this.removePlayer(player.id);
-        }
+      // If role changed, remove the old model
+      const existingModel = this.playerModels.get(player.id);
+      const roleChanged = existingModel.userData.role !== player.role;
+
+      if (roleChanged) {
+        console.log(
+          `Role changed for player ${player.id} from ${existingModel.userData.role} to ${player.role}`
+        );
+        this.removePlayer(player.id);
+      }
     }
-    
+
     // Create or update the player model
     if (!this.playerModels.has(player.id)) {
-        console.log('Creating new model for player:', player.id, 'with role:', player.role);
-        // Create new model
-        const model = this.modelFactory.createPlayerModel(player);
-        if (model) {
-            console.log('Model created successfully:', model);
-            // Store the player's role in the model's userData for future reference
-            model.userData = { 
-                role: player.role,
-                playerId: player.id
-            };
-            
-            // Set initial position and rotation
-            if (player.position) {
-                model.position.set(player.position.x, player.position.y, player.position.z);
-            }
-            if (player.rotation !== undefined) {
-                model.rotation.y = player.rotation;
-            }
-            
-            this.scene.add(model);
-            this.playerModels.set(player.id, model);
-            
-            console.log(`Added player model to scene. Total models: ${this.playerModels.size}`);
-        } else {
-            console.error('Failed to create model for player:', player);
-        }
-    } else {
-        // Update existing model position/rotation
-        console.log('Updating existing model for player:', player.id);
-        const model = this.playerModels.get(player.id);
-        
+      console.log(
+        "Creating new model for player:",
+        player.id,
+        "with role:",
+        player.role
+      );
+      // Create new model
+      const model = this.modelFactory.createPlayerModel(player);
+      if (model) {
+        console.log("Model created successfully:", model);
+        // Store the player's role in the model's userData for future reference
+        model.userData = {
+          role: player.role,
+          playerId: player.id,
+        };
+
+        // Set initial position and rotation
         if (player.position) {
-            model.position.set(player.position.x, player.position.y, player.position.z);
+          model.position.set(
+            player.position.x,
+            player.position.y,
+            player.position.z
+          );
         }
         if (player.rotation !== undefined) {
-            model.rotation.y = player.rotation;
+          model.rotation.y = player.rotation;
         }
+
+        this.scene.add(model);
+        this.playerModels.set(player.id, model);
+
+        console.log(
+          `Added player model to scene. Total models: ${this.playerModels.size}`
+        );
+      } else {
+        console.error("Failed to create model for player:", player);
+      }
+    } else {
+      // Update existing model position/rotation
+      console.log("Updating existing model for player:", player.id);
+      const model = this.playerModels.get(player.id);
+
+      if (player.position) {
+        model.position.set(
+          player.position.x,
+          player.position.y,
+          player.position.z
+        );
+      }
+      if (player.rotation !== undefined) {
+        model.rotation.y = player.rotation;
+      }
     }
   }
 
   updatePlayerPosition(data) {
     const model = this.playerModels.get(data.id);
     if (model) {
-        console.log(`Updating position for ${data.id}:`, data.position);
-        if (data.position) {
-            model.position.set(data.position.x, model.position.y, data.position.z);
-        }
-        if (data.rotation !== undefined) {
-            model.rotation.y = data.rotation;
-        }
+      console.log(`Updating position for ${data.id}:`, data.position);
+      if (data.position) {
+        model.position.set(data.position.x, model.position.y, data.position.z);
+      }
+      if (data.rotation !== undefined) {
+        model.rotation.y = data.rotation;
+      }
     } else {
-        console.warn(`Tried to update position for missing player model: ${data.id}`);
+      console.warn(
+        `Tried to update position for missing player model: ${data.id}`
+      );
     }
   }
 
   removePlayer(playerId) {
-    console.log('Removing player model:', playerId);
+    console.log("Removing player model:", playerId);
     const model = this.playerModels.get(playerId);
     if (model) {
-        this.scene.remove(model);
-        this.playerModels.delete(playerId);
-        console.log(`Removed player model. Total models: ${this.playerModels.size}`);
+      this.scene.remove(model);
+      this.playerModels.delete(playerId);
+      console.log(
+        `Removed player model. Total models: ${this.playerModels.size}`
+      );
     }
   }
 }
