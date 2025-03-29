@@ -719,6 +719,19 @@ export class Renderer {
         this.createTextBubble(data.id || data.playerId, messageText, false);
       }
     });
+
+    // Add handler for match end to trigger the fall animation
+    socketClient.on("matchEnd", (data) => {
+      console.log("Match ended. Winner:", data.winnerId, "Loser:", data.loserId);
+      
+      // Only animate if we have a valid loser ID
+      if (data.loserId) {
+        // Add a small delay for dramatic effect
+        setTimeout(() => {
+          this.animateFighterFall(data.loserId);
+        }, 500);
+      }
+    });
   }
 
   // Add a new method to handle player role changes
@@ -1532,6 +1545,135 @@ export class Renderer {
         this.cameraSystem.setMode(this.cameraSystem.MODES.WAITING_OVERVIEW);
         break;
     }
+  }
+
+  // Add this method to animate a fighter falling off the ring
+  animateFighterFall(loserId) {
+    console.log(`Animating fall for fighter: ${loserId}`);
+    
+    // Get the fighter model
+    const fighterModel = this.playerModels.get(loserId);
+    if (!fighterModel) {
+      console.warn(`Cannot animate fall: fighter model ${loserId} not found`);
+      return;
+    }
+    
+    // Save original position and rotation for reference
+    const originalPosition = fighterModel.position.clone();
+    const originalRotation = fighterModel.rotation.clone();
+    
+    // Calculate a random direction to fall (away from the ring center)
+    const ringCenter = new THREE.Vector3(0, 0, 0);
+    const fallDirection = new THREE.Vector3()
+      .subVectors(originalPosition, ringCenter)
+      .normalize();
+    
+    // Add some randomness to make it more natural
+    fallDirection.x += (Math.random() * 0.4) - 0.2;
+    fallDirection.z += (Math.random() * 0.4) - 0.2;
+    fallDirection.normalize();
+    
+    // Calculate a target position in the audience
+    const fallDistance = 12 + Math.random() * 5; // How far they fall (into audience)
+    const targetPosition = new THREE.Vector3()
+      .copy(originalPosition)
+      .add(fallDirection.multiplyScalar(fallDistance));
+    
+    // Randomize landing spot a bit
+    targetPosition.x += (Math.random() * 6) - 3;
+    targetPosition.z += (Math.random() * 6) - 3;
+    targetPosition.y = 0.5; // Land on the floor
+    
+    // Calculate a target rotation (face up, looking at the ceiling)
+    const targetRotation = new THREE.Euler(
+      Math.PI / 2 + (Math.random() * 0.4 - 0.2), // Mostly face up, slight random tilt
+      originalRotation.y + Math.PI + (Math.random() * 0.6 - 0.3), // Spin around with some randomness
+      (Math.random() * 0.5) - 0.25 // Slight random roll
+    );
+    
+    // Animation parameters
+    const startTime = performance.now();
+    const duration = 2000; // 2 seconds for the fall
+    const bounceHeight = 8; // Maximum height during the arc
+    
+    // Create a new text bubble for a dramatic "NOOOOO!" or similar exclamation
+    const fallExclamations = [
+      "NOOOOO!",
+      "AAAAAH!",
+      "I'M FLYING!",
+      "OOF!",
+      "NOT LIKE THIS!",
+      "IMPOSSIBLE!",
+      "DISHONOR!"
+    ];
+    const randomExclamation = fallExclamations[Math.floor(Math.random() * fallExclamations.length)];
+    
+    // Add a slight delay before showing the text bubble
+    setTimeout(() => {
+      this.createTextBubble(loserId, randomExclamation, true);
+    }, 500);
+    
+    // Animation function
+    const animateFall = (currentTime) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1.0);
+      
+      // Use easing functions for more natural motion
+      const positionEase = this.easeOutQuart(progress);
+      const rotationEase = this.easeInOutQuad(progress);
+      
+      // Calculate current position with arc trajectory
+      const currentPosition = new THREE.Vector3();
+      
+      // Interpolate X and Z with easing
+      currentPosition.x = originalPosition.x + (targetPosition.x - originalPosition.x) * positionEase;
+      currentPosition.z = originalPosition.z + (targetPosition.z - originalPosition.z) * positionEase;
+      
+      // Y position follows a parabolic arc (up then down)
+      // Start upward trajectory, then fall down
+      if (progress < 0.5) {
+        // First half - go up
+        currentPosition.y = originalPosition.y + bounceHeight * this.easeOutQuad(progress * 2);
+      } else {
+        // Second half - fall down
+        currentPosition.y = originalPosition.y + bounceHeight + 
+          (targetPosition.y - (originalPosition.y + bounceHeight)) * 
+          this.easeInQuad((progress - 0.5) * 2);
+      }
+      
+      // Update fighter position
+      fighterModel.position.copy(currentPosition);
+      
+      // Interpolate rotation with easing
+      fighterModel.rotation.x = originalRotation.x + (targetRotation.x - originalRotation.x) * rotationEase;
+      fighterModel.rotation.y = originalRotation.y + (targetRotation.y - originalRotation.y) * rotationEase;
+      fighterModel.rotation.z = originalRotation.z + (targetRotation.z - originalRotation.z) * rotationEase;
+      
+      // Continue animation if not complete
+      if (progress < 1) {
+        requestAnimationFrame(animateFall);
+      }
+    };
+    
+    // Start the animation
+    requestAnimationFrame(animateFall);
+  }
+
+  // Add easing functions to make the animation more natural
+  easeOutQuad(t) {
+    return 1 - (1 - t) * (1 - t);
+  }
+
+  easeInQuad(t) {
+    return t * t;
+  }
+
+  easeInOutQuad(t) {
+    return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  }
+
+  easeOutQuart(t) {
+    return 1 - Math.pow(1 - t, 4);
   }
 }
 
