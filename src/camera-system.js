@@ -46,12 +46,12 @@ export class CameraSystem {
         fighter1: null,
         fighter2: null,
         referee: null,
-        // Timing constants (in milliseconds)
-        introduceDelay: 1000,    // Initial delay before starting introductions
-        fighter1Time: 2000,      // Time to focus on fighter 1
-        fighter2Time: 2000,      // Time to focus on fighter 2
-        refereeTime: 2000,       // Time to focus on referee
-        outroTime: 1000,         // Time to transition back to overview
+        // Timing constants (in milliseconds) - doubled for slower movement
+        introduceDelay: 2000,    // Initial delay before starting introductions (2x slower)
+        fighter1Time: 4000,      // Time to focus on fighter 1 (2x slower)
+        fighter2Time: 4000,      // Time to focus on fighter 2 (2x slower)
+        refereeTime: 4000,       // Time to focus on referee (2x slower)
+        outroTime: 2000,         // Time to transition back to overview (2x slower)
         // Camera settings for close-ups
         closeupDistance: 1.0,    // How far from the face to position camera
         closeupHeight: 1.6,      // Height adjustment for close-ups
@@ -203,18 +203,21 @@ export class CameraSystem {
   }
   
   /**
-   * Update camera for waiting overview mode
+   * Update camera for waiting overview mode with slower motion
    * @param {Object} settings - Camera settings for this mode
    * @param {number} elapsedTime - Time elapsed since mode was set
    */
   updateWaitingOverviewCamera(settings, elapsedTime) {
     // Ensure we're not in ceremony mode
     if (this.ceremonyCameraActive) {
-        this.cleanupCeremonyMode();
+      this.cleanupCeremonyMode();
     }
 
+    // Slow down the bobbing effect by halving the speed
+    const slowerElapsedTime = elapsedTime * 0.5; // 2x slower
+    
     // Calculate vertical bobbing
-    const yOffset = Math.sin(elapsedTime * settings.bobSpeed) * settings.bobAmplitude;
+    const yOffset = Math.sin(slowerElapsedTime * settings.bobSpeed) * settings.bobAmplitude;
     
     // Set camera position with bobbing effect
     this.camera.position.copy(settings.basePosition);
@@ -222,6 +225,7 @@ export class CameraSystem {
     
     // Always look at the center of the ring
     this.camera.lookAt(settings.lookAt);
+    this.camera.up.set(0, 1, 0); // Always maintain world-up
   }
   
   /**
@@ -232,10 +236,10 @@ export class CameraSystem {
   updateCeremonyCamera(settings, elapsedTime) {
     // Early exit if we don't have all the required participants
     if (!settings.fighter1 || !settings.fighter2 || !settings.referee) {
-        console.warn('Ceremony mode is missing participants, falling back to overview');
-        this.cleanupCeremonyMode();
-        this.setMode(this.MODES.WAITING_OVERVIEW);
-        return;
+      console.warn('Ceremony mode is missing participants, falling back to overview');
+      this.cleanupCeremonyMode();
+      this.setMode(this.MODES.WAITING_OVERVIEW);
+      return;
     }
     
     // Define the phases and their timing
@@ -243,7 +247,7 @@ export class CameraSystem {
       intro: {
         time: settings.introduceDelay,
         next: 'fighter1',
-        showBars: false
+        showBars: true  // Show cinematic bars from the start for more epic feel
       },
       fighter1: {
         time: settings.fighter1Time,
@@ -266,7 +270,7 @@ export class CameraSystem {
       outro: {
         time: settings.outroTime,
         next: null,
-        showBars: false
+        showBars: true  // Keep bars visible through the outro for consistency
       }
     };
     
@@ -295,27 +299,38 @@ export class CameraSystem {
     
     switch (currentPhase) {
       case 'intro':
-        // Instead of rotating, just position the camera at a fixed overview position
-        this.camera.position.set(-15, 15, 15);
-        this.camera.lookAt(0, 0, 0);
+        // More dramatic intro shot from lower angle
+        const introAngle = Math.PI / 4 * phaseProgress; // Rotate around the ring
+        const introRadius = 20 - phaseProgress * 5; // Move closer as we progress
+        const introHeight = 5 + phaseProgress * 5; // Move up as we progress
+        
+        // Calculate camera position based on circular movement
+        this.camera.position.set(
+          Math.sin(introAngle) * introRadius,
+          introHeight,
+          Math.cos(introAngle) * introRadius
+        );
+        
+        // Always look at the ring center
+        this.camera.lookAt(0, 1, 0);
         break;
         
       case 'fighter1':
       case 'fighter2':
       case 'referee':
-        // Position camera for close-up on the current target
-        this.positionCameraForCloseup(phase.target, settings);
+        // Position camera for dramatic close-up on the current target
+        this.positionCameraForDramaticCloseup(phase.target, settings, phaseProgress);
         break;
         
       case 'outro':
-        // Transition back to waiting overview
+        // Epic pull-back shot revealing the whole scene
         if (phaseProgress >= 1.0) {
           if (this.currentMode === this.MODES.CEREMONY) {
             this.cleanupCeremonyMode();
             this.setMode(this.MODES.WAITING_OVERVIEW);
           }
         } else {
-          this.transitionToWaitingOverview(phaseProgress);
+          this.createEpicOutroShot(phaseProgress);
         }
         break;
     }
@@ -354,153 +369,127 @@ export class CameraSystem {
   }
   
   /**
-   * Position camera for close-up on a target
+   * Position camera for dramatic close-up on a target
    * @param {Object} target - The target to focus on (fighter or referee)
    * @param {Object} settings - Camera settings
+   * @param {number} progress - Progress through the current phase (0-1)
    */
-  positionCameraForCloseup(target, settings) {
+  positionCameraForDramaticCloseup(target, settings, progress) {
     if (!target || !target.position) {
       console.warn('Invalid target for close-up');
       return;
     }
     
-    // Position camera at the center of the ring
-    const ringCenter = new THREE.Vector3(0, RING_HEIGHT + settings.closeupHeight, 0); // Center of the ring, slightly elevated
-    
     // Get target position
     const targetPosition = target.position.clone();
     
-    // Calculate direction from ring center to target
-    const directionToTarget = new THREE.Vector3()
-      .subVectors(targetPosition, ringCenter)
-      .normalize();
+    // Eye-level height (adjusted for fighter models)
+    const eyeHeight = targetPosition.y + settings.closeupHeight;
     
-    // Calculate eye level position (adjust height for better framing)
-    const eyePosition = targetPosition.clone();
-    eyePosition.y += settings.closeupHeight;
+    // *** IMPROVED CAMERA ORBIT ***
+    // Restrict orbit to the front 180° of the fighter (semicircle) to prevent inversions
+    // with a constant, slower pace (2x slower)
+    const orbitRadius = 3.0 - progress * 0.5; // Start wider, move closer more gradually
+    const orbitHeight = eyeHeight;
     
-    // Position camera in the center of the ring
-    this.camera.position.copy(ringCenter);
+    // More limited orbit range - only 180 degrees in front of the fighter
+    const frontAngleRange = Math.PI; // 180 degrees (half circle)
+    const startAngle = -frontAngleRange/2; // -90 degrees (left side)
+    const currentOrbitAngle = startAngle + (progress * frontAngleRange); // Move from left to right
+    
+    // Calculate base direction the fighter is facing (relative to ring center)
+    const ringCenter = new THREE.Vector3(0, 0, 0);
+    const fighterToCenter = new THREE.Vector3().subVectors(ringCenter, targetPosition).normalize();
+    
+    // Calculate the base angle (where the fighter is looking)
+    const baseAngle = Math.atan2(fighterToCenter.z, fighterToCenter.x);
+    
+    // Calculate final orbit angle - orbital motion around the fighter's facing direction
+    const finalAngle = baseAngle + currentOrbitAngle;
+    
+    // Calculate camera position based on the orbit
+    const cameraX = targetPosition.x + Math.cos(finalAngle) * orbitRadius;
+    const cameraZ = targetPosition.z + Math.sin(finalAngle) * orbitRadius;
+    
+    // Apply a smoothed vertical position curve - higher at the sides, level at front
+    // This creates a more dynamic vertical movement
+    const verticalOffset = Math.abs(currentOrbitAngle) * 0.2; // Higher when at sides
+    const cameraY = orbitHeight + verticalOffset;
+    
+    // Set camera position
+    this.camera.position.set(cameraX, cameraY, cameraZ);
+    
+    // Create look target - always at eye level
+    const lookTarget = new THREE.Vector3(
+      targetPosition.x,
+      eyeHeight,
+      targetPosition.z
+    );
+    
+    // Always use world-up as the reference vector
+    this.camera.up.set(0, 1, 0);
     
     // Look at the target's eye level
-    this.camera.lookAt(eyePosition);
+    this.camera.lookAt(lookTarget);
     
-    // Add a slight upward tilt for a more dramatic look
-    const cameraUp = new THREE.Vector3(0, 0.5, 0);
-    const rightVector = new THREE.Vector3().crossVectors(directionToTarget, cameraUp).normalize();
+    // IMPORTANT: Reset quaternion after lookAt to enforce up direction
+    // This explicitly controls orientation to prevent any inversions
+    const lookDir = new THREE.Vector3().subVectors(lookTarget, this.camera.position).normalize();
+    const right = new THREE.Vector3().crossVectors(lookDir, new THREE.Vector3(0, 1, 0)).normalize();
+    const up = new THREE.Vector3().crossVectors(right, lookDir).normalize();
     
-    // Tilt the camera slightly based on an offset from the perfect center
-    const tiltDirection = new THREE.Vector3().crossVectors(rightVector, directionToTarget).normalize();
-    this.camera.position.add(tiltDirection.multiplyScalar(0.3)); // Subtle upward tilt
+    // Create an orientation matrix and apply it to the camera
+    const matrix = new THREE.Matrix4();
+    matrix.makeBasis(right, up, lookDir.negate());
+    this.camera.quaternion.setFromRotationMatrix(matrix);
+    
+    // No roll/tilt - keeps a level horizon
+    this.camera.rotation.z = 0;
   }
   
   /**
-   * Transition from current position to waiting overview
-   * @param {number} progress - Transition progress (0-1)
+   * Create an epic outro shot that pulls back and up (slowed down)
+   * @param {number} progress - Progress through the outro phase (0-1)
    */
-  transitionToWaitingOverview(progress) {
-    const overviewSettings = this.cameraSettings[this.MODES.WAITING_OVERVIEW];
+  createEpicOutroShot(progress) {
+    // Use a non-linear easing for smoother movement
+    const easedProgress = this.easeOutCubic(progress);
     
-    // Use smoothstep for easing
-    const t = this.smoothstep(0, 1, progress);
+    // Calculate starting point
+    const startPos = new THREE.Vector3(3, 4, 3);
     
-    // Interpolate position
+    // Calculate ending position (high overview)
+    const endPos = new THREE.Vector3(-15, 18, 15);
+    
+    // Interpolate between positions (slower with halved movement strength)
     const newPosition = new THREE.Vector3().lerpVectors(
-      this.transitionFromPosition,
-      overviewSettings.basePosition,
-      t
+      startPos,
+      endPos,
+      easedProgress * 0.8 // 20% less distance for slower apparent motion
     );
+    
+    // Add a circular movement component for more dynamic feel (reduced amplitude)
+    const angle = progress * Math.PI * 0.3; // Slower rotation
+    newPosition.x += Math.sin(angle) * 3 * (1 - easedProgress); // Reduced circular motion
+    newPosition.z += Math.cos(angle) * 3 * (1 - easedProgress);
     
     this.camera.position.copy(newPosition);
     
-    // Interpolate look target (more complex)
-    const fromDirection = this.transitionFromTarget.clone().sub(this.transitionFromPosition).normalize();
-    const toDirection = overviewSettings.lookAt.clone().sub(overviewSettings.basePosition).normalize();
+    // Always keep world-up as the reference vector
+    this.camera.up.set(0, 1, 0);
     
-    // Spherical interpolation would be better, but we'll use a simple approach
-    const currentDirection = new THREE.Vector3().lerpVectors(fromDirection, toDirection, t).normalize();
-    
-    // Calculate look target point
-    const targetPoint = newPosition.clone().add(currentDirection.multiplyScalar(10));
-    this.camera.lookAt(targetPoint);
+    // Always look at the center, but gradually move up the look point
+    const lookHeight = easedProgress * 2; // Lower height range
+    this.camera.lookAt(0, lookHeight, 0);
   }
   
   /**
-   * Smoothstep function for better easing
-   * @param {number} min - Minimum value
-   * @param {number} max - Maximum value
-   * @param {number} value - Input value
-   * @returns {number} Smoothed value
+   * Cubic ease-out function for smoother camera movement
+   * @param {number} x - Input value between 0 and 1
+   * @returns {number} Eased value
    */
-  smoothstep(min, max, value) {
-    const x = Math.max(0, Math.min(1, (value - min) / (max - min)));
-    return x * x * (3 - 2 * x);
-  }
-  
-  /**
-   * Create cinematic black bars
-   * @returns {Object} Controls for the bars
-   */
-  createCinematicBars() {
-    const CINEMA_BAR_HEIGHT = 0.15; // 15% of screen height for top and bottom
-    
-    const container = document.createElement('div');
-    container.id = 'cinematic-bars';
-    container.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 1000;
-      opacity: 0;
-      transition: opacity 0.5s ease-in-out;
-    `;
-
-    const topBar = document.createElement('div');
-    topBar.style.cssText = `
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: ${CINEMA_BAR_HEIGHT * 100}%;
-      background-color: black;
-      transform: translateY(-100%);
-      transition: transform 0.5s ease-in-out;
-    `;
-
-    const bottomBar = document.createElement('div');
-    bottomBar.style.cssText = `
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      height: ${CINEMA_BAR_HEIGHT * 100}%;
-      background-color: black;
-      transform: translateY(100%);
-      transition: transform 0.5s ease-in-out;
-    `;
-
-    container.appendChild(topBar);
-    container.appendChild(bottomBar);
-    document.body.appendChild(container);
-
-    return {
-      container,
-      topBar,
-      bottomBar,
-      show() {
-        container.style.opacity = '1';
-        topBar.style.transform = 'translateY(0)';
-        bottomBar.style.transform = 'translateY(0)';
-      },
-      hide() {
-        container.style.opacity = '0';
-        topBar.style.transform = 'translateY(-100%)';
-        bottomBar.style.transform = 'translateY(100%)';
-      }
-    };
+  easeOutCubic(x) {
+    return 1 - Math.pow(1 - x, 3);
   }
   
   /**
@@ -540,5 +529,71 @@ export class CameraSystem {
         document.body.removeChild(this.ceremonyCineBars.container);
         this.ceremonyCineBars = null;
     }
+  }
+
+  /**
+   * Create cinematic black bars with improved styling
+   * @returns {Object} Controls for the bars
+   */
+  createCinematicBars() {
+    const CINEMA_BAR_HEIGHT = 0.15; // 15% of screen height for top and bottom
+    
+    const container = document.createElement('div');
+    container.id = 'cinematic-bars';
+    container.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
+    `;
+
+    const topBar = document.createElement('div');
+    topBar.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: ${CINEMA_BAR_HEIGHT * 100}%;
+      background-color: black;
+      transform: translateY(-100%);
+      transition: transform 0.8s cubic-bezier(0.4, 0.0, 0.2, 1);
+    `;
+
+    const bottomBar = document.createElement('div');
+    bottomBar.style.cssText = `
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: ${CINEMA_BAR_HEIGHT * 100}%;
+      background-color: black;
+      transform: translateY(100%);
+      transition: transform 0.8s cubic-bezier(0.4, 0.0, 0.2, 1);
+    `;
+
+    container.appendChild(topBar);
+    container.appendChild(bottomBar);
+    document.body.appendChild(container);
+
+    return {
+      container,
+      topBar,
+      bottomBar,
+      show() {
+        container.style.opacity = '1';
+        topBar.style.transform = 'translateY(0)';
+        bottomBar.style.transform = 'translateY(0)';
+      },
+      hide() {
+        container.style.opacity = '0';
+        topBar.style.transform = 'translateY(-100%)';
+        bottomBar.style.transform = 'translateY(100%)';
+      }
+    };
   }
 } 
