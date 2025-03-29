@@ -163,6 +163,11 @@ class UIManager {
     }
 
     debouncedAddMessage(sender, message) {
+        // Skip adding messages from fake users to the chat history
+        if (sender.startsWith('fake-')) {
+            return;
+        }
+        
         clearTimeout(this._updateTimeout);
         this._updateTimeout = setTimeout(() => {
             this.addMessageToHistory(sender, message);

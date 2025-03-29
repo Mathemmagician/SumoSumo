@@ -1248,24 +1248,25 @@ export class Renderer {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (isEmote) {
-        // Emote styling - bigger and darker
-        ctx.font = 'bold 400px "Sawarabi Mincho"'; // Increased from 300px to 400px
+        // Emote styling - centered and dark for better contrast
+        ctx.font = 'bold 400px "Sawarabi Mincho"';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         
-        // Even thicker dark outline
-        ctx.strokeStyle = '#1a2634'; // Darker outline
-        ctx.lineWidth = 20; // Increased from 16 to 20
+        // Much darker outline for better contrast
+        ctx.strokeStyle = '#111827'; // Almost black outline
+        ctx.lineWidth = 24; // Thicker outline
         
-        // Warmer, less washed-out fill color
-        ctx.fillStyle = '#e0e0e0'; // Slightly darker fill
+        // Much darker fill color to combat washing out
+        ctx.fillStyle = '#1f2937'; // Dark gray fill
         
         // Stronger shadow
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-        ctx.shadowBlur = 20;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowBlur = 25;
         ctx.shadowOffsetX = 0;
         ctx.shadowOffsetY = 4;
         
+        // Draw in canvas center
         const x = canvas.width / 2;
         const y = canvas.height / 2;
         
@@ -1276,36 +1277,37 @@ export class Renderer {
         
     } else {
         // Message styling - speech bubble with tail
-        ctx.font = 'bold 120px "Sawarabi Mincho"'; // Increased from 96px to 120px
+        ctx.font = 'bold 120px "Sawarabi Mincho"';
         
-        // Warmer beige colors for bubble
+        // Even warmer beige colors for bubble
         const bubbleGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        bubbleGradient.addColorStop(0, 'rgba(238, 232, 224, 0.98)'); // Warmer beige
-        bubbleGradient.addColorStop(1, 'rgba(226, 217, 205, 0.98)'); // Darker warm beige
+        bubbleGradient.addColorStop(0, 'rgba(245, 238, 230, 0.98)'); // Warmer light beige
+        bubbleGradient.addColorStop(1, 'rgba(232, 220, 202, 0.98)'); // Warmer dark beige
         
-        // Add shadow
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
-        ctx.shadowBlur = 12;
+        // Stronger shadow for bubble
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+        ctx.shadowBlur = 15;
         ctx.shadowOffsetX = 2;
         ctx.shadowOffsetY = 4;
         
-        const padding = 60; // Increased padding for better text placement
+        // Center the bubble in the canvas
+        const padding = 60;
         const cornerRadius = 30;
-        const bubbleWidth = canvas.width - padding * 3;
+        const bubbleWidth = canvas.width - padding * 2; // Less padding for more centered bubble
         const bubbleHeight = canvas.height - padding * 2 - 30;
         
-        // Offset bubble to one side
-        const offsetX = padding * 1.5;
+        // Calculate the start X position to center the bubble
+        const bubbleStartX = (canvas.width - bubbleWidth) / 2;
         
         // Draw bubble with tail
         ctx.beginPath();
-        ctx.moveTo(offsetX + cornerRadius, padding);
-        ctx.lineTo(offsetX + bubbleWidth - cornerRadius, padding);
-        ctx.quadraticCurveTo(offsetX + bubbleWidth, padding, offsetX + bubbleWidth, padding + cornerRadius);
-        ctx.lineTo(offsetX + bubbleWidth, padding + bubbleHeight - cornerRadius);
-        ctx.quadraticCurveTo(offsetX + bubbleWidth, padding + bubbleHeight, offsetX + bubbleWidth - cornerRadius, padding + bubbleHeight);
+        ctx.moveTo(bubbleStartX + cornerRadius, padding);
+        ctx.lineTo(bubbleStartX + bubbleWidth - cornerRadius, padding);
+        ctx.quadraticCurveTo(bubbleStartX + bubbleWidth, padding, bubbleStartX + bubbleWidth, padding + cornerRadius);
+        ctx.lineTo(bubbleStartX + bubbleWidth, padding + bubbleHeight - cornerRadius);
+        ctx.quadraticCurveTo(bubbleStartX + bubbleWidth, padding + bubbleHeight, bubbleStartX + bubbleWidth - cornerRadius, padding + bubbleHeight);
         
-        // Add tail
+        // Add tail at center bottom
         const tailWidth = 50;
         const tailHeight = 25;
         const tailX = canvas.width / 2;
@@ -1313,10 +1315,10 @@ export class Renderer {
         ctx.lineTo(tailX, padding + bubbleHeight + tailHeight);
         ctx.lineTo(tailX - tailWidth/2, padding + bubbleHeight);
         
-        ctx.lineTo(offsetX + cornerRadius, padding + bubbleHeight);
-        ctx.quadraticCurveTo(offsetX, padding + bubbleHeight, offsetX, padding + bubbleHeight - cornerRadius);
-        ctx.lineTo(offsetX, padding + cornerRadius);
-        ctx.quadraticCurveTo(offsetX + cornerRadius, padding, offsetX + cornerRadius, padding);
+        ctx.lineTo(bubbleStartX + cornerRadius, padding + bubbleHeight);
+        ctx.quadraticCurveTo(bubbleStartX, padding + bubbleHeight, bubbleStartX, padding + bubbleHeight - cornerRadius);
+        ctx.lineTo(bubbleStartX, padding + cornerRadius);
+        ctx.quadraticCurveTo(bubbleStartX, padding, bubbleStartX + cornerRadius, padding);
         
         ctx.closePath();
         
@@ -1324,27 +1326,62 @@ export class Renderer {
         ctx.fillStyle = bubbleGradient;
         ctx.fill();
         
-        // Add subtle border
-        ctx.strokeStyle = 'rgba(188, 175, 165, 0.5)'; // Slightly more visible border
-        ctx.lineWidth = 2;
+        // Darker border
+        ctx.strokeStyle = 'rgba(162, 138, 120, 0.6)'; // Darker, more visible border
+        ctx.lineWidth = 3;
         ctx.stroke();
         
         // Reset shadow for text
         ctx.shadowColor = 'transparent';
         
-        // Draw text with darker color
-        ctx.fillStyle = '#1a2634'; // Darker text color
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
+        // Much darker text color to combat washing out
+        ctx.fillStyle = '#111827'; // Almost black text
         
-        // Adjust text positioning
+        // Add very subtle text shadow for depth
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
+        ctx.shadowBlur = 2;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+        
+        // Text centering calculations
         const words = text.split(' ');
+        const lineHeight = 110;
+        const maxWidth = bubbleWidth - padding * 1.5;
+        
+        // Measure how many lines we'll need
+        let testLine = '';
+        let lineCount = 1;
+        for (let word of words) {
+            const testWithWord = testLine + word + ' ';
+            const metrics = ctx.measureText(testWithWord);
+            
+            if (metrics.width > maxWidth) {
+                lineCount++;
+                testLine = word + ' ';
+            } else {
+                testLine = testWithWord;
+            }
+        }
+        
+        // Calculate starting Y position to center text vertically
+        const totalTextHeight = lineCount * lineHeight;
+        let startY = padding + (bubbleHeight - totalTextHeight) / 2;
+        if (lineCount === 1) {
+            // For single lines, center exactly
+            startY = padding + bubbleHeight / 2;
+        } else {
+            // For multiple lines, start a bit higher than center
+            startY += lineHeight * 0.3;
+        }
+        
+        // Draw text with proper centering
+        ctx.textAlign = 'center'; // Center text horizontally
+        ctx.textBaseline = 'middle';
+        const bubbleCenterX = canvas.width / 2; // Center of the canvas
+        
         let line = '';
-        let y = padding + bubbleHeight / 2 - (words.length > 1 ? lineHeight/2 : 0); // Center text vertically
-        const lineHeight = 110; // Adjusted for larger font
-        const maxWidth = bubbleWidth - padding * 2;
-        const bubbleCenterX = offsetX + bubbleWidth / 2;
-
+        let y = startY;
+        
         for (let word of words) {
             const testLine = line + word + ' ';
             const metrics = ctx.measureText(testLine);
@@ -1371,7 +1408,9 @@ export class Renderer {
         transparent: true,
         depthWrite: false,
         depthTest: true,
-        sizeAttenuation: true
+        sizeAttenuation: true,
+        color: 0xffffff, // Full white color multiplier
+        toneMapped: false // Disable tone mapping for the text
     });
     
     const sprite = new THREE.Sprite(material);
@@ -1434,7 +1473,7 @@ export class Renderer {
         const playerPosition = new THREE.Vector3();
         bubble.playerModel.getWorldPosition(playerPosition);
         bubble.sprite.position.copy(playerPosition);
-        bubble.sprite.position.y += 8; // Match the modelHeight from createTextBubble
+        bubble.sprite.position.y += 8;
       }
     });
   }
