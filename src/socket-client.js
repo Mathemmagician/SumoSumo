@@ -245,18 +245,32 @@ class SocketClient {
     this.socketStats.gameStateReset++;
     this.updateSocketStats();
     console.log("Game state reset received");
+    
+    // Collect all players
     const allPlayers = [...this.gameState.fighters, ...this.gameState.viewers];
     if (this.gameState.referee) {
       allPlayers.push(this.gameState.referee);
     }
+    
+    // Reset all role lists
     this.gameState.fighters = [];
     this.gameState.referee = null;
+    
+    // Convert all players to viewers with reset positions
     this.gameState.viewers = allPlayers.map((player) => {
-      player.role = "viewer";
-      return player;
+      // Clear any existing position data to force re-placement in the stands
+      return {
+        ...player,
+        role: "viewer",
+        position: null  // Set position to null to trigger repositioning
+      };
     });
+    
+    // Update my role
     this.gameState.myRole = "viewer";
-    this.emit("gameStateReset", {});
+    
+    // Emit the event with the updated game state
+    this.emit("gameStateReset", { viewers: this.gameState.viewers });
   }
 
   handleViewerOnlyUpdated(isViewerOnly) {

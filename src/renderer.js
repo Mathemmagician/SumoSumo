@@ -623,6 +623,19 @@ export class Renderer {
         this.updateOrCreatePlayer(data.referee);
       }
     });
+
+    // Add specific handler for game state reset
+    socketClient.on("gameStateReset", (data) => {
+      console.log("Renderer received gameStateReset:", data);
+      
+      // Force complete update of all player models
+      this.updatePlayers(socketClient.gameState);
+      
+      // Optional: move camera to a good viewing position
+      if (this.isFreeCamera === false) {
+        this.resetCameraPosition();
+      }
+    });
   }
 
   // Add a new method to handle player role changes
@@ -718,11 +731,13 @@ export class Renderer {
         // Clone viewer object to avoid modifying the original game state
         const viewerWithPosition = { ...viewer };
 
-        // If viewer doesn't have a position or is at default position, place on a seat
+        // If viewer doesn't have a position or has null position (reset case),
+        // place on a seat
         if (
           !viewerWithPosition.position ||
+          viewerWithPosition.position === null || 
           (viewerWithPosition.position.x === 0 &&
-            viewerWithPosition.position.z === 0)
+           viewerWithPosition.position.z === 0)
         ) {
           // Use seat position based on index (wrap around if more viewers than seats)
           const seatIndex = index % seatPositions.length;
@@ -919,6 +934,39 @@ export class Renderer {
 
     // Other cleanup as needed
     console.log("Renderer cleanup completed");
+  }
+
+  // Add a method to reset camera to a good viewing position
+  resetCameraPosition() {
+    // Smoothly move camera to a default position overlooking the ring
+    const targetPosition = new THREE.Vector3(-15, 15, 15);
+    const targetLookAt = new THREE.Vector3(0, 0, 0);
+    
+    // Use a simple animation to move the camera
+    const duration = 1000; // 1 second
+    const startTime = performance.now();
+    const startPosition = this.camera.position.clone();
+    
+    const animateCamera = (currentTime) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Use an easing function for smoother motion
+      const easeProgress = 1 - Math.pow(1 - progress, 3); // Cubic ease out
+      
+      // Interpolate position
+      this.camera.position.lerpVectors(startPosition, targetPosition, easeProgress);
+      
+      // Look at center
+      this.camera.lookAt(targetLookAt);
+      
+      // Continue animation if not complete
+      if (progress < 1) {
+        requestAnimationFrame(animateCamera);
+      }
+    };
+    
+    requestAnimationFrame(animateCamera);
   }
 }
 
