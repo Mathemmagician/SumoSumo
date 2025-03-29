@@ -224,11 +224,11 @@ function selectFighters() {
 
   // Set their roles & positions with Z coordinate
   fighter1.role = 'fighter';
-  fighter1.position = { x: -3, y: 2, z: 0 };
+  fighter1.position = { x: -3, y: 3, z: 0 };
   fighter1.rotation = Math.PI / 2;
 
   fighter2.role = 'fighter';
-  fighter2.position = { x: 3, y: 2, z: 0 };
+  fighter2.position = { x: 3, y: 3, z: 0 };
   fighter2.rotation = -Math.PI / 2;
 
   // Add them to the fighters array
@@ -243,7 +243,7 @@ function selectFighters() {
     // Remove referee from viewers array
     gameState.viewers = gameState.viewers.filter(v => v.id !== gameState.referee.id);
     gameState.referee.role = 'referee';
-    gameState.referee.position = { x: 0, y: 2, z: -2 }; // Place referee at north side
+    gameState.referee.position = { x: 0, y: 3, z: -2 }; // Place referee at north side
   } else {
     console.log("No eligible viewers for referee role");
     changeGameStage(GAME_STAGES.WAITING_FOR_PLAYERS);
@@ -282,8 +282,8 @@ function startPreMatchCeremony() {
   });
 
   // Move fighters slightly apart and up in the air
-  gameState.fighters[0].position = { x: -5, y: 2, z: 0 };
-  gameState.fighters[1].position = { x: 5, y: 2, z: 0 };
+  gameState.fighters[0].position = { x: -5, y: 3, z: 0 };
+  gameState.fighters[1].position = { x: 5, y: 3, z: 0 };
 
   // Broadcast updated positions
   gameState.fighters.forEach(fighter => {
@@ -326,10 +326,10 @@ function startMatch() {
   }
 
   // Reset fighter positions - place them on opposite sides of the ring
-  gameState.fighters[0].position = { x: -3, y: 2, z: 0 };
+  gameState.fighters[0].position = { x: -3, y: 3, z: 0 };
   gameState.fighters[0].rotation = Math.PI / 2; // Face right/east
   
-  gameState.fighters[1].position = { x: 3, y: 2, z: 0 };
+  gameState.fighters[1].position = { x: 3, y: 3, z: 0 };
   gameState.fighters[1].rotation = -Math.PI / 2; // Face left/west
 
   // Broadcast match start
@@ -397,11 +397,11 @@ io.on('connect', (socket) => {
   const player = {
     id: socket.id,
     role: 'viewer',
-    position: { x: 0, y: 0, z: 0 },
+    position: { x: 0, y: 3, z: 0 },
     rotation: 0,
     faceId: Math.floor(Math.random() * 10),  // 0-9 inclusive
     colorId: Math.floor(Math.random() * 10), // 0-9 inclusive
-    seed: Math.floor(Math.random() * 1000000), // Random seed for any future randomization needs
+    seed: Math.floor(Math.random() * 1000000), // Random seed for any future randomization needs and 3D model selection
     viewerOnly: false  // New field, default false
   };
 
@@ -750,11 +750,11 @@ function addFakeUser() {
   const fakeUser = {
     id: fakeId,
     role: 'viewer',
-    position: { x: 0, y: 0, z: 0 },
+    position: { x: 0, y: 3, z: 0 },
     rotation: 0,
     faceId: Math.floor(Math.random() * 10),
     colorId: Math.floor(Math.random() * 10),
-    seed: Math.floor(Math.random() * 1000000),
+    seed: Math.floor(Math.random() * 1000000), // Random seed for consistent positioning and 3D model selection
     viewerOnly: true
   };
 

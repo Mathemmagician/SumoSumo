@@ -54,7 +54,7 @@ export class CameraSystem {
         outroTime: 1000,         // Time to transition back to overview
         // Camera settings for close-ups
         closeupDistance: 1.0,    // How far from the face to position camera
-        closeupHeight: 1.4,      // Height adjustment for close-ups
+        closeupHeight: 1.6,      // Height adjustment for close-ups
         cineBarsEnabled: true    // Whether to show cinematic bars
       }
     };

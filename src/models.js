@@ -101,7 +101,7 @@ export class ModelLoader {
     this.loadedModels = {
       fighter: null,
       referee: null,
-      viewer: null
+      viewers: []
     };
     this.isLoading = false;
     this.loadPromise = null;
@@ -115,7 +115,7 @@ export class ModelLoader {
     }
     
     // If models are already loaded, return immediately
-    if (this.loadedModels.fighter && this.loadedModels.referee && this.loadedModels.viewer) {
+    if (this.loadedModels.fighter && this.loadedModels.referee && this.loadedModels.viewers.length === 4) {
       console.log('Models already loaded, returning immediately');
       return this.loadedModels;
     }
@@ -127,16 +127,24 @@ export class ModelLoader {
     this.loadPromise = new Promise(async (resolve, reject) => {
       try {
         // Load all models in parallel
-        const [fighterGltf, refereeGltf, viewerGltf] = await Promise.all([
+        const [fighterGltf, refereeGltf, viewer0Gltf, viewer1Gltf, viewer2Gltf, viewer3Gltf] = await Promise.all([
           this.loadModel('/models3d/sumo.glb'),
           this.loadModel('/models3d/referee.glb'),
-          this.loadModel('/models3d/viewer_0.glb')
+          this.loadModel('/models3d/viewer_0.glb'),
+          this.loadModel('/models3d/viewer_1.glb'),
+          this.loadModel('/models3d/viewer_2.glb'),
+          this.loadModel('/models3d/viewer_3.glb')
         ]);
 
         // Process and store the models
         this.loadedModels.fighter = this.processModel(fighterGltf.scene);
         this.loadedModels.referee = this.processModel(refereeGltf.scene);
-        this.loadedModels.viewer = this.processModel(viewerGltf.scene);
+        this.loadedModels.viewers = [
+          this.processModel(viewer0Gltf.scene),
+          this.processModel(viewer1Gltf.scene),
+          this.processModel(viewer2Gltf.scene),
+          this.processModel(viewer3Gltf.scene)
+        ];
 
         console.log('All models loaded successfully');
         resolve(this.loadedModels);
@@ -208,8 +216,9 @@ export class ModelLoader {
     } else if (player.role === 'referee') {
       baseModel = this.loadedModels.referee;
     } else {
-      // Default to viewer
-      baseModel = this.loadedModels.viewer;
+      // For viewers, select a model based on player.seed
+      const viewerModelIndex = player.seed % this.loadedModels.viewers.length;
+      baseModel = this.loadedModels.viewers[viewerModelIndex];
     }
     
     if (!baseModel) {
@@ -227,9 +236,16 @@ export class ModelLoader {
       role: player.role
     };
     
-    // Scale up the model by a factor of 3
-    model.scale.set(3, 3, 3);
-    
+    // Scale up the model by a factor of 3    
+    if (player.role === 'fighter') {
+      model.scale.set(4, 4, 4);
+    } else if (player.role === 'referee') {
+      model.scale.set(5, 5, 5);
+    } else {
+      // Default to viewer
+      model.scale.set(3, 3, 3);
+    }
+
     return model;
   }
 }
