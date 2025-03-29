@@ -401,7 +401,7 @@ io.on('connect', (socket) => {
     rotation: 0,
     faceId: Math.floor(Math.random() * 10),  // 0-9 inclusive
     colorId: Math.floor(Math.random() * 10), // 0-9 inclusive
-    seed: Math.floor(Math.random() * 1000000), // Random seed for any future randomization needs
+    seed: Math.floor(Math.random() * 1000000), // Random seed for any future randomization needs and 3D model selection
     viewerOnly: false  // New field, default false
   };
 
@@ -754,7 +754,7 @@ function addFakeUser() {
     rotation: 0,
     faceId: Math.floor(Math.random() * 10),
     colorId: Math.floor(Math.random() * 10),
-    seed: Math.floor(Math.random() * 1000000),
+    seed: Math.floor(Math.random() * 1000000), // Random seed for consistent positioning and 3D model selection
     viewerOnly: true
   };
 
