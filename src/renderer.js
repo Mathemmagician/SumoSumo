@@ -69,6 +69,9 @@ export class Renderer {
 
     // Add a Map to store player models
     this.playerModels = new Map();
+
+    // Add map to store active text bubbles
+    this.textBubbles = new Map();
   }
 
   async initialize() {
@@ -413,6 +416,19 @@ export class Renderer {
       this._hasLoggedFirstFrame = true;
     }
 
+    // Update text bubble positions to follow players
+    this.textBubbles.forEach((bubble) => {
+      if (bubble.sprite && bubble.playerModel) {
+        const playerPosition = new THREE.Vector3();
+        bubble.playerModel.getWorldPosition(playerPosition);
+        bubble.sprite.position.copy(playerPosition);
+        bubble.sprite.position.y += 2.0; // Match the new modelHeight
+
+        // Make sprite face camera
+        bubble.sprite.quaternion.copy(this.camera.quaternion);
+      }
+    });
+
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -669,6 +685,28 @@ export class Renderer {
       } else {
         // For fighters and referees, we can directly create/update the model
         this.updateOrCreatePlayer(player);
+      }
+    });
+
+    // Update emote handler to match socket data structure
+    socketClient.on("playerEmote", (data) => {
+      console.log("Renderer received playerEmote:", data);
+      // Check the actual data structure
+      const emoteText = data.emote || data.type || data;
+      if (typeof emoteText === 'string' && emoteText.length > 0) {
+        console.log("Creating emote bubble for", data.id || data.playerId, "with text:", emoteText);
+        this.createTextBubble(data.id || data.playerId, emoteText, true);
+      }
+    });
+
+    // Update message handler to match socket data structure
+    socketClient.on("playerMessage", (data) => {
+      console.log("Renderer received playerMessage:", data);
+      // Check the actual data structure
+      const messageText = data.message || data.text || data;
+      if (typeof messageText === 'string' && messageText.length > 0) {
+        console.log("Creating message bubble for", data.id || data.playerId, "with text:", messageText);
+        this.createTextBubble(data.id || data.playerId, messageText, false);
       }
     });
   }
@@ -1067,6 +1105,14 @@ export class Renderer {
 
     // Other cleanup as needed
     console.log("Renderer cleanup completed");
+
+    // Clean up any remaining text bubbles
+    for (const [playerId, bubble] of this.textBubbles) {
+      clearTimeout(bubble.timeout);
+      bubble.sprite.material.dispose();
+      bubble.sprite.material.map.dispose();
+    }
+    this.textBubbles.clear();
   }
 
   // Add a method to reset camera to a good viewing position
@@ -1177,6 +1223,220 @@ export class Renderer {
     if (this.fighterMovement.right) {
       socketClient.sendMovement('right');
     }
+  }
+
+  // Add new methods for text bubble management
+  createTextBubble(playerId, text, isEmote = false) {
+    console.log(`Creating ${isEmote ? 'emote' : 'message'} bubble for ${playerId}: "${text}"`);
+    
+    this.removeTextBubble(playerId);
+
+    const playerModel = this.playerModels.get(playerId);
+    if (!playerModel) {
+        console.warn(`No player model found for ${playerId}`);
+        return;
+    }
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Increase canvas size for better text quality
+    canvas.width = 1024;
+    canvas.height = 512;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (isEmote) {
+        // Emote styling - bigger and darker
+        ctx.font = 'bold 400px "Sawarabi Mincho"'; // Increased from 300px to 400px
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Even thicker dark outline
+        ctx.strokeStyle = '#1a2634'; // Darker outline
+        ctx.lineWidth = 20; // Increased from 16 to 20
+        
+        // Warmer, less washed-out fill color
+        ctx.fillStyle = '#e0e0e0'; // Slightly darker fill
+        
+        // Stronger shadow
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+        ctx.shadowBlur = 20;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 4;
+        
+        const x = canvas.width / 2;
+        const y = canvas.height / 2;
+        
+        // Draw outline first
+        ctx.strokeText(text, x, y);
+        // Then fill
+        ctx.fillText(text, x, y);
+        
+    } else {
+        // Message styling - speech bubble with tail
+        ctx.font = 'bold 120px "Sawarabi Mincho"'; // Increased from 96px to 120px
+        
+        // Warmer beige colors for bubble
+        const bubbleGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        bubbleGradient.addColorStop(0, 'rgba(238, 232, 224, 0.98)'); // Warmer beige
+        bubbleGradient.addColorStop(1, 'rgba(226, 217, 205, 0.98)'); // Darker warm beige
+        
+        // Add shadow
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 4;
+        
+        const padding = 60; // Increased padding for better text placement
+        const cornerRadius = 30;
+        const bubbleWidth = canvas.width - padding * 3;
+        const bubbleHeight = canvas.height - padding * 2 - 30;
+        
+        // Offset bubble to one side
+        const offsetX = padding * 1.5;
+        
+        // Draw bubble with tail
+        ctx.beginPath();
+        ctx.moveTo(offsetX + cornerRadius, padding);
+        ctx.lineTo(offsetX + bubbleWidth - cornerRadius, padding);
+        ctx.quadraticCurveTo(offsetX + bubbleWidth, padding, offsetX + bubbleWidth, padding + cornerRadius);
+        ctx.lineTo(offsetX + bubbleWidth, padding + bubbleHeight - cornerRadius);
+        ctx.quadraticCurveTo(offsetX + bubbleWidth, padding + bubbleHeight, offsetX + bubbleWidth - cornerRadius, padding + bubbleHeight);
+        
+        // Add tail
+        const tailWidth = 50;
+        const tailHeight = 25;
+        const tailX = canvas.width / 2;
+        ctx.lineTo(tailX + tailWidth/2, padding + bubbleHeight);
+        ctx.lineTo(tailX, padding + bubbleHeight + tailHeight);
+        ctx.lineTo(tailX - tailWidth/2, padding + bubbleHeight);
+        
+        ctx.lineTo(offsetX + cornerRadius, padding + bubbleHeight);
+        ctx.quadraticCurveTo(offsetX, padding + bubbleHeight, offsetX, padding + bubbleHeight - cornerRadius);
+        ctx.lineTo(offsetX, padding + cornerRadius);
+        ctx.quadraticCurveTo(offsetX + cornerRadius, padding, offsetX + cornerRadius, padding);
+        
+        ctx.closePath();
+        
+        // Fill bubble
+        ctx.fillStyle = bubbleGradient;
+        ctx.fill();
+        
+        // Add subtle border
+        ctx.strokeStyle = 'rgba(188, 175, 165, 0.5)'; // Slightly more visible border
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Reset shadow for text
+        ctx.shadowColor = 'transparent';
+        
+        // Draw text with darker color
+        ctx.fillStyle = '#1a2634'; // Darker text color
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Adjust text positioning
+        const words = text.split(' ');
+        let line = '';
+        let y = padding + bubbleHeight / 2 - (words.length > 1 ? lineHeight/2 : 0); // Center text vertically
+        const lineHeight = 110; // Adjusted for larger font
+        const maxWidth = bubbleWidth - padding * 2;
+        const bubbleCenterX = offsetX + bubbleWidth / 2;
+
+        for (let word of words) {
+            const testLine = line + word + ' ';
+            const metrics = ctx.measureText(testLine);
+            
+            if (metrics.width > maxWidth) {
+                ctx.fillText(line, bubbleCenterX, y);
+                line = word + ' ';
+                y += lineHeight;
+            } else {
+                line = testLine;
+            }
+        }
+        ctx.fillText(line, bubbleCenterX, y);
+    }
+
+    // Create texture with better filtering
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.anisotropy = 16; // Increase anisotropic filtering for sharper text
+    
+    const material = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthWrite: false,
+        depthTest: true,
+        sizeAttenuation: true
+    });
+    
+    const sprite = new THREE.Sprite(material);
+
+    const playerPosition = new THREE.Vector3();
+    playerModel.getWorldPosition(playerPosition);
+
+    const modelHeight = 2.5;
+    sprite.position.copy(playerPosition);
+    sprite.position.y += modelHeight;
+
+    // Adjust scale for the larger canvas
+    const scale = isEmote ? 2.5 : 2.0; // Increased both scales
+    sprite.scale.set(scale, scale * 0.5, 1);
+
+    this.scene.add(sprite);
+    
+    this.textBubbles.set(playerId, {
+        sprite,
+        playerModel,
+        timeout: setTimeout(() => {
+            this.removeTextBubble(playerId);
+        }, isEmote ? 3000 : 5000)
+    });
+  }
+
+  removeTextBubble(playerId) {
+    const bubble = this.textBubbles.get(playerId);
+    if (bubble) {
+      clearTimeout(bubble.timeout);
+      if (bubble.sprite) {
+        // Remove from scene instead of player model
+        this.scene.remove(bubble.sprite);
+        bubble.sprite.material.dispose();
+        bubble.sprite.material.map.dispose();
+      }
+      this.textBubbles.delete(playerId);
+    }
+  }
+
+  // Helper method for drawing rounded rectangles
+  roundRect(ctx, x, y, width, height, radius) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+  }
+
+  // Add this method to update text bubble positions
+  updateTextBubblePositions() {
+    this.textBubbles.forEach((bubble, playerId) => {
+      if (bubble.sprite && bubble.playerModel) {
+        const playerPosition = new THREE.Vector3();
+        bubble.playerModel.getWorldPosition(playerPosition);
+        bubble.sprite.position.copy(playerPosition);
+        bubble.sprite.position.y += 8; // Match the modelHeight from createTextBubble
+      }
+    });
   }
 }
 

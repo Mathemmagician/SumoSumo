@@ -77,7 +77,7 @@ const FAKE_USERS = {
   count: 0,
   users: new Map(), // Store fake user data
   intervals: new Map(), // Store intervals for each fake user
-  targetCount: 0, // Set the target count for fake users
+  targetCount: 100, // Set the target count for fake users
   disconnectInterval: null,
   reconnectInterval: null
 };
@@ -458,7 +458,7 @@ io.on('connect', (socket) => {
     }
     
     // Movement speed
-    const moveSpeed = 0.2;
+    const moveSpeed = 0.08; // Reduced from 0.2 to 0.08 for more controlled movement
     
     // Calculate movement based on direction relative to opponent
     switch(direction) {
