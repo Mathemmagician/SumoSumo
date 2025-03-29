@@ -227,9 +227,16 @@ export class ModelLoader {
       role: player.role
     };
     
-    // Scale up the model by a factor of 3
-    model.scale.set(3, 3, 3);
-    
+    // Scale up the model by a factor of 3    
+    if (player.role === 'fighter') {
+      model.scale.set(4, 4, 4);
+    } else if (player.role === 'referee') {
+      model.scale.set(5, 5, 5);
+    } else {
+      // Default to viewer
+      model.scale.set(3, 3, 3);
+    }
+
     return model;
   }
 }
