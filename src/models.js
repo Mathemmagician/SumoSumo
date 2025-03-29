@@ -161,6 +161,16 @@ export class ModelLoader {
     // Apply standard material adjustments
     model.traverse((child) => {
       if (child.isMesh) {
+        // Enable smooth normals
+        child.geometry.computeVertexNormals();
+        
+        // Increase mesh smoothness by setting flat shading to false
+        child.material.flatShading = false;
+        
+        // Update the material to show the changes
+        child.material.needsUpdate = true;
+        
+        // Existing shadow settings
         child.castShadow = true;
         child.receiveShadow = true;
         if (child.material) {
@@ -459,7 +469,189 @@ export class StadiumFactory {
     
     // Add some lanterns for ambient lighting
     this.addStageLighting(stadiumGroup, wallDistance);
-    
+
+    // Add sponsor banners between pillars on East and West walls
+    const availableAdSpaces = [
+      {
+        text: "",
+        subtext: "",
+        color: 0x5D4037,
+        isAvailableSpace: true
+      },
+      {
+        text: "",
+        subtext: "",
+        color: 0x5D4037,
+        isAvailableSpace: true
+      }
+    ];
+
+    // Define ads with custom font sizes
+    const eastWallBanners = [
+      {
+        text: "SUMO SLIM",
+        subtext: "Lose Weight While\nYou Wait for Your Turn!",
+        color: 0x2E8B57, // Sea green
+        mainFontSize: 72,  // Base size
+        subFontSize: 48    // Base size
+      },
+      {
+        text: "MIGHTY MAWASHI",
+        subtext: "The Only Underwear That\nCan Handle Your Ambitions",
+        color: 0xDB7093, // Pale violet red
+        mainFontSize: 55,  // Slightly smaller due to longer text
+        subFontSize: 40
+      },
+      ...availableAdSpaces
+    ];
+
+    const westWallBanners = [
+      {
+        text: "BIG BOI BURGERS",
+        subtext: "Eat Like a Champion\nMove Like... Well, Just Eat",
+        color: 0xB8860B, // Dark golden rod
+        mainFontSize: 53,  // 15% smaller than base
+        subFontSize: 42
+      },
+      {
+        text: "SUMO VPN",
+        subtext: "We Hide Your Data\nLike You Hide Your Moves",
+        color: 0x4682B4, // Steel blue
+        mainFontSize: 72,  // Can be large due to short text
+        subFontSize: 42
+      },
+      {
+        text: "BOUNCE BACK",
+        subtext: "Because Sometimes\nYou Land Outside the Ring",
+        color: 0x8B4513, // Saddle brown
+        mainFontSize: 68,  // Can be large due to short text
+        subFontSize: 42
+      },
+      ...availableAdSpaces
+    ];
+
+    // Only add to East and West walls
+    const adWalls = [
+      {x: wallDistance, z: 0, rotation: Math.PI / 2, banners: eastWallBanners}, // East
+      {x: -wallDistance, z: 0, rotation: -Math.PI / 2, banners: westWallBanners} // West
+    ];
+
+    adWalls.forEach(wall => {
+      // Space between pillars was defined earlier as wallLength / (numColumns + 1)
+      const numColumns = 5;
+      const wallLength = wallDistance * 2 + 10;
+      const spacing = wallLength / (numColumns + 1);
+
+      // Add banners between pillars
+      for (let i = 0; i < numColumns - 1; i++) {
+        const bannerInfo = wall.banners[i % wall.banners.length];
+        
+        // Create banner background
+        const bannerWidth = spacing * 0.9; // Slightly smaller than space between pillars
+        const bannerHeight = s.WALL_HEIGHT * 0.4;
+        const bannerGeometry = new THREE.PlaneGeometry(bannerWidth, bannerHeight);
+        
+        // Create canvas for the banner texture
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+
+        // Fill background with color
+        ctx.fillStyle = `#${bannerInfo.color.toString(16).padStart(6, '0')}`;
+        ctx.fillRect(0, 0, 512, 256);
+
+        if (!bannerInfo.isAvailableSpace) {
+            // Add darker gradient overlay for better contrast
+            const gradient = ctx.createLinearGradient(0, 0, 0, 256);
+            gradient.addColorStop(0, 'rgba(0, 0, 0, 0.3)');
+            gradient.addColorStop(0.5, 'rgba(0, 0, 0, 0.1)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.4)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 512, 256);
+
+            // Add text shadow for better readability
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+
+            // Add main text with border using custom font size
+            ctx.fillStyle = 'white';
+            ctx.font = `bold ${bannerInfo.mainFontSize || 72}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            // Draw text border
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.lineWidth = 4;
+            ctx.strokeText(bannerInfo.text, 256, 90);
+            // Draw text
+            ctx.fillText(bannerInfo.text, 256, 90);
+
+            // Add subtext with border using custom font size
+            ctx.font = `italic ${bannerInfo.subFontSize || 48}px Arial`;
+            ctx.lineWidth = 3;
+            const subtextLines = bannerInfo.subtext.split('\n');
+            const lineHeight = Math.floor(bannerInfo.subFontSize * 1.125); // Dynamic line height based on font size
+            const startY = 160; // Keep consistent starting position
+            
+            subtextLines.forEach((line, index) => {
+                const y = startY + (index * lineHeight);
+                ctx.strokeText(line, 256, y);
+                ctx.fillText(line, 256, y);
+            });
+        }
+
+        // Create texture from canvas
+        const texture = new THREE.CanvasTexture(canvas);
+        const bannerMaterial = new THREE.MeshStandardMaterial({
+            map: texture,
+            emissive: bannerInfo.color,
+            emissiveIntensity: bannerInfo.isAvailableSpace ? 0.05 : 0.1,
+            roughness: 0.7,
+            metalness: 0.2
+        });
+
+        const banner = new THREE.Mesh(bannerGeometry, bannerMaterial);
+
+        // Position banner between pillars
+        const offset = (i - (numColumns - 2) / 2) * spacing;
+        if (wall.rotation === Math.PI / 2) {
+          banner.position.set(wall.x - 1.5, s.WALL_HEIGHT * 0.7, offset);
+          banner.rotation.y = wall.rotation + Math.PI; // Add PI to face inward
+        } else {
+          banner.position.set(wall.x + 1.5, s.WALL_HEIGHT * 0.7, offset);
+          banner.rotation.y = wall.rotation + Math.PI; // Add PI to face inward
+        }
+
+        // Add subtle glow effect
+        const glowGeometry = new THREE.PlaneGeometry(bannerWidth * 1.1, bannerHeight * 1.1);
+        const glowMaterial = new THREE.MeshBasicMaterial({
+          color: bannerInfo.color,
+          transparent: true,
+          opacity: 0.1, // Reduced from 0.2
+          side: THREE.DoubleSide
+        });
+        const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+        glow.position.copy(banner.position);
+        if (wall.rotation === Math.PI / 2) {
+          glow.position.x -= 0.1;
+          glow.rotation.y = wall.rotation + Math.PI; // Match banner rotation
+        } else {
+          glow.position.x += 0.1;
+          glow.rotation.y = wall.rotation + Math.PI; // Match banner rotation
+        }
+
+        // Modify the glow effect for available spaces
+        if (bannerInfo.isAvailableSpace) {
+          glowMaterial.opacity = 0.05 + Math.sin(Date.now() * 0.001) * 0.05; // Subtle pulsing effect
+        }
+
+        stadiumGroup.add(glow);
+        stadiumGroup.add(banner);
+      }
+    });
+
     return stadiumGroup;
   }
   
