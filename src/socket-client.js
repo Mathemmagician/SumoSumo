@@ -82,17 +82,23 @@ class SocketClient {
     this.updateSocketStats();
     console.log("Player joined:", player);
     if (player.id === this.gameState.myId) return;
+    
+    // Remove player from any existing role list first
+    this.gameState.fighters = this.gameState.fighters.filter(f => f.id !== player.id);
+    this.gameState.viewers = this.gameState.viewers.filter(v => v.id !== player.id);
+    if (this.gameState.referee?.id === player.id) {
+      this.gameState.referee = null;
+    }
+    
+    // Now add to the appropriate list
     if (player.role === "fighter") {
-      if (!this.gameState.fighters.some((f) => f.id === player.id)) {
-        this.gameState.fighters.push(player);
-      }
+      this.gameState.fighters.push(player);
     } else if (player.role === "referee") {
       this.gameState.referee = player;
     } else {
-      if (!this.gameState.viewers.some((v) => v.id === player.id)) {
-        this.gameState.viewers.push(player);
-      }
+      this.gameState.viewers.push(player);
     }
+    
     this.emit("playerJoined", player);
   }
 
@@ -133,28 +139,39 @@ class SocketClient {
     this.socketStats.playerRoleChanged++;
     this.updateSocketStats();
     console.log("Player role changed:", { id, role });
-    const player = this.findPlayerInGameState(id);
+    
+    // Find the player in any of the role lists
+    let player = this.findPlayerInGameState(id);
     if (!player) return;
+    
+    // Remove the player from all role lists first
     this.gameState.fighters = this.gameState.fighters.filter((f) => f.id !== id);
     this.gameState.viewers = this.gameState.viewers.filter((v) => v.id !== id);
     if (this.gameState.referee?.id === id) {
       this.gameState.referee = null;
     }
-    player.role = role;
+    
+    // Clone the player object to avoid reference issues
+    const updatedPlayer = { ...player, role };
+    
+    // Add to the appropriate list based on new role
     switch (role) {
       case "fighter":
-        this.gameState.fighters.push(player);
+        this.gameState.fighters.push(updatedPlayer);
         break;
       case "referee":
-        this.gameState.referee = player;
+        this.gameState.referee = updatedPlayer;
         break;
       case "viewer":
-        this.gameState.viewers.push(player);
+        this.gameState.viewers.push(updatedPlayer);
         break;
     }
+    
+    // Update my role if this is me
     if (id === this.gameState.myId) {
       this.gameState.myRole = role;
     }
+    
     this.emit("playerRoleChanged", { id, role });
   }
 
@@ -162,8 +179,21 @@ class SocketClient {
     this.socketStats.fightersSelected++;
     this.updateSocketStats();
     console.log("Fighters selected:", data);
+    
+    // Get IDs of new fighters and referee
+    const fighter1Id = data.fighter1?.id;
+    const fighter2Id = data.fighter2?.id;
+    const refereeId = data.referee?.id;
+    
+    // Remove selected players from viewers list
+    if (fighter1Id) this.gameState.viewers = this.gameState.viewers.filter(v => v.id !== fighter1Id);
+    if (fighter2Id) this.gameState.viewers = this.gameState.viewers.filter(v => v.id !== fighter2Id);
+    if (refereeId) this.gameState.viewers = this.gameState.viewers.filter(v => v.id !== refereeId);
+    
+    // Update fighters and referee in game state
     this.gameState.fighters = [data.fighter1, data.fighter2];
     this.gameState.referee = data.referee;
+    
     this.determineMyRole();
     this.emit("fightersSelected", data);
   }

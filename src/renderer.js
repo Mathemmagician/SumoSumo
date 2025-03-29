@@ -127,6 +127,10 @@ export class Renderer {
     this.createFpsDisplay();
     console.log("FPS display created");
 
+    // Start a timer to update the game state debug info every 100ms
+    this.startGameStateUpdateTimer();
+    console.log("Game state update timer started");
+
     // Add event listeners
     window.addEventListener("resize", this.onWindowResize);
     // Add keyboard event listeners
@@ -887,6 +891,34 @@ export class Renderer {
         `Removed player model. Total models: ${this.playerModels.size}`
       );
     }
+  }
+
+  // Add a new method to start the game state update timer
+  startGameStateUpdateTimer() {
+    // Update the game state debug info every 100ms (0.1 seconds)
+    this.gameStateUpdateInterval = setInterval(() => {
+      // Get the latest game state from socket client
+      const gameState = socketClient.gameState;
+      // Update the debug display
+      this.updateGameStateDebug(gameState);
+    }, 100); // 100ms = 0.1 seconds
+  }
+
+  // Add a cleanup method to properly dispose resources
+  cleanup() {
+    // Clear the game state update interval
+    if (this.gameStateUpdateInterval) {
+      clearInterval(this.gameStateUpdateInterval);
+      this.gameStateUpdateInterval = null;
+    }
+
+    // Remove event listeners
+    window.removeEventListener("resize", this.onWindowResize);
+    window.removeEventListener("keydown", this.handleKeyDown);
+    window.removeEventListener("keyup", this.handleKeyUp);
+
+    // Other cleanup as needed
+    console.log("Renderer cleanup completed");
   }
 }
 
