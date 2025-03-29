@@ -390,7 +390,7 @@ function sanitizeForSocketIO(obj) {
 }
 
 // When a client connects
-io.on('connection', (socket) => {
+io.on('connect', (socket) => {
   console.log('User connected:', socket.id);
 
   // Create a new player
