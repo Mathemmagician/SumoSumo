@@ -120,8 +120,8 @@ export class Renderer {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     
     // Performance optimizations
-    this.renderer.shadowMap.enabled = false; // Disable shadows
-    // this.renderer.shadowMap.enabled = !this.isMobile; // Disable shadows on mobile
+    // this.renderer.shadowMap.enabled = false; // Disable shadows
+    this.renderer.shadowMap.enabled = !this.isMobile; // Disable shadows on mobile
     if (this.isMobile) {
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1)); // Limit pixel ratio on mobile
     }
