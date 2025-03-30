@@ -81,15 +81,20 @@ export class Renderer {
 
     // Initialize ModelFactory first
     await this.modelFactory.initialize();
+    
+    // Check if running on mobile
+    this.isMobile = this.checkIsMobile();
+    console.log("Mobile device detected:", this.isMobile);
 
     // Create scene
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87ceeb); // Sky blue background
     console.log("Scene created");
 
-    // Create camera
+    // Create camera with adjusted field of view for mobile
+    const fov = this.isMobile ? 45 : 75; // Wider FOV on mobile
     this.camera = new THREE.PerspectiveCamera(
-      75,
+      fov,
       window.innerWidth / window.innerHeight,
       0.1,
       1000
@@ -98,13 +103,14 @@ export class Renderer {
     this.camera.lookAt(0, 0, 0);
     console.log("Camera created and positioned");
 
-    // Create renderer
+    // Create renderer with mobile optimizations if needed
     this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
+      antialias: !this.isMobile, // Disable antialiasing on mobile for better performance
       powerPreference: "high-performance",
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.setPixelRatio(this.isMobile ? Math.min(window.devicePixelRatio, 2) : window.devicePixelRatio);
+    this.renderer.shadowMap.enabled = !this.isMobile;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputEncoding = THREE.sRGBEncoding;
     this.renderer.physicallyCorrectLights = true;
@@ -141,9 +147,9 @@ export class Renderer {
     this.createStadium();
     console.log("Stadium created");
 
-    // Create FPS display
-    this.createFpsDisplay();
-    console.log("FPS display created");
+    // Create FPS display - commented out for now
+    // this.createFpsDisplay();
+    // console.log("FPS display created");
 
     // Start a timer to update the game state debug info every 100ms
     this.startGameStateUpdateTimer();
@@ -1189,12 +1195,22 @@ export class Renderer {
 
   // Add new methods for fighter movement
   handleFighterKeyDown(event) {
-    // Only handle fighter movement if I am a fighter and match is in progress
-    if (socketClient.gameState.myRole !== 'fighter' || 
-        socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
+    // Check if this is coming from a custom event (our mobile controls)
+    const isMobileEvent = event.isTrusted === false;
+    
+    // Only handle fighter movement if I am a fighter
+    // For mobile, we'll be more lenient about the stage check
+    if (socketClient.gameState.myRole !== 'fighter') {
+      return;
+    }
+    
+    // For keyboard input, enforce match in progress stage check
+    if (!isMobileEvent && socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
       return;
     }
 
+    console.log(`Fighter control: ${event.key} down, mobile: ${isMobileEvent}`);
+    
     switch (event.key.toLowerCase()) {
       case "w":
       case "arrowup":
@@ -1216,12 +1232,22 @@ export class Renderer {
   }
 
   handleFighterKeyUp(event) {
-    // Only handle fighter movement if I am a fighter and match is in progress
-    if (socketClient.gameState.myRole !== 'fighter' || 
-        socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
+    // Check if this is coming from a custom event (our mobile controls)
+    const isMobileEvent = event.isTrusted === false;
+    
+    // Only handle fighter movement if I am a fighter
+    // For mobile, we'll be more lenient about the stage check
+    if (socketClient.gameState.myRole !== 'fighter') {
+      return;
+    }
+    
+    // For keyboard input, enforce match in progress stage check
+    if (!isMobileEvent && socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
       return;
     }
 
+    console.log(`Fighter control: ${event.key} up, mobile: ${isMobileEvent}`);
+    
     switch (event.key.toLowerCase()) {
       case "w":
       case "arrowup":
@@ -1243,24 +1269,41 @@ export class Renderer {
   }
 
   updateFighterMovement() {
-    // Only send movement if we're actually moving and are a fighter in an active match
-    if (socketClient.gameState.myRole !== 'fighter' || 
-        socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
+    // Only send movement if we're a fighter
+    if (socketClient.gameState.myRole !== 'fighter') {
+      return;
+    }
+    
+    // On mobile, we're more lenient about the stage check
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+    
+    // For non-mobile, enforce match in progress stage check
+    if (!isMobile && socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
       return;
     }
 
     // Check if any movement keys are pressed
+    let movement = false;
+    
     if (this.fighterMovement.forward) {
       socketClient.sendMovement('forward');
+      movement = true;
     }
     if (this.fighterMovement.backward) {
       socketClient.sendMovement('backward');
+      movement = true;
     }
     if (this.fighterMovement.left) {
       socketClient.sendMovement('left');
+      movement = true;
     }
     if (this.fighterMovement.right) {
       socketClient.sendMovement('right');
+      movement = true;
+    }
+    
+    if (movement && isMobile) {
+      console.log("Mobile fighter movement detected");
     }
   }
 
@@ -1689,6 +1732,11 @@ export class Renderer {
 
   easeOutQuart(t) {
     return 1 - Math.pow(1 - t, 4);
+  }
+
+  // Add helper method to check if on mobile
+  checkIsMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
   }
 }
 
