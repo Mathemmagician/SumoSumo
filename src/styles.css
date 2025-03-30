@@ -519,8 +519,8 @@ body {
 /* Fullscreen Button Styles */
 #fullscreen-btn {
     position: fixed;
-    top: 15px;
-    right: 15px;
+    top: 20px;
+    right: 70px;
     width: 40px;
     height: 40px;
     background-color: rgba(60, 20, 0, 0.7);

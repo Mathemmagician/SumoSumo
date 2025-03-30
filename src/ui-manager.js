@@ -186,8 +186,10 @@ class UIManager {
                 setTimeout(() => {
                     this.isLandscape = window.innerWidth > window.innerHeight;
                     this.checkOrientation();
-                }, 
-            100); // Short delay to allow dimensions to update
+                }, 100); // Short delay to allow dimensions to update
+            });
+        }
+        
         // Tutorial button functionality
         const tutorialBtn = document.getElementById('tutorial-btn');
         const tutorialModal = document.getElementById('tutorial-modal');
@@ -445,7 +447,7 @@ class UIManager {
         });
         
         document.body.appendChild(this.fullscreenBtn);
-      
+        
     }
     
     // Toggle fullscreen
