@@ -284,29 +284,33 @@ body {
     100% { opacity: 0.6; }
 }
 
-/* Clean up duplicate sponsor button styles and keep the simple style */
+/* Updated sponsor button with a new style */
 .sponsor-button {
-  background-color: #e0e0e0; /* Light gray background */
-  color: #333; /* Dark gray text */
-  border: 1px solid #999; /* Medium gray border */
-  border-radius: 4px;
-  padding: 6px 12px;
-  font-size: 14px;
-  font-weight: normal;
+  background-color: #f8e6cb; /* Warm cream color */
+  color: #8b4513; /* Dark brown text */
+  border: none;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 15px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s ease;
-  font-family: 'Sawarabi Mincho', serif;
+  transition: all 0.2s ease;
+  font-family: 'Yuji Mai', serif; /* More thematic font */
   position: relative;
   display: block;
   width: auto;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .sponsor-button:hover {
-  background-color: #ccc; /* Slightly darker on hover */
+  background-color: #f0d9b5; /* Slightly darker on hover */
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
 }
 
 .sponsor-button:active {
-  background-color: #bbb; /* Even darker when clicked */
+  background-color: #e8cfa3; /* Even darker when pressed */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transform: translateY(1px);
 }
 
 /* Simple sponsor banner positioning */
