@@ -777,6 +777,14 @@ export class Renderer {
     // Listen for stage changes
     socketClient.on("stageChanged", (data) => {
       console.log("Stage changed to:", data.stage);
+
+      // Update the UI
+      uiManager.updateMatchStatus(data.displayName);
+      
+      // Reset fighter movement if stage is not MATCH_IN_PROGRESS
+      if (data.stage !== 'MATCH_IN_PROGRESS') {
+        this.resetFighterMovement();
+      }
       
       // When match ends and victory ceremony begins, make viewers excited
       if (data.stage === "VICTORY_CEREMONY") {
@@ -814,6 +822,9 @@ export class Renderer {
       
       // Animate the loser falling
       this.animateFighterFall(loserId);
+      
+      // Reset fighter movement state to prevent continued movement after match
+      this.resetFighterMovement();
       
       // Set viewers to excited state immediately when match ends
       console.log("Match ended, viewers getting excited!");
@@ -1365,11 +1376,8 @@ export class Renderer {
       return;
     }
     
-    // On mobile, we're more lenient about the stage check
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
-    
-    // For non-mobile, enforce match in progress stage check
-    if (!isMobile && socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
+    // Strictly enforce match in progress stage check - no mobile exception
+    if (socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
       return;
     }
 
@@ -1391,10 +1399,6 @@ export class Renderer {
     if (this.fighterMovement.right) {
       socketClient.sendMovement('right');
       movement = true;
-    }
-    
-    if (movement && isMobile) {
-      console.log("Mobile fighter movement detected");
     }
   }
 
@@ -1738,6 +1742,14 @@ export class Renderer {
     });
     
     console.log(`Setting viewer excited state to: ${excited}`);
+  }
+
+  // Add a helper method to reset fighter movement
+  resetFighterMovement() {
+    this.fighterMovement.forward = false;
+    this.fighterMovement.backward = false;
+    this.fighterMovement.left = false;
+    this.fighterMovement.right = false;
   }
 }
 
