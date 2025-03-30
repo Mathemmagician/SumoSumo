@@ -389,7 +389,7 @@ export class Renderer {
 
     // Add a back light to highlight the model's edges
     const backLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    backLight.position.set(0, 10, -20);
+    backLight.position.set(5, 5, 20);
     this.scene.add(backLight);
   }
 
@@ -1362,7 +1362,7 @@ export class Renderer {
     
     // Position above player model - adjust height based on player scale
     const modelHeight = player.scale.y;
-    textObject.position.set(0, 0.8, 0);
+    textObject.position.set(0, 1.0, 0);
     
     // Add to player mesh and store reference
     player.add(textObject);
