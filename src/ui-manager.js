@@ -7,6 +7,14 @@ class UIManager {
         this.chatHistory = null;
         this.chatInput = null;
         
+        // Mobile controls
+        this.mobileControls = null;
+        this.fullscreenBtn = null;
+        this.landscapeNotice = null;
+        this.isMobile = this.checkIsMobile();
+        this.isLandscape = window.innerWidth > window.innerHeight;
+        this.debugMode = false; // Set to true to force show controls
+        
         // Initialize after DOM is loaded
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => this.initialize());
@@ -20,11 +28,30 @@ class UIManager {
         this.chatHistory = document.getElementById('chat-history');
         this.chatInput = document.getElementById('chat-input');
         
+        console.log("UI Manager initializing, isMobile:", this.isMobile, "isLandscape:", this.isLandscape);
+        
+        // Create mobile controls
+        this.createMobileControls();
+        
+        // Create fullscreen button
+        this.createFullscreenButton();
+        
+        // Create landscape notice for portrait mode
+        if (this.isMobile) {
+            this.createLandscapeNotice();
+            this.checkOrientation();
+        }
+        
         // Initialize event listeners
         this.initializeEventListeners();
         
         // Subscribe to socket client events
         this.setupSocketEvents();
+        
+        // Force check of controls visibility with current state
+        if (socketClient.gameState) {
+            this.toggleMobileControls(socketClient.gameState.myRole, socketClient.gameState.stage);
+        }
     }
 
     setupSocketEvents() {
@@ -32,6 +59,11 @@ class UIManager {
         socketClient.on('gameStateUpdated', (gameState) => {
             this.updateRoleBadge(gameState.myRole);
             this.updatePlayerCount(this.countAllPlayers(gameState));
+            
+            // Show/hide mobile controls based on role
+            if (this.isMobile) {
+                this.toggleMobileControls(gameState.myRole, gameState.stage);
+            }
         });
         
         // Listen to player events that affect counts
@@ -59,6 +91,11 @@ class UIManager {
         socketClient.on('stageChanged', (data) => {
             const seconds = Math.ceil(data.duration / 1000);
             this.updateMatchStatus(data.displayName, seconds);
+            
+            // Toggle mobile controls visibility if needed
+            if (this.isMobile) {
+                this.toggleMobileControls(socketClient.gameState.myRole, data.name);
+            }
             
             // Start stage timer if needed
             if (data.duration > 0) {
@@ -134,6 +171,22 @@ class UIManager {
         if (freeCameraToggle) {
             freeCameraToggle.addEventListener('change', () => {
                 this.toggleFreeCamera(freeCameraToggle);
+            });
+        }
+        
+        // Listen for orientation changes on mobile
+        if (this.isMobile) {
+            window.addEventListener('resize', () => {
+                this.isLandscape = window.innerWidth > window.innerHeight;
+                this.checkOrientation();
+            });
+            
+            // Also listen for orientation change event
+            window.addEventListener('orientationchange', () => {
+                setTimeout(() => {
+                    this.isLandscape = window.innerWidth > window.innerHeight;
+                    this.checkOrientation();
+                }, 100); // Short delay to allow dimensions to update
             });
         }
     }
@@ -287,9 +340,196 @@ class UIManager {
             }
         }, 1000);
     }
+
+    // Helper method to check if user is on mobile
+    checkIsMobile() {
+        // Force mobile detection to true for testing
+        // return true;
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+    }
+    
+    // Create mobile controls
+    createMobileControls() {
+        console.log("Creating mobile controls");
+        
+        // Create mobile controls container
+        this.mobileControls = document.createElement('div');
+        this.mobileControls.id = 'mobile-controls';
+        this.mobileControls.style.display = 'none'; // Hidden by default
+        
+        // Create arrows container
+        const arrowsContainer = document.createElement('div');
+        arrowsContainer.className = 'arrows-container';
+        
+        // Define arrow directions and their positions
+        const arrows = [
+            { direction: 'up', text: '▲', key: 'ArrowUp' },
+            { direction: 'left', text: '◄', key: 'ArrowLeft' },
+            { direction: 'right', text: '►', key: 'ArrowRight' },
+            { direction: 'down', text: '▼', key: 'ArrowDown' }
+        ];
+        
+        // Create arrow buttons
+        arrows.forEach(arrow => {
+            const btn = document.createElement('button');
+            btn.className = `mobile-control-btn ${arrow.direction}`;
+            btn.setAttribute('data-key', arrow.key);
+            btn.textContent = arrow.text;
+            
+            // Touch event listeners for mobile buttons
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                this.sendMobileControlEvent(arrow.key, true);
+            });
+            
+            btn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                this.sendMobileControlEvent(arrow.key, false);
+            });
+            
+            // Mouse events for testing on desktop
+            btn.addEventListener('mousedown', (e) => {
+                this.sendMobileControlEvent(arrow.key, true);
+            });
+            
+            btn.addEventListener('mouseup', (e) => {
+                this.sendMobileControlEvent(arrow.key, false);
+            });
+            
+            arrowsContainer.appendChild(btn);
+        });
+        
+        this.mobileControls.appendChild(arrowsContainer);
+        document.body.appendChild(this.mobileControls);
+        
+        // For testing: uncomment to force show controls
+        // this.mobileControls.style.display = 'block';
+    }
+    
+    // Create fullscreen button
+    createFullscreenButton() {
+        this.fullscreenBtn = document.createElement('button');
+        this.fullscreenBtn.id = 'fullscreen-btn';
+        this.fullscreenBtn.innerHTML = '⛶';
+        this.fullscreenBtn.title = 'Toggle Fullscreen';
+        
+        this.fullscreenBtn.addEventListener('click', () => {
+            this.toggleFullscreen();
+        });
+        
+        document.body.appendChild(this.fullscreenBtn);
+      
+    }
+    
+    // Toggle fullscreen
+    toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.error(`Error attempting to enable fullscreen: ${err.message}`);
+            });
+            this.fullscreenBtn.innerHTML = '⮻';
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+                this.fullscreenBtn.innerHTML = '⛶';
+            }
+        }
+    }
+    
+    // Create landscape orientation notice
+    createLandscapeNotice() {
+        // Create the notice element
+        this.landscapeNotice = document.createElement('div');
+        this.landscapeNotice.id = 'landscape-notice';
+        this.landscapeNotice.className = 'landscape-notice';
+        
+        // Create rotate icon
+        const rotateIcon = document.createElement('div');
+        rotateIcon.className = 'rotate-icon';
+        rotateIcon.innerHTML = '↺';
+        
+        // Create message
+        const message = document.createElement('div');
+        message.className = 'landscape-message';
+        message.textContent = 'Please rotate your device to landscape mode for the best experience';
+        
+        // Add elements to notice
+        this.landscapeNotice.appendChild(rotateIcon);
+        this.landscapeNotice.appendChild(message);
+        
+        // Add notice to body but hide initially
+        document.body.appendChild(this.landscapeNotice);
+        this.landscapeNotice.style.display = 'none';
+    }
+    
+    // Check device orientation and show/hide notice
+    checkOrientation() {
+        if (!this.landscapeNotice) return;
+        
+        if (this.isMobile && !this.isLandscape) {
+            // Show landscape notice if in portrait mode
+            this.landscapeNotice.style.display = 'flex';
+            
+            // Hide controls in portrait mode
+            if (this.mobileControls) {
+                this.mobileControls.style.display = 'none';
+            }
+        } else {
+            // Hide notice in landscape mode
+            this.landscapeNotice.style.display = 'none';
+            
+            // Restore controls visibility based on role when back in landscape
+            if (socketClient.gameState && this.isMobile) {
+                this.toggleMobileControls(socketClient.gameState.myRole, socketClient.gameState.stage);
+            }
+        }
+    }
+    
+    // Toggle mobile controls visibility based on role and game stage
+    toggleMobileControls(role, stage) {
+        if (!this.mobileControls) return;
+        
+        console.log(`Toggling mobile controls: role=${role}, stage=${stage}, isMobile=${this.isMobile}, isLandscape=${this.isLandscape}, debugMode=${this.debugMode}`);
+        
+        // Debug mode always shows controls
+        if (this.debugMode) {
+            console.log("Debug mode: showing mobile controls");
+            this.mobileControls.style.display = 'block';
+            return;
+        }
+        
+        // Don't show controls in portrait mode
+        if (this.isMobile && !this.isLandscape) {
+            console.log("Portrait mode: hiding mobile controls");
+            this.mobileControls.style.display = 'none';
+            return;
+        }
+        
+        // Always show controls on mobile if user is a fighter, regardless of stage
+        if (this.isMobile && role === 'fighter') {
+            console.log("Showing mobile controls");
+            this.mobileControls.style.display = 'block';
+        } else {
+            console.log("Hiding mobile controls");
+            this.mobileControls.style.display = 'none';
+        }
+    }
+    
+    // Send key event to simulate keyboard controls
+    sendMobileControlEvent(key, isKeyDown) {
+        console.log(`Sending mobile control event: ${key} ${isKeyDown ? 'down' : 'up'}`);
+        
+        const eventType = isKeyDown ? 'keydown' : 'keyup';
+        const event = new KeyboardEvent(eventType, {
+            bubbles: true,
+            cancelable: true,
+            key: key
+        });
+        document.dispatchEvent(event);
+    }
 }
 
-// Create and export a singleton instance
+// Export a singleton instance of the UIManager
 export const uiManager = new UIManager();
 
 // Make it globally available for HTML event handlers
