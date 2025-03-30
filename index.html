@@ -43,6 +43,17 @@
   </head>
   <body>
     <div id="game-container">
+      <!-- Tutorial button -->
+      <button id="tutorial-btn" aria-label="Show Tutorial">?</button>
+      
+      <!-- Tutorial modal -->
+      <div id="tutorial-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+          <span id="close-tutorial" class="close-btn">&times;</span>
+          <img src="tutorial.png" alt="SumoSumo Game Tutorial" class="tutorial-image">
+        </div>
+      </div>
+
       <!-- Improved Game Info Panel -->
       <div id="game-info" class="ui-panel">
         <h1 class="game-title">SumoSumo!</h1>

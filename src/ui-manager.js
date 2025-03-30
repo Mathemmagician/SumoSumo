@@ -136,6 +136,35 @@ class UIManager {
                 this.toggleFreeCamera(freeCameraToggle);
             });
         }
+        
+        // Tutorial button functionality
+        const tutorialBtn = document.getElementById('tutorial-btn');
+        const tutorialModal = document.getElementById('tutorial-modal');
+        const closeBtn = document.getElementById('close-tutorial');
+        
+        if (tutorialBtn && tutorialModal && closeBtn) {
+            tutorialBtn.addEventListener('click', () => {
+                tutorialModal.style.display = 'flex';
+            });
+            
+            closeBtn.addEventListener('click', () => {
+                tutorialModal.style.display = 'none';
+            });
+            
+            // Also close when clicking outside the modal content
+            tutorialModal.addEventListener('click', (e) => {
+                if (e.target === tutorialModal) {
+                    tutorialModal.style.display = 'none';
+                }
+            });
+            
+            // Close on escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && tutorialModal.style.display === 'flex') {
+                    tutorialModal.style.display = 'none';
+                }
+            });
+        }
     }
 
     addMessageToHistory(sender, message) {
