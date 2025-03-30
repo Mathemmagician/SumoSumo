@@ -123,14 +123,23 @@ class UIManager {
     countAllPlayers(gameState) {
         const playerIds = new Set();
         
-        // Add fighters
-        gameState.fighters.forEach(f => playerIds.add(f.id));
+        // Filter out NPCs (players with IDs starting with 'npc-' or 'fake-')
+        const isRealPlayer = (id) => !id.startsWith('npc-') && !id.startsWith('fake-');
         
-        // Add referee if exists
-        if (gameState.referee) playerIds.add(gameState.referee.id);
+        // Add fighters (excluding NPCs)
+        gameState.fighters.forEach(f => {
+            if (isRealPlayer(f.id)) playerIds.add(f.id);
+        });
         
-        // Add viewers
-        gameState.viewers.forEach(v => playerIds.add(v.id));
+        // Add referee if exists (excluding NPCs)
+        if (gameState.referee && isRealPlayer(gameState.referee.id)) {
+            playerIds.add(gameState.referee.id);
+        }
+        
+        // Add viewers (excluding NPCs)
+        gameState.viewers.forEach(v => {
+            if (isRealPlayer(v.id)) playerIds.add(v.id);
+        });
         
         return playerIds.size;
     }

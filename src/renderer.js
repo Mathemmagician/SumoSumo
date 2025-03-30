@@ -297,7 +297,7 @@ export class Renderer {
     statsDiv.innerHTML = html;
   }
 
-  // Add a new method to update the game state debug display
+  // Update the game state debug display
   updateGameStateDebug(gameState) {
     const gameStateDiv = document.getElementById("game-state-debug");
     if (!gameStateDiv) return;
@@ -309,23 +309,34 @@ export class Renderer {
       <b>Players:</b><br>
     `;
 
-    // Add fighters
-    html += "  <b>Fighters:</b> " + gameState.fighters.length + "<br>";
-    gameState.fighters.forEach((fighter) => {
+    // Add fighters (filtered to exclude NPCs)
+    const realFighters = gameState.fighters.filter(
+      fighter => !fighter.id.startsWith('npc-') && !fighter.id.startsWith('fake-')
+    );
+    html += "  <b>Fighters:</b> " + realFighters.length + "<br>";
+    realFighters.forEach((fighter) => {
       html += `  • ${fighter.id.substring(0, 6)} (pos: ${Math.round(
         fighter.position?.x || 0
       )},${Math.round(fighter.position?.z || 0)})<br>`;
     });
 
-    // Add referee
-    html += "  <b>Referee:</b> " + (gameState.referee ? "1" : "0") + "<br>";
-    if (gameState.referee) {
-      html += `  • ${gameState.referee.id.substring(0, 6)}<br>`;
+    // Add referee (only if not an NPC)
+    const referee = gameState.referee && 
+                   !gameState.referee.id.startsWith('npc-') && 
+                   !gameState.referee.id.startsWith('fake-') ? 
+                   gameState.referee : null;
+    
+    html += "  <b>Referee:</b> " + (referee ? "1" : "0") + "<br>";
+    if (referee) {
+      html += `  • ${referee.id.substring(0, 6)}<br>`;
     }
 
-    // Add viewers
-    html += "  <b>Viewers:</b> " + gameState.viewers.length + "<br>";
-    gameState.viewers.forEach((viewer) => {
+    // Add viewers (filtered to exclude NPCs)
+    const realViewers = gameState.viewers.filter(
+      viewer => !viewer.id.startsWith('npc-') && !viewer.id.startsWith('fake-')
+    );
+    html += "  <b>Viewers:</b> " + realViewers.length + "<br>";
+    realViewers.forEach((viewer) => {
       html += `  • ${viewer.id.substring(0, 6)}<br>`;
     });
 
