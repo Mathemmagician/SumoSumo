@@ -118,12 +118,15 @@ export class Renderer {
       powerPreference: "high-performance",
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.shadowMap.enabled = !this.isMobile;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.outputEncoding = THREE.sRGBEncoding;
-    this.renderer.physicallyCorrectLights = true;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.3; // Reduced from 1.5 to 1.3 for a slightly darker scene
+    
+    // Performance optimizations
+    this.renderer.shadowMap.enabled = !this.isMobile; // Disable shadows on mobile
+    if (this.isMobile) {
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1)); // Limit pixel ratio on mobile
+    }
+    
+    // Enable frustum culling for better performance
+    this.camera.frustumCulled = true;
 
     // Add renderer to DOM
     const container = document.createElement("div");
