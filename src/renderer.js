@@ -1467,7 +1467,7 @@ export class Renderer {
     sprite.position.y += modelHeight;
 
     // Adjust scale for the larger canvas
-    const scale = isEmote ? 5.0 : 4.0; // Increased both scales
+    const scale = isEmote ? 4.0 : 4.0; // Increased both scales
     sprite.scale.set(scale, scale * 0.5, 1);
 
     this.scene.add(sprite);
