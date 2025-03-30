@@ -1285,30 +1285,30 @@ export class Renderer {
     const ctx = canvas.getContext('2d');
     
     // Increase canvas size for better text quality
-    canvas.width = 1024;
-    canvas.height = 512;
+    canvas.width = 2048; // Increased width
+    canvas.height = 1024; // Increased height
 
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (isEmote) {
         // Emote styling - centered and dark for better contrast
-        ctx.font = 'bold 400px "Sawarabi Mincho"';
+        ctx.font = 'bold 800px "Sawarabi Mincho"'; // Increased font size
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         
         // Much darker outline for better contrast
         ctx.strokeStyle = '#111827'; // Almost black outline
-        ctx.lineWidth = 24; // Thicker outline
+        ctx.lineWidth = 48; // Thicker outline
         
         // Much darker fill color to combat washing out
         ctx.fillStyle = '#1f2937'; // Dark gray fill
         
         // Stronger shadow
         ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-        ctx.shadowBlur = 25;
+        ctx.shadowBlur = 50; // Increased shadow blur
         ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 4;
+        ctx.shadowOffsetY = 8; // Increased shadow offset
         
         // Draw in canvas center
         const x = canvas.width / 2;
@@ -1321,7 +1321,7 @@ export class Renderer {
         
     } else {
         // Message styling - speech bubble with tail
-        ctx.font = 'bold 120px "Sawarabi Mincho"';
+        ctx.font = 'bold 240px "Sawarabi Mincho"'; // Increased font size
         
         // Even warmer beige colors for bubble
         const bubbleGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
@@ -1330,15 +1330,15 @@ export class Renderer {
         
         // Stronger shadow for bubble
         ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-        ctx.shadowBlur = 15;
-        ctx.shadowOffsetX = 2;
-        ctx.shadowOffsetY = 4;
+        ctx.shadowBlur = 30; // Increased shadow blur
+        ctx.shadowOffsetX = 4; // Increased shadow offset
+        ctx.shadowOffsetY = 8; // Increased shadow offset
         
         // Center the bubble in the canvas
-        const padding = 60;
-        const cornerRadius = 30;
+        const padding = 120; // Increased padding
+        const cornerRadius = 60; // Increased corner radius
         const bubbleWidth = canvas.width - padding * 2; // Less padding for more centered bubble
-        const bubbleHeight = canvas.height - padding * 2 - 30;
+        const bubbleHeight = canvas.height - padding * 2 - 60; // Adjusted for larger canvas
         
         // Calculate the start X position to center the bubble
         const bubbleStartX = (canvas.width - bubbleWidth) / 2;
@@ -1352,8 +1352,8 @@ export class Renderer {
         ctx.quadraticCurveTo(bubbleStartX + bubbleWidth, padding + bubbleHeight, bubbleStartX + bubbleWidth - cornerRadius, padding + bubbleHeight);
         
         // Add tail at center bottom
-        const tailWidth = 50;
-        const tailHeight = 25;
+        const tailWidth = 100; // Increased tail width
+        const tailHeight = 50; // Increased tail height
         const tailX = canvas.width / 2;
         ctx.lineTo(tailX + tailWidth/2, padding + bubbleHeight);
         ctx.lineTo(tailX, padding + bubbleHeight + tailHeight);
@@ -1372,7 +1372,7 @@ export class Renderer {
         
         // Darker border
         ctx.strokeStyle = 'rgba(162, 138, 120, 0.6)'; // Darker, more visible border
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 6; // Increased line width
         ctx.stroke();
         
         // Reset shadow for text
@@ -1383,13 +1383,13 @@ export class Renderer {
         
         // Add very subtle text shadow for depth
         ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
-        ctx.shadowBlur = 2;
-        ctx.shadowOffsetX = 1;
-        ctx.shadowOffsetY = 1;
+        ctx.shadowBlur = 4; // Increased shadow blur
+        ctx.shadowOffsetX = 2; // Increased shadow offset
+        ctx.shadowOffsetY = 2; // Increased shadow offset
         
         // Text centering calculations
         const words = text.split(' ');
-        const lineHeight = 110;
+        const lineHeight = 220; // Increased line height
         const maxWidth = bubbleWidth - padding * 1.5;
         
         // Measure how many lines we'll need
@@ -1462,12 +1462,12 @@ export class Renderer {
     const playerPosition = new THREE.Vector3();
     playerModel.getWorldPosition(playerPosition);
 
-    const modelHeight = 2.5;
+    const modelHeight = 5.0; // Increased model height
     sprite.position.copy(playerPosition);
     sprite.position.y += modelHeight;
 
     // Adjust scale for the larger canvas
-    const scale = isEmote ? 2.5 : 2.0; // Increased both scales
+    const scale = isEmote ? 5.0 : 4.0; // Increased both scales
     sprite.scale.set(scale, scale * 0.5, 1);
 
     this.scene.add(sprite);
