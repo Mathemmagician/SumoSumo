@@ -2,16 +2,22 @@
   "name": "sumo-sumo",
   "version": "1.0.0",
   "description": "A multiplayer sumo wrestling game",
-  "main": "server/server.js",
+  "type": "module",
   "scripts": {
-    "start": "node server/server.js",
-    "dev": "nodemon server/server.js"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node server.js",
+    "dev-server": "nodemon server.js"
   },
   "dependencies": {
     "express": "^4.17.1",
-    "socket.io": "^4.4.1"
+    "socket.io": "^4.8.1",
+    "three": "^0.174.0"
   },
   "devDependencies": {
-    "nodemon": "^2.0.15"
+    "nodemon": "^2.0.15",
+    "socket.io-client": "^4.8.1",
+    "vite": "^6.2.3"
   }
-} 
+}
