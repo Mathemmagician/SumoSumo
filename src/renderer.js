@@ -778,8 +778,11 @@ export class Renderer {
     socketClient.on("stageChanged", (data) => {
       console.log("Stage changed to:", data.stage);
 
-      // Update the UI
-      uiManager.updateMatchStatus(data.displayName);
+      // Calculate seconds for display
+      const seconds = Math.ceil(data.duration / 1000);
+      
+      // Update the UI with both the display name and the seconds
+      uiManager.updateMatchStatus(data.displayName, seconds);
       
       // Reset fighter movement if stage is not MATCH_IN_PROGRESS
       if (data.stage !== 'MATCH_IN_PROGRESS') {
