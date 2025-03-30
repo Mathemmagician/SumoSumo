@@ -78,7 +78,7 @@ const FAKE_USERS = {
   count: 0,
   users: new Map(), // Store fake user data
   intervals: new Map(), // Store intervals for each fake user
-  targetCount: 30, // Set the target count for fake users
+  targetCount: 0, // Set the target count for fake users
   disconnectInterval: null,
   reconnectInterval: null
 };
