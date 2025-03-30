@@ -284,34 +284,38 @@ body {
     100% { opacity: 0.6; }
 }
 
-/* Add sponsor banner styling */
-#sponsor-banner {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background-color: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 15px 30px;
-    border-radius: 10px;
-    font-size: 1.8rem;
-    font-weight: bold;
-    text-align: center;
-    z-index: 100;
-    display: none;
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.7);
-    border: 2px solid gold;
-    animation: glow 2s infinite alternate;
-    max-width: 80%;
+/* Clean up duplicate sponsor button styles and keep the simple style */
+.sponsor-button {
+  background-color: #e0e0e0; /* Light gray background */
+  color: #333; /* Dark gray text */
+  border: 1px solid #999; /* Medium gray border */
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: normal;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  font-family: 'Sawarabi Mincho', serif;
+  position: relative;
+  display: block;
+  width: auto;
 }
 
-@keyframes glow {
-    from {
-        box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-    }
-    to {
-        box-shadow: 0 0 20px rgba(255, 215, 0, 1);
-    }
+.sponsor-button:hover {
+  background-color: #ccc; /* Slightly darker on hover */
+}
+
+.sponsor-button:active {
+  background-color: #bbb; /* Even darker when clicked */
+}
+
+/* Simple sponsor banner positioning */
+#sponsor-banner {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
 }
 
 /* Viewer Only Toggle Styles */
@@ -705,4 +709,33 @@ body {
     display: block;
     border-radius: 8px;
 
+}
+
+/* Add this to your CSS file */
+.sponsor-button {
+  background-color: #f5f5dc; /* Beige color */
+  color: #000;
+  border: 2px solid #000;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  font-family: 'Sawarabi Mincho', serif;
+  position: relative;
+  display: block;
+  width: auto;
+}
+
+.sponsor-button:hover {
+  background-color: #e8e8c9; /* Slightly darker beige on hover */
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+}
+
+.sponsor-button:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 } 
