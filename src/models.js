@@ -525,10 +525,24 @@ export class StadiumFactory {
         mainFontSize: 55,  // Slightly smaller due to longer text
         subFontSize: 35
       },
-      ...availableAdSpaces
+      {
+        text: "Make $1,000,000",
+        subtext: "By Giving Us $1,000\nPlaySumoSumo.com/sponsor",
+        color: 0x4d7734, // Rich money color
+        mainFontSize: 55,
+        subFontSize: 35
+      },
+      // ...availableAdSpaces
     ];
 
     const westWallBanners = [
+      {
+        text: "Got $1?",
+        subtext: "Send It Our Way\nOr Else. You don't want to know.",
+        color: 0x4d7734, // Rich money color
+        mainFontSize: 75,
+        subFontSize: 35
+      },
       {
         text: "BIG BOI BURGERS",
         subtext: "Eat Like a Champion\nMove Like... Well, Just Eat",
@@ -550,7 +564,7 @@ export class StadiumFactory {
         mainFontSize: 65,  // Can be large due to short text
         subFontSize: 42
       },
-      ...availableAdSpaces
+      // ...availableAdSpaces
     ];
 
     // Only add to East and West walls
