@@ -1,11 +1,7 @@
 # SumoSumo
 
-Let's play some SumoSumo!
+[![SumoSumo Gameplay](public/thumbnail.png)](https://playsumosumo.com/)
 
+Let's play some [SumoSumo](https://playsumosumo.com/)!
 
-Test server socket connection:
-
-```bash
-node socket-client-test.js
-```
-
+Completely open source, inspired by #vibejam
