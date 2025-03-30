@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import Stripe from 'stripe';
 
 // Get the directory name using ES modules approach
 const __filename = fileURLToPath(import.meta.url);
@@ -81,6 +82,9 @@ const FAKE_USERS = {
   disconnectInterval: null,
   reconnectInterval: null
 };
+
+// Initialize Stripe with your secret key (make sure this is not exposed in client-side code)
+const stripe = Stripe('sk_test_your_secret_key');
 
 // Function to change the game stage
 function changeGameStage(newStage) {
@@ -874,6 +878,39 @@ function stopFakeUserSystem() {
   // Reset counters
   FAKE_USERS.count = 0;
 }
+
+// Add this route to create Stripe checkout sessions
+app.post('/create-checkout-session', async (req, res) => {
+  try {
+    const { amount, name, description } = req.body;
+    
+    // Create a checkout session
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: name || 'SumoSumo Sponsorship',
+              description: description || 'Advertise your brand on SumoSumo!'
+            },
+            unit_amount: amount || 50000, // $500.00 in cents
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: `${req.headers.origin}/sponsor-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${req.headers.origin}`,
+    });
+    
+    res.json({ id: session.id });
+  } catch (error) {
+    console.error('Error creating checkout session:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Start the server
 const PORT = process.env.PORT || 3001;
