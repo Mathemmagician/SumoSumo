@@ -148,8 +148,10 @@ export class Renderer {
     console.log("Stadium created");
 
     // Create FPS display - commented out for now
-    // this.createFpsDisplay();
-    // console.log("FPS display created");
+    if (!this.isMobile) {
+      this.createFpsDisplay();
+      console.log("FPS display created");
+    }
 
     // Start a timer to update the game state debug info every 100ms
     this.startGameStateUpdateTimer();
