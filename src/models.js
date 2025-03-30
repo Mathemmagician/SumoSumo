@@ -127,9 +127,10 @@ export class ModelLoader {
     this.loadPromise = new Promise(async (resolve, reject) => {
       try {
         // Load all models in parallel
-        const [sumo0Gltf, sumo1Gltf, refereeGltf, viewer0Gltf, viewer1Gltf, viewer2Gltf, viewer3Gltf] = await Promise.all([
+        const [sumo0Gltf, sumo1Gltf, sumo2Gltf, refereeGltf, viewer0Gltf, viewer1Gltf, viewer2Gltf, viewer3Gltf] = await Promise.all([
           this.loadModel('/models3d/sumo.glb'),
           this.loadModel('/models3d/sumo_1.glb'),
+          this.loadModel('/models3d/sumo_2.glb'),
           this.loadModel('/models3d/referee.glb'),
           this.loadModel('/models3d/viewer_0.glb'),
           this.loadModel('/models3d/viewer_1.glb'),
@@ -140,7 +141,8 @@ export class ModelLoader {
         // Process and store the models
         this.loadedModels.fighters = [
           this.processModel(sumo0Gltf.scene),
-          this.processModel(sumo1Gltf.scene)
+          this.processModel(sumo1Gltf.scene),
+          this.processModel(sumo2Gltf.scene)
         ];
         this.loadedModels.referee = this.processModel(refereeGltf.scene);
         this.loadedModels.viewers = [

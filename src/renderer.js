@@ -19,6 +19,17 @@ import { ModelFactory } from "./models";
 import { CameraSystem } from './camera-system';
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 
+// First, update the VIEWER_ANIMATION constants with additional properties for excited state
+const VIEWER_ANIMATION = {
+  BOB_AMPLITUDE: 0.05,           // Normal bobbing height
+  BOB_FREQUENCY: 0.0025,         // Normal bobbing speed
+  EXCITED_AMPLITUDE: 0.1,        // 2x amplitude when excited (match end)
+  EXCITED_FREQUENCY: 0.005,      // 2x frequency when excited
+  PHASE_VARIATION: 0.5,          // Random phase offset to prevent viewers from bobbing in sync
+  FREQUENCY_VARIATION: 0.3,      // Small random variation in bobbing speed
+  TRANSITION_DURATION: 1000      // Time in ms to transition between normal and excited states
+};
+
 export class Renderer {
   constructor() {
     console.log("Renderer constructor called");
@@ -120,8 +131,8 @@ export class Renderer {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     
     // Performance optimizations
-    // this.renderer.shadowMap.enabled = false; // Disable shadows
-    this.renderer.shadowMap.enabled = !this.isMobile; // Disable shadows on mobile
+    this.renderer.shadowMap.enabled = false; // Disable shadows
+    // this.renderer.shadowMap.enabled = !this.isMobile; // Disable shadows on mobile
     if (this.isMobile) {
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1)); // Limit pixel ratio on mobile
     }
@@ -469,6 +480,9 @@ export class Renderer {
       }
     });
 
+    // Update viewer bobbing animations
+    this.updateViewerAnimations();
+
     // Add CSS2D renderer render call before the main render
     this.labelRenderer.render(this.scene, this.camera);
     this.renderer.render(this.scene, this.camera);
@@ -756,9 +770,25 @@ export class Renderer {
       }
     });
 
-    // Add handler for match end to trigger the fall animation
+    // Listen for stage changes
+    socketClient.on("stageChanged", (data) => {
+      console.log("Stage changed to:", data.stage);
+      
+      // When match ends and victory ceremony begins, make viewers excited
+      if (data.stage === "VICTORY_CEREMONY") {
+        console.log("Victory ceremony started, viewers getting excited!");
+        this.setViewersExcitedState(true);
+      } 
+      // When post-match cooldown starts, return to normal
+      else if (data.stage === "POST_MATCH_COOLDOWN") {
+        console.log("Post-match cooldown started, viewers calming down");
+        this.setViewersExcitedState(false);
+      }
+    });
+
+    // Handle match end - trigger excitement immediately when match ends
     socketClient.on("matchEnd", (data) => {
-      console.log("Match ended. Winner:", data.winnerId, "Loser:", data.loserId);
+      console.log("Match ended, winner:", data.winnerId, "loser:", data.loserId);
       
       // Extract winner and loser objects from the scene
       const winnerId = data.winnerId;
@@ -778,8 +808,12 @@ export class Renderer {
         this.cameraSystem.startKnockoutSequence(winnerObject, loserObject);
       }
       
-      // Animate the loser falling as you currently do
+      // Animate the loser falling
       this.animateFighterFall(loserId);
+      
+      // Set viewers to excited state immediately when match ends
+      console.log("Match ended, viewers getting excited!");
+      this.setViewersExcitedState(true);
     });
   }
 
@@ -1109,6 +1143,11 @@ export class Renderer {
         console.log(
           `Added player model to scene. Total models: ${this.playerModels.size}`
         );
+
+        // Initialize bobbing animation for viewers
+        if (player.role === 'viewer') {
+          this.initializeViewerAnimation(model, player.id);
+        }
       } else {
         console.error("Failed to create model for player:", player);
       }
@@ -1588,6 +1627,102 @@ export class Renderer {
   // Add helper method to check if on mobile
   checkIsMobile() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+  }
+
+  // Add a method to initialize viewer animation properties
+  initializeViewerAnimation(viewerModel, playerId) {
+    // Generate a consistent phase offset based on player ID
+    const phaseHash = this.hashStringToFloat(playerId);
+    
+    // Store animation parameters in the model's userData
+    viewerModel.userData.animation = {
+      baseY: viewerModel.position.y,  // Store original Y position
+      phaseOffset: phaseHash * Math.PI * 2 * VIEWER_ANIMATION.PHASE_VARIATION, // Unique phase
+      frequencyMod: 0.8 + (phaseHash * VIEWER_ANIMATION.FREQUENCY_VARIATION)   // Slight frequency variation
+    };
+  }
+
+  // Add a helper method to create a consistent float from string
+  hashStringToFloat(str) {
+    if (!str) return Math.random();
+    
+    // Simple string hash
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash |= 0; // Convert to 32bit integer
+    }
+    
+    // Normalize to 0-1 range
+    return (hash & 0x7FFFFFFF) / 0x7FFFFFFF;
+  }
+
+  // Add this method to update the viewer animations during each frame
+  updateViewerAnimations() {
+    const currentTime = performance.now();
+    
+    // Go through all player models
+    this.playerModels.forEach((model, playerId) => {
+      // Only animate viewers
+      if (model.userData.role === 'viewer' && model.userData.animation) {
+        const animation = model.userData.animation;
+        
+        // Calculate transition progress if we're in a transition
+        let transitionProgress = 1;
+        if (animation.transitionStartTime) {
+          const timeSinceTransition = currentTime - animation.transitionStartTime;
+          if (timeSinceTransition < VIEWER_ANIMATION.TRANSITION_DURATION) {
+            transitionProgress = timeSinceTransition / VIEWER_ANIMATION.TRANSITION_DURATION;
+            // Keep progress between 0 and 1
+            transitionProgress = Math.max(0, Math.min(1, transitionProgress));
+          } else {
+            // Transition complete, clear transition time
+            animation.transitionStartTime = null;
+          }
+        }
+        
+        // Determine the current amplitude and frequency based on excited state and transition
+        let currentAmplitude, currentFrequency;
+        
+        if (animation.excited) {
+          // Transitioning to excited state
+          currentAmplitude = VIEWER_ANIMATION.BOB_AMPLITUDE + 
+            (VIEWER_ANIMATION.EXCITED_AMPLITUDE - VIEWER_ANIMATION.BOB_AMPLITUDE) * transitionProgress;
+          currentFrequency = VIEWER_ANIMATION.BOB_FREQUENCY + 
+            (VIEWER_ANIMATION.EXCITED_FREQUENCY - VIEWER_ANIMATION.BOB_FREQUENCY) * transitionProgress;
+        } else {
+          // Transitioning to normal state
+          currentAmplitude = VIEWER_ANIMATION.EXCITED_AMPLITUDE - 
+            (VIEWER_ANIMATION.EXCITED_AMPLITUDE - VIEWER_ANIMATION.BOB_AMPLITUDE) * transitionProgress;
+          currentFrequency = VIEWER_ANIMATION.EXCITED_FREQUENCY - 
+            (VIEWER_ANIMATION.EXCITED_FREQUENCY - VIEWER_ANIMATION.BOB_FREQUENCY) * transitionProgress;
+        }
+        
+        // Calculate bobbing effect with current animation parameters
+        const bobbing = Math.sin(
+          currentTime * currentFrequency * animation.frequencyMod + 
+          animation.phaseOffset
+        ) * currentAmplitude;
+        
+        // Apply bobbing to model position
+        model.position.y = animation.baseY + bobbing;
+      }
+    });
+  }
+
+  // Add a method to set all viewers to excited state
+  setViewersExcitedState(excited) {
+    const transitionStartTime = performance.now();
+    
+    // Update all viewer models
+    this.playerModels.forEach((model, playerId) => {
+      if (model.userData.role === 'viewer' && model.userData.animation) {
+        model.userData.animation.excited = excited;
+        model.userData.animation.transitionStartTime = transitionStartTime;
+      }
+    });
+    
+    console.log(`Setting viewer excited state to: ${excited}`);
   }
 }
 
