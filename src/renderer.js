@@ -17,6 +17,7 @@ import {
 } from "./constants";
 import { ModelFactory } from "./models";
 import { CameraSystem } from './camera-system';
+import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 
 export class Renderer {
   constructor() {
@@ -74,6 +75,14 @@ export class Renderer {
 
     // Add map to store active text bubbles
     this.textBubbles = new Map();
+
+    // Add CSS2D renderer
+    this.labelRenderer = new CSS2DRenderer();
+    this.labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    this.labelRenderer.domElement.style.position = 'absolute';
+    this.labelRenderer.domElement.style.top = '0px';
+    this.labelRenderer.domElement.style.pointerEvents = 'none';
+    document.body.appendChild(this.labelRenderer.domElement);
   }
 
   async initialize() {
@@ -402,6 +411,9 @@ export class Renderer {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    
+    // Add CSS2D renderer resize
+    this.labelRenderer.setSize(window.innerWidth, window.innerHeight);
   }
 
   animate() {
@@ -453,6 +465,8 @@ export class Renderer {
       }
     });
 
+    // Add CSS2D renderer render call before the main render
+    this.labelRenderer.render(this.scene, this.camera);
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -1170,6 +1184,11 @@ export class Renderer {
       this.cameraSystem.dispose();
       this.cameraSystem = null;
     }
+
+    // Remove CSS2D renderer
+    if (this.labelRenderer) {
+      document.body.removeChild(this.labelRenderer.domElement);
+    }
   }
 
   // Add a method to reset camera to a good viewing position
@@ -1321,230 +1340,45 @@ export class Renderer {
 
   // Add new methods for text bubble management
   createTextBubble(playerId, text, isEmote = false) {
-    // Only log for non-NPC players
-    if (!playerId.startsWith('npc-') && !playerId.startsWith('fake-')) {
-        console.log(`Creating ${isEmote ? 'emote' : 'message'} bubble for ${playerId}: "${text}"`);
-    }
-    
+    // Remove any existing bubble
     this.removeTextBubble(playerId);
 
-    const playerModel = this.playerModels.get(playerId);
-    if (!playerModel) {
-        if (!playerId.startsWith('npc-') && !playerId.startsWith('fake-')) {
-            console.warn(`No player model found for ${playerId}`);
-        }
-        return;
-    }
+    const player = this.playerModels.get(playerId);
+    if (!player) return;
 
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+    // Create container div
+    const bubbleDiv = document.createElement('div');
+    bubbleDiv.className = isEmote ? 'text-bubble emote-bubble' : 'text-bubble';
     
-    // Increase canvas size for better text quality
-    canvas.width = 2048; // Increased width
-    canvas.height = 1024; // Increased height
+    // Set text content
+    bubbleDiv.textContent = text;
 
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (isEmote) {
-        // Emote styling - centered and dark for better contrast
-        ctx.font = 'bold 800px "Sawarabi Mincho"'; // Increased font size
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        // Much darker outline for better contrast
-        ctx.strokeStyle = '#111827'; // Almost black outline
-        ctx.lineWidth = 48; // Thicker outline
-        
-        // Much darker fill color to combat washing out
-        ctx.fillStyle = '#1f2937'; // Dark gray fill
-        
-        // Stronger shadow
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-        ctx.shadowBlur = 50; // Increased shadow blur
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 8; // Increased shadow offset
-        
-        // Draw in canvas center
-        const x = canvas.width / 2;
-        const y = canvas.height / 2;
-        
-        // Draw outline first
-        ctx.strokeText(text, x, y);
-        // Then fill
-        ctx.fillText(text, x, y);
-        
-    } else {
-        // Message styling - speech bubble with tail
-        ctx.font = 'bold 240px "Sawarabi Mincho"'; // Increased font size
-        
-        // Even warmer beige colors for bubble
-        const bubbleGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        bubbleGradient.addColorStop(0, 'rgba(245, 238, 230, 0.98)'); // Warmer light beige
-        bubbleGradient.addColorStop(1, 'rgba(232, 220, 202, 0.98)'); // Warmer dark beige
-        
-        // Stronger shadow for bubble
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-        ctx.shadowBlur = 30; // Increased shadow blur
-        ctx.shadowOffsetX = 4; // Increased shadow offset
-        ctx.shadowOffsetY = 8; // Increased shadow offset
-        
-        // Center the bubble in the canvas
-        const padding = 120; // Increased padding
-        const cornerRadius = 60; // Increased corner radius
-        const bubbleWidth = canvas.width - padding * 2; // Less padding for more centered bubble
-        const bubbleHeight = canvas.height - padding * 2 - 60; // Adjusted for larger canvas
-        
-        // Calculate the start X position to center the bubble
-        const bubbleStartX = (canvas.width - bubbleWidth) / 2;
-        
-        // Draw bubble with tail
-        ctx.beginPath();
-        ctx.moveTo(bubbleStartX + cornerRadius, padding);
-        ctx.lineTo(bubbleStartX + bubbleWidth - cornerRadius, padding);
-        ctx.quadraticCurveTo(bubbleStartX + bubbleWidth, padding, bubbleStartX + bubbleWidth, padding + cornerRadius);
-        ctx.lineTo(bubbleStartX + bubbleWidth, padding + bubbleHeight - cornerRadius);
-        ctx.quadraticCurveTo(bubbleStartX + bubbleWidth, padding + bubbleHeight, bubbleStartX + bubbleWidth - cornerRadius, padding + bubbleHeight);
-        
-        // Add tail at center bottom
-        const tailWidth = 100; // Increased tail width
-        const tailHeight = 50; // Increased tail height
-        const tailX = canvas.width / 2;
-        ctx.lineTo(tailX + tailWidth/2, padding + bubbleHeight);
-        ctx.lineTo(tailX, padding + bubbleHeight + tailHeight);
-        ctx.lineTo(tailX - tailWidth/2, padding + bubbleHeight);
-        
-        ctx.lineTo(bubbleStartX + cornerRadius, padding + bubbleHeight);
-        ctx.quadraticCurveTo(bubbleStartX, padding + bubbleHeight, bubbleStartX, padding + bubbleHeight - cornerRadius);
-        ctx.lineTo(bubbleStartX, padding + cornerRadius);
-        ctx.quadraticCurveTo(bubbleStartX, padding, bubbleStartX + cornerRadius, padding);
-        
-        ctx.closePath();
-        
-        // Fill bubble
-        ctx.fillStyle = bubbleGradient;
-        ctx.fill();
-        
-        // Darker border
-        ctx.strokeStyle = 'rgba(162, 138, 120, 0.6)'; // Darker, more visible border
-        ctx.lineWidth = 6; // Increased line width
-        ctx.stroke();
-        
-        // Reset shadow for text
-        ctx.shadowColor = 'transparent';
-        
-        // Much darker text color to combat washing out
-        ctx.fillStyle = '#111827'; // Almost black text
-        
-        // Add very subtle text shadow for depth
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
-        ctx.shadowBlur = 4; // Increased shadow blur
-        ctx.shadowOffsetX = 2; // Increased shadow offset
-        ctx.shadowOffsetY = 2; // Increased shadow offset
-        
-        // Text centering calculations
-        const words = text.split(' ');
-        const lineHeight = 220; // Increased line height
-        const maxWidth = bubbleWidth - padding * 1.5;
-        
-        // Measure how many lines we'll need
-        let testLine = '';
-        let lineCount = 1;
-        for (let word of words) {
-            const testWithWord = testLine + word + ' ';
-            const metrics = ctx.measureText(testWithWord);
-            
-            if (metrics.width > maxWidth) {
-                lineCount++;
-                testLine = word + ' ';
-            } else {
-                testLine = testWithWord;
-            }
-        }
-        
-        // Calculate starting Y position to center text vertically
-        const totalTextHeight = lineCount * lineHeight;
-        let startY = padding + (bubbleHeight - totalTextHeight) / 2;
-        if (lineCount === 1) {
-            // For single lines, center exactly
-            startY = padding + bubbleHeight / 2;
-        } else {
-            // For multiple lines, start a bit higher than center
-            startY += lineHeight * 0.3;
-        }
-        
-        // Draw text with proper centering
-        ctx.textAlign = 'center'; // Center text horizontally
-        ctx.textBaseline = 'middle';
-        const bubbleCenterX = canvas.width / 2; // Center of the canvas
-        
-        let line = '';
-        let y = startY;
-        
-        for (let word of words) {
-            const testLine = line + word + ' ';
-            const metrics = ctx.measureText(testLine);
-            
-            if (metrics.width > maxWidth) {
-                ctx.fillText(line, bubbleCenterX, y);
-                line = word + ' ';
-                y += lineHeight;
-            } else {
-                line = testLine;
-            }
-        }
-        ctx.fillText(line, bubbleCenterX, y);
-    }
-
-    // Create texture with better filtering
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    texture.anisotropy = 16; // Increase anisotropic filtering for sharper text
+    // Create CSS2DObject
+    const textObject = new CSS2DObject(bubbleDiv);
     
-    const material = new THREE.SpriteMaterial({
-        map: texture,
-        transparent: true,
-        depthWrite: false,
-        depthTest: true,
-        sizeAttenuation: true,
-        color: 0xffffff, // Full white color multiplier
-        toneMapped: false // Disable tone mapping for the text
-    });
+    // Position above player model - adjust height based on player scale
+    const modelHeight = player.scale.y;
+    textObject.position.set(0, 0.8, 0);
     
-    const sprite = new THREE.Sprite(material);
+    // Add to player mesh and store reference
+    player.add(textObject);
+    this.textBubbles.set(playerId, textObject);
 
-    const playerPosition = new THREE.Vector3();
-    playerModel.getWorldPosition(playerPosition);
-
-    const modelHeight = 5.0; // Increased model height
-    sprite.position.copy(playerPosition);
-    sprite.position.y += modelHeight;
-
-    // Adjust scale for the larger canvas
-    const scale = isEmote ? 4.0 : 4.0; // Increased both scales
-    sprite.scale.set(scale, scale * 0.5, 1);
-
-    this.scene.add(sprite);
-    
-    this.textBubbles.set(playerId, {
-        sprite,
-        playerModel,
-        timeout: setTimeout(() => {
-            this.removeTextBubble(playerId);
-        }, isEmote ? 3000 : 5000)
-    });
+    // Auto-remove after delay
+    setTimeout(() => {
+      if (this.textBubbles.has(playerId)) {
+        bubbleDiv.style.opacity = '0';
+        setTimeout(() => this.removeTextBubble(playerId), 300);
+      }
+    }, isEmote ? 2000 : 5000);
   }
 
   removeTextBubble(playerId) {
-    const bubble = this.textBubbles.get(playerId);
-    if (bubble) {
-      clearTimeout(bubble.timeout);
-      if (bubble.sprite) {
-        // Remove from scene instead of player model
-        this.scene.remove(bubble.sprite);
-        bubble.sprite.material.dispose();
-        bubble.sprite.material.map.dispose();
+    const textObject = this.textBubbles.get(playerId);
+    if (textObject) {
+      const player = this.playerModels.get(playerId);
+      if (player) {
+        player.remove(textObject);
       }
       this.textBubbles.delete(playerId);
     }
@@ -1565,19 +1399,7 @@ export class Renderer {
     ctx.closePath();
   }
 
-  // Add this method to update text bubble positions
-  updateTextBubblePositions() {
-    this.textBubbles.forEach((bubble, playerId) => {
-      if (bubble.sprite && bubble.playerModel) {
-        const playerPosition = new THREE.Vector3();
-        bubble.playerModel.getWorldPosition(playerPosition);
-        bubble.sprite.position.copy(playerPosition);
-        bubble.sprite.position.y += 8;
-      }
-    });
-  }
-
-  // Add a method to handle game state updates for camera
+  // Add this method to handle game state updates for camera
   updateCameraForGameState(gameState) {
     // Don't update if free camera is enabled or cameraSystem is not initialized
     if (this.isFreeCamera || !this.cameraSystem) return;
