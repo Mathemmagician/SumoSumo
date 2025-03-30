@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RING_HEIGHT } from './constants';
+import { STAGE_DURATIONS } from './constants';
 
 /**
  * Camera System for SumoSumo
@@ -242,254 +243,174 @@ export class CameraSystem {
       return;
     }
     
-    // Define the phases and their timing
-    const phases = {
-      intro: {
-        time: settings.introduceDelay,
-        next: 'fighter1',
-        showBars: true  // Show cinematic bars from the start for more epic feel
-      },
-      fighter1: {
-        time: settings.fighter1Time,
-        next: 'fighter2',
-        showBars: true,
-        target: settings.fighter1
-      },
-      fighter2: {
-        time: settings.fighter2Time,
-        next: 'referee',
-        showBars: true,
-        target: settings.fighter2
-      },
-      referee: {
-        time: settings.refereeTime,
-        next: 'outro',
-        showBars: true,
-        target: settings.referee
-      },
-      outro: {
-        time: settings.outroTime,
-        next: null,
-        showBars: true  // Keep bars visible through the outro for consistency
-      }
-    };
+    // Get the total ceremony duration from constants
+    const totalDuration = STAGE_DURATIONS.PRE_MATCH_CEREMONY;
     
-    // Find which phase we're in based on elapsed time
-    let timeAccumulator = 0;
-    let currentPhase = 'intro';
+    // Define new timing logic based on requirements
+    // Using time remaining because we're counting backward from the end
+    const timeRemaining = totalDuration - elapsedTime;
     
-    for (const [phaseName, phase] of Object.entries(phases)) {
-      if (elapsedTime < timeAccumulator + phase.time) {
-        currentPhase = phaseName;
-        break;
-      }
-      timeAccumulator += phase.time;
-    }
-    
-    // Update ceremony phase if changed
-    if (this.ceremonyPhase !== currentPhase) {
-      this.handlePhaseChange(this.ceremonyPhase, currentPhase, phases);
-      this.ceremonyPhase = currentPhase;
-    }
-    
-    // Handle the current phase
-    const phase = phases[currentPhase];
-    const phaseElapsedTime = elapsedTime - timeAccumulator;
-    const phaseProgress = phaseElapsedTime / phase.time;
-    
-    switch (currentPhase) {
-      case 'intro':
-        // More dramatic intro shot from lower angle
-        const introAngle = Math.PI / 4 * phaseProgress; // Rotate around the ring
-        const introRadius = 20 - phaseProgress * 5; // Move closer as we progress
-        const introHeight = 5 + phaseProgress * 5; // Move up as we progress
-        
-        // Calculate camera position based on circular movement
-        this.camera.position.set(
-          Math.sin(introAngle) * introRadius,
-          introHeight,
-          Math.cos(introAngle) * introRadius
-        );
-        
-        // Always look at the ring center
-        this.camera.lookAt(0, 1, 0);
-        break;
-        
-      case 'fighter1':
-      case 'fighter2':
-      case 'referee':
-        // Position camera for dramatic close-up on the current target
-        this.positionCameraForDramaticCloseup(phase.target, settings, phaseProgress);
-        break;
-        
-      case 'outro':
-        // Epic pull-back shot revealing the whole scene
-        if (phaseProgress >= 1.0) {
-          if (this.currentMode === this.MODES.CEREMONY) {
-            this.cleanupCeremonyMode();
-            this.setMode(this.MODES.WAITING_OVERVIEW);
-          }
-        } else {
-          this.createEpicOutroShot(phaseProgress);
-        }
-        break;
-    }
-    
-    // If we've gone through all phases, exit ceremony mode
-    if (timeAccumulator + phase.time <= elapsedTime && !phase.next) {
-        if (this.currentMode === this.MODES.CEREMONY) {
-            this.cleanupCeremonyMode();
-            this.setMode(this.MODES.WAITING_OVERVIEW);
-        }
-        return;
-    }
-  }
-  
-  /**
-   * Handle phase change in ceremony mode
-   * @param {string} fromPhase - The previous phase
-   * @param {string} toPhase - The new phase
-   * @param {Object} phases - Phase definitions
-   */
-  handlePhaseChange(fromPhase, toPhase, phases) {
-    const fromPhaseObj = phases[fromPhase];
-    const toPhaseObj = phases[toPhase];
-    
-    // Handle cinematic bars
-    if (toPhaseObj.showBars && this.ceremonyCineBars) {
+
+    const fightersTime = 7000;
+    const perFighterTime = fightersTime / 2;
+    const refereeTime = 1000;
+    const totalTime = fightersTime + refereeTime;
+
+    // Show cinematic bars for the fighter closeups and referee zoom
+    if (timeRemaining <= totalTime && this.ceremonyCineBars) {
       this.ceremonyCineBars.show();
     } else if (this.ceremonyCineBars) {
       this.ceremonyCineBars.hide();
     }
     
-    // Store transition start info
-    this.transitionStartTime = Date.now();
-    this.transitionFromPosition = this.camera.position.clone();
-    this.transitionFromTarget = this.getTargetFromCamera();
-  }
-  
-  /**
-   * Position camera for dramatic close-up on a target
-   * @param {Object} target - The target to focus on (fighter or referee)
-   * @param {Object} settings - Camera settings
-   * @param {number} progress - Progress through the current phase (0-1)
-   */
-  positionCameraForDramaticCloseup(target, settings, progress) {
-    if (!target || !target.position) {
-      console.warn('Invalid target for close-up');
-      return;
+    // Last 1 second: zoom from referee's face back to default overview
+    if (timeRemaining <= refereeTime) {
+      const progress = 1 - (timeRemaining / refereeTime); // 0 at start, 1 at end
+      this.handleRefereeToOverviewTransition(settings, progress);
+    }
+    // Last 1-3 seconds: slow horizontal pan showing fighter2
+    else if (timeRemaining <= refereeTime + perFighterTime) {
+      const progress = (timeRemaining - refereeTime) / perFighterTime; // 1 at start, 0 at end
+      this.handleFighterCloseup(settings.fighter2, settings, progress);
+    }
+    // Last 3-5 seconds: same camera setup for fighter1
+    else if (timeRemaining <= refereeTime + fightersTime) {
+      const progress = (timeRemaining - refereeTime - perFighterTime) / perFighterTime; // 1 at start, 0 at end
+      this.handleFighterCloseup(settings.fighter1, settings, progress);
+    }
+    // Rest of the time: just do regular bobbing
+    else {
+      this.handleRegularBobbing(elapsedTime);
     }
     
-    // Get target position
-    const targetPosition = target.position.clone();
+    // If we've reached the end, exit ceremony mode
+    if (elapsedTime >= totalDuration) {
+      this.cleanupCeremonyMode();
+      this.setMode(this.MODES.WAITING_OVERVIEW);
+    }
+  }
+  
+  /**
+   * Handle the transition from referee closeup back to overview
+   * @param {Object} settings - Camera settings
+   * @param {number} progress - Transition progress (0-1)
+   */
+  handleRefereeToOverviewTransition(settings, progress) {
+    const eased = this.easeOutCubic(progress);
     
-    // Eye-level height (adjusted for fighter models)
-    const eyeHeight = targetPosition.y + settings.closeupHeight;
+    // Start position (referee closeup)
+    const referee = settings.referee;
+    const startPos = this.calculateRefereeCloseupPosition(referee);
     
-    // *** IMPROVED CAMERA ORBIT ***
-    // Restrict orbit to the front 180° of the fighter (semicircle) to prevent inversions
-    // with a constant, slower pace (2x slower)
-    const orbitRadius = 3.0 - progress * 0.5; // Start wider, move closer more gradually
-    const orbitHeight = eyeHeight;
+    // End position (overview)
+    const endPos = this.cameraSettings[this.MODES.WAITING_OVERVIEW].basePosition.clone();
     
-    // More limited orbit range - only 180 degrees in front of the fighter
-    const frontAngleRange = Math.PI; // 180 degrees (half circle)
-    const startAngle = -frontAngleRange/2; // -90 degrees (left side)
-    const currentOrbitAngle = startAngle + (progress * frontAngleRange); // Move from left to right
+    // Interpolate position
+    const newPos = new THREE.Vector3().lerpVectors(startPos, endPos, eased);
+    this.camera.position.copy(newPos);
     
-    // Calculate base direction the fighter is facing (relative to ring center)
-    const ringCenter = new THREE.Vector3(0, 0, 0);
-    const fighterToCenter = new THREE.Vector3().subVectors(ringCenter, targetPosition).normalize();
+    // Interpolate look target
+    const startTarget = new THREE.Vector3(
+      referee.position.x,
+      referee.position.y + 1.6, // Eye level
+      referee.position.z
+    );
+    const endTarget = this.cameraSettings[this.MODES.WAITING_OVERVIEW].lookAt.clone();
+    const newTarget = new THREE.Vector3().lerpVectors(startTarget, endTarget, eased);
     
-    // Calculate the base angle (where the fighter is looking)
-    const baseAngle = Math.atan2(fighterToCenter.z, fighterToCenter.x);
+    // Look at the target
+    this.camera.lookAt(newTarget);
+    this.camera.up.set(0, 1, 0);
     
-    // Calculate final orbit angle - orbital motion around the fighter's facing direction
-    const finalAngle = baseAngle + currentOrbitAngle;
+    // Interpolate FOV if using different FOVs
+    const startFOV = 45;
+    const endFOV = 75; // Default FOV
+    this.camera.fov = startFOV + (endFOV - startFOV) * eased;
+    this.camera.updateProjectionMatrix();
+  }
+  
+  /**
+   * Calculate position for referee closeup
+   * @param {Object} referee - The referee object
+   * @returns {THREE.Vector3} Camera position
+   */
+  calculateRefereeCloseupPosition(referee) {
+    // Position slightly behind and to the side of the referee
+    const refPos = referee.position.clone();
+    return new THREE.Vector3(
+      refPos.x - 2,
+      refPos.y + 1.6, // Eye level
+      refPos.z + 2
+    );
+  }
+  
+  /**
+   * Handle fighter closeup with horizontal panning
+   * @param {Object} fighter - Fighter to focus on
+   * @param {Object} settings - Camera settings
+   * @param {number} progress - Progress through this phase (1 to 0)
+   */
+  handleFighterCloseup(fighter, settings, progress) {
+    // Change FOV for cinematic effect
+    this.camera.fov = 35;
+    this.camera.updateProjectionMatrix();
     
-    // Calculate camera position based on the orbit
-    const cameraX = targetPosition.x + Math.cos(finalAngle) * orbitRadius;
-    const cameraZ = targetPosition.z + Math.sin(finalAngle) * orbitRadius;
+    // Get fighter position
+    const fighterPos = fighter.position.clone();
+    const modelHeight = 1.3; // Estimate model height
     
-    // Apply a smoothed vertical position curve - higher at the sides, level at front
-    // This creates a more dynamic vertical movement
-    const verticalOffset = Math.abs(currentOrbitAngle) * 0.2; // Higher when at sides
-    const cameraY = orbitHeight + verticalOffset;
+    // Calculate camera height (slightly below eye level)
+    const cameraHeight = fighterPos.y + (modelHeight * 0.9);
     
-    // Set camera position
-    this.camera.position.set(cameraX, cameraY, cameraZ);
+    // Calculate horizontal panning
+    // Start further to one side and move across
+    const horizontalRange = 0.5; // How far to pan horizontally
+    const panOffset = (progress * 2 - 1) * horizontalRange; // -1 to 1 range
     
-    // Create look target - always at eye level
+    // Set camera position for horizontal pan
+    this.camera.position.set(
+      fighterPos.x / 2, 
+      cameraHeight,
+      fighterPos.z + panOffset // Stay at a fixed distance in front
+    );
+    
+    // Look at fighter's face
     const lookTarget = new THREE.Vector3(
-      targetPosition.x,
-      eyeHeight,
-      targetPosition.z
+      fighterPos.x,
+      fighterPos.y + modelHeight, // Face level
+      fighterPos.z
     );
     
-    // Always use world-up as the reference vector
-    this.camera.up.set(0, 1, 0);
-    
-    // Look at the target's eye level
     this.camera.lookAt(lookTarget);
-    
-    // IMPORTANT: Reset quaternion after lookAt to enforce up direction
-    // This explicitly controls orientation to prevent any inversions
-    const lookDir = new THREE.Vector3().subVectors(lookTarget, this.camera.position).normalize();
-    const right = new THREE.Vector3().crossVectors(lookDir, new THREE.Vector3(0, 1, 0)).normalize();
-    const up = new THREE.Vector3().crossVectors(right, lookDir).normalize();
-    
-    // Create an orientation matrix and apply it to the camera
-    const matrix = new THREE.Matrix4();
-    matrix.makeBasis(right, up, lookDir.negate());
-    this.camera.quaternion.setFromRotationMatrix(matrix);
-    
-    // No roll/tilt - keeps a level horizon
-    this.camera.rotation.z = 0;
+    this.camera.up.set(0, 1, 0);
   }
   
   /**
-   * Create an epic outro shot that pulls back and up (slowed down)
-   * @param {number} progress - Progress through the outro phase (0-1)
+   * Handle regular bobbing camera for the introduction
+   * @param {number} elapsedTime - Time elapsed
    */
-  createEpicOutroShot(progress) {
-    // Use a non-linear easing for smoother movement
-    const easedProgress = this.easeOutCubic(progress);
+  handleRegularBobbing(elapsedTime) {
+    const overviewSettings = this.cameraSettings[this.MODES.WAITING_OVERVIEW];
     
-    // Calculate starting point
-    const startPos = new THREE.Vector3(3, 4, 3);
+    // Calculate vertical bobbing with slower motion
+    const slowerElapsedTime = elapsedTime * 0.3; // Even slower for ceremony
+    const yOffset = Math.sin(slowerElapsedTime * overviewSettings.bobSpeed) * overviewSettings.bobAmplitude;
     
-    // Calculate ending position (high overview)
-    const endPos = new THREE.Vector3(-15, 18, 15);
+    // Add slight circular motion
+    const radius = 2;
+    const xOffset = Math.sin(slowerElapsedTime * 0.0003) * radius;
+    const zOffset = Math.cos(slowerElapsedTime * 0.0003) * radius;
     
-    // Interpolate between positions (slower with halved movement strength)
-    const newPosition = new THREE.Vector3().lerpVectors(
-      startPos,
-      endPos,
-      easedProgress * 0.8 // 20% less distance for slower apparent motion
+    // Set camera position with combined effects
+    this.camera.position.set(
+      overviewSettings.basePosition.x + xOffset,
+      overviewSettings.basePosition.y + yOffset,
+      overviewSettings.basePosition.z + zOffset
     );
     
-    // Add a circular movement component for more dynamic feel (reduced amplitude)
-    const angle = progress * Math.PI * 0.3; // Slower rotation
-    newPosition.x += Math.sin(angle) * 3 * (1 - easedProgress); // Reduced circular motion
-    newPosition.z += Math.cos(angle) * 3 * (1 - easedProgress);
-    
-    this.camera.position.copy(newPosition);
-    
-    // Always keep world-up as the reference vector
+    // Always look at the center
+    this.camera.lookAt(overviewSettings.lookAt);
     this.camera.up.set(0, 1, 0);
-    
-    // Always look at the center, but gradually move up the look point
-    const lookHeight = easedProgress * 2; // Lower height range
-    this.camera.lookAt(0, lookHeight, 0);
-  }
-  
-  /**
-   * Cubic ease-out function for smoother camera movement
-   * @param {number} x - Input value between 0 and 1
-   * @returns {number} Eased value
-   */
-  easeOutCubic(x) {
-    return 1 - Math.pow(1 - x, 3);
   }
   
   /**
@@ -536,7 +457,7 @@ export class CameraSystem {
    * @returns {Object} Controls for the bars
    */
   createCinematicBars() {
-    const CINEMA_BAR_HEIGHT = 0.15; // 15% of screen height for top and bottom
+    const CINEMA_BAR_HEIGHT = 0.25;
     
     const container = document.createElement('div');
     container.id = 'cinematic-bars';
@@ -547,7 +468,7 @@ export class CameraSystem {
       width: 100%;
       height: 100%;
       pointer-events: none;
-      z-index: 1000;
+      z-index: 10; /* Lower z-index to appear below UI elements */
       opacity: 0;
       transition: opacity 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
     `;
@@ -595,5 +516,34 @@ export class CameraSystem {
         bottomBar.style.transform = 'translateY(100%)';
       }
     };
+  }
+
+  /**
+   * Cubic ease-out function for smoother camera movement
+   * @param {number} x - Input value between 0 and 1
+   * @returns {number} Eased value
+   */
+  easeOutCubic(x) {
+    return 1 - Math.pow(1 - x, 3);
+  }
+  
+  /**
+   * Cubic ease-in function
+   * @param {number} x - Input value between 0 and 1
+   * @returns {number} Eased value
+   */
+  easeInCubic(x) {
+    return x * x * x;
+  }
+  
+  /**
+   * Cubic ease-in-out function
+   * @param {number} x - Input value between 0 and 1
+   * @returns {number} Eased value
+   */
+  easeInOutCubic(x) {
+    return x < 0.5 
+      ? 4 * x * x * x 
+      : 1 - Math.pow(-2 * x + 2, 3) / 2;
   }
 } 
