@@ -99,7 +99,7 @@ export class ModelLoader {
   constructor() {
     this.loader = new GLTFLoader();
     this.loadedModels = {
-      fighter: null,
+      fighters: [], // Change to array to hold multiple fighter models
       referee: null,
       viewers: []
     };
@@ -115,7 +115,7 @@ export class ModelLoader {
     }
     
     // If models are already loaded, return immediately
-    if (this.loadedModels.fighter && this.loadedModels.referee && this.loadedModels.viewers.length === 4) {
+    if (this.loadedModels.fighters.length >= 2 && this.loadedModels.referee && this.loadedModels.viewers.length === 4) {
       console.log('Models already loaded, returning immediately');
       return this.loadedModels;
     }
@@ -127,8 +127,9 @@ export class ModelLoader {
     this.loadPromise = new Promise(async (resolve, reject) => {
       try {
         // Load all models in parallel
-        const [fighterGltf, refereeGltf, viewer0Gltf, viewer1Gltf, viewer2Gltf, viewer3Gltf] = await Promise.all([
+        const [sumo0Gltf, sumo1Gltf, refereeGltf, viewer0Gltf, viewer1Gltf, viewer2Gltf, viewer3Gltf] = await Promise.all([
           this.loadModel('/models3d/sumo.glb'),
+          this.loadModel('/models3d/sumo_1.glb'),
           this.loadModel('/models3d/referee.glb'),
           this.loadModel('/models3d/viewer_0.glb'),
           this.loadModel('/models3d/viewer_1.glb'),
@@ -137,7 +138,10 @@ export class ModelLoader {
         ]);
 
         // Process and store the models
-        this.loadedModels.fighter = this.processModel(fighterGltf.scene);
+        this.loadedModels.fighters = [
+          this.processModel(sumo0Gltf.scene),
+          this.processModel(sumo1Gltf.scene)
+        ];
         this.loadedModels.referee = this.processModel(refereeGltf.scene);
         this.loadedModels.viewers = [
           this.processModel(viewer0Gltf.scene),
@@ -212,7 +216,11 @@ export class ModelLoader {
     let baseModel = null;
     
     if (player.role === 'fighter') {
-      baseModel = this.loadedModels.fighter;
+      // Select fighter model based on player.seed or random if no seed
+      const fighterModelIndex = player.seed ? 
+        Math.abs(player.seed) % this.loadedModels.fighters.length :
+        Math.floor(Math.random() * this.loadedModels.fighters.length);
+      baseModel = this.loadedModels.fighters[fighterModelIndex];
     } else if (player.role === 'referee') {
       baseModel = this.loadedModels.referee;
     } else {
@@ -233,7 +241,10 @@ export class ModelLoader {
     // Store player data in userData
     model.userData = {
       id: player.id,
-      role: player.role
+      role: player.role,
+      modelIndex: player.role === 'fighter' ? 
+        Math.abs(player.seed) % this.loadedModels.fighters.length : 
+        player.seed % this.loadedModels.viewers.length
     };
     
     // Scale up the model by a factor of 3    
