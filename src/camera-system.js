@@ -81,7 +81,7 @@ export class CameraSystem {
     this.transitionFromTarget = null;
     this.transitionToPosition = null;
     this.transitionToTarget = null;
-    this.transitionDuration = 500; // ms
+    this.transitionDuration = 1000; // Default: 1 second transition
     
     // Initialize the system
     this.init();
@@ -92,20 +92,33 @@ export class CameraSystem {
    */
   init() {
     // Set initial camera position based on current mode
-    this.setMode(this.currentMode);
+    this.currentMode = this.MODES.WAITING_OVERVIEW;
+    
+    // Directly set camera position without transition for initialization
+    const settings = this.cameraSettings[this.currentMode];
+    if (settings) {
+      this.camera.position.copy(settings.basePosition);
+      this.camera.lookAt(settings.lookAt);
+    }
   }
   
   /**
    * Set the camera mode
    * @param {string} modeName - The mode to set
    * @param {Object} params - Optional parameters for the mode
+   * @param {number} transitionDuration - Optional transition duration in milliseconds
    */
-  setMode(modeName, params = {}) {
+  setMode(modeName, params = {}, transitionDuration = null) {
     if (!this._initialized) return;
     
     // For now, only allow WAITING_OVERVIEW, CEREMONY, and KNOCKOUT_SEQUENCE modes
     if (modeName !== this.MODES.CEREMONY && modeName !== this.MODES.WAITING_OVERVIEW && modeName !== this.MODES.KNOCKOUT_SEQUENCE) {
       modeName = this.MODES.WAITING_OVERVIEW;
+    }
+
+    // Don't change if already in this mode
+    if (this.currentMode === modeName) {
+      return;
     }
 
     // Handle specific setup for ceremony mode
@@ -122,12 +135,17 @@ export class CameraSystem {
     this.transitionStartTime = Date.now();
     this.transitionFromPosition = this.camera.position.clone();
     this.transitionFromTarget = this.getTargetFromCamera();
+    
+    // Use custom transition duration if provided
+    if (transitionDuration !== null) {
+      this.transitionDuration = transitionDuration;
+    }
 
     this.currentMode = modeName;
     this.animationStartTime = Date.now();
 
-    // Initialize position for this mode
-    this.updateCameraForCurrentMode(0);
+    // Initialize position for this mode, but don't apply it immediately (will be handled by transition)
+    // We'll call updateCameraForCurrentMode in the update method during transition
   }
   
   /**
@@ -174,6 +192,51 @@ export class CameraSystem {
    */
   update() {
     if (!this._initialized) return;
+    
+    // Check if we're in a transition between camera modes
+    const now = Date.now();
+    const transitionElapsed = now - this.transitionStartTime;
+    const inTransition = transitionElapsed < this.transitionDuration;
+    
+    if (inTransition && this.transitionFromPosition && this.transitionFromTarget) {
+      // Calculate transition progress with easing
+      const progress = Math.min(transitionElapsed / this.transitionDuration, 1.0);
+      const easedProgress = this.easeOutCubic(progress);
+      
+      // Store current camera settings temporarily
+      const originalPosition = this.camera.position.clone();
+      const originalFOV = this.camera.fov;
+      
+      // Update for current mode to get the target position/rotation
+      const elapsedTime = now - this.animationStartTime;
+      this.updateCameraForCurrentMode(elapsedTime);
+      
+      // Store the target position calculated by updateCameraForCurrentMode
+      const targetPosition = this.camera.position.clone();
+      const targetLookAt = this.getTargetFromCamera();
+      const targetFOV = this.camera.fov;
+      
+      // Interpolate between the previous and current positions
+      this.camera.position.lerpVectors(this.transitionFromPosition, targetPosition, easedProgress);
+      
+      // Calculate and apply interpolated look-at target
+      const currentLookAt = new THREE.Vector3().lerpVectors(this.transitionFromTarget, targetLookAt, easedProgress);
+      this.camera.lookAt(currentLookAt);
+      
+      // Interpolate FOV if needed
+      if (originalFOV !== targetFOV) {
+        this.camera.fov = originalFOV + (targetFOV - originalFOV) * easedProgress;
+        this.camera.updateProjectionMatrix();
+      }
+      
+      // If transition is complete, clear transition data
+      if (progress >= 1.0) {
+        this.transitionFromPosition = null;
+        this.transitionFromTarget = null;
+      }
+      
+      return;
+    }
     
     // Add knockout mode handling
     if (this.currentMode === this.MODES.KNOCKOUT_SEQUENCE) {
@@ -756,5 +819,15 @@ export class CameraSystem {
     // Slightly adjust FOV for more dramatic effect as loser flies away
     this.camera.fov = 45 + progress * 10; // 45 to 55, less dramatic change
     this.camera.updateProjectionMatrix();
+  }
+
+  /**
+   * Set the transition duration for camera movements
+   * @param {number} duration - Transition duration in milliseconds
+   */
+  setTransitionDuration(duration) {
+    if (duration > 0) {
+      this.transitionDuration = duration;
+    }
   }
 } 

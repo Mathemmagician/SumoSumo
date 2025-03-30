@@ -253,7 +253,7 @@ export class ModelLoader {
     if (player.role === 'fighter') {
       model.scale.set(4, 4, 4);
     } else if (player.role === 'referee') {
-      model.scale.set(5, 5, 5);
+      model.scale.set(4, 4, 4);
     } else {
       // Default to viewer
       model.scale.set(3, 3, 3);

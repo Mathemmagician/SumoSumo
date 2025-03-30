@@ -897,7 +897,7 @@ function animate() {
   // Update camera system (this replaces the old camera angle code)
   if (!freeCameraMode && cameraSystem) {
     // Check if we're in the PRE_MATCH_CEREMONY stage and should switch to ceremony mode
-    if (gameState.stage === 'PRE_MATCH_CEREMONY' && gameState.stageTimeRemaining <= 5000 &&
+    if (gameState.stage === 'PRE_MATCH_CEREMONY' && 
         cameraSystem.getCurrentMode() !== cameraSystem.MODES.CEREMONY) {
       
       // Get the participants for the ceremony
@@ -906,12 +906,12 @@ function animate() {
       const refereeModel = gameState.referee ? playerModels[gameState.referee.id] : null;
       
       if (fighter1Model && fighter2Model && refereeModel) {
-        // Switch to ceremony mode
+        // Switch to ceremony mode with smooth transition - 1.5 seconds
         cameraSystem.setMode(cameraSystem.MODES.CEREMONY, {
           fighter1: fighter1Model,
           fighter2: fighter2Model,
           referee: refereeModel
-        });
+        }, 1500); // 1.5 second transition
       }
     }
     

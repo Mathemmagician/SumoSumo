@@ -1470,6 +1470,7 @@ export class Renderer {
     // Update camera mode based on game stage
     switch (currentStage) {
       case 'PRE_CEREMONY':
+      case 'PRE_MATCH_CEREMONY':
         // Set ceremony mode with fighters and referee
         if (gameState.fighters.length === 2 && gameState.referee) {
           const fighter1Model = this.playerModels.get(gameState.fighters[0].id);
@@ -1477,24 +1478,34 @@ export class Renderer {
           const refereeModel = this.playerModels.get(gameState.referee.id);
           
           if (fighter1Model && fighter2Model && refereeModel) {
-            console.log("Setting ceremony camera mode");
-            this.cameraSystem.setMode(this.cameraSystem.MODES.CEREMONY, {
-              fighter1: fighter1Model,
-              fighter2: fighter2Model,
-              referee: refereeModel
-            });
+            // Only change mode if needed
+            if (this.cameraSystem.getCurrentMode() !== this.cameraSystem.MODES.CEREMONY) {
+              console.log("Setting ceremony camera mode");
+              // Use longer transition for ceremony (1.5 seconds)
+              this.cameraSystem.setMode(this.cameraSystem.MODES.CEREMONY, {
+                fighter1: fighter1Model,
+                fighter2: fighter2Model,
+                referee: refereeModel
+              }, 1500);
+            }
           }
         }
         break;
         
       case 'MATCH_IN_PROGRESS':
         // During match, use the overview camera
-        this.cameraSystem.setMode(this.cameraSystem.MODES.WAITING_OVERVIEW);
+        if (this.cameraSystem.getCurrentMode() !== this.cameraSystem.MODES.WAITING_OVERVIEW) {
+          // Fast transition to match view (0.8 seconds)
+          this.cameraSystem.setMode(this.cameraSystem.MODES.WAITING_OVERVIEW, {}, 800);
+        }
         break;
         
       default:
         // Default to waiting overview
-        this.cameraSystem.setMode(this.cameraSystem.MODES.WAITING_OVERVIEW);
+        if (this.cameraSystem.getCurrentMode() !== this.cameraSystem.MODES.WAITING_OVERVIEW) {
+          // Standard transition (1 second)
+          this.cameraSystem.setMode(this.cameraSystem.MODES.WAITING_OVERVIEW);
+        }
         break;
     }
   }
