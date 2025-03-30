@@ -253,7 +253,7 @@ export class CameraSystem {
 
     const fightersTime = 7000;
     const perFighterTime = fightersTime / 2;
-    const refereeTime = 1000;
+    const refereeTime = 2000;
     const totalTime = fightersTime + refereeTime;
 
     // Show cinematic bars for the fighter closeups and referee zoom
