@@ -186,7 +186,34 @@ class UIManager {
                 setTimeout(() => {
                     this.isLandscape = window.innerWidth > window.innerHeight;
                     this.checkOrientation();
-                }, 100); // Short delay to allow dimensions to update
+                }, 
+            100); // Short delay to allow dimensions to update
+        // Tutorial button functionality
+        const tutorialBtn = document.getElementById('tutorial-btn');
+        const tutorialModal = document.getElementById('tutorial-modal');
+        const closeBtn = document.getElementById('close-tutorial');
+        
+        if (tutorialBtn && tutorialModal && closeBtn) {
+            tutorialBtn.addEventListener('click', () => {
+                tutorialModal.style.display = 'flex';
+            });
+            
+            closeBtn.addEventListener('click', () => {
+                tutorialModal.style.display = 'none';
+            });
+            
+            // Also close when clicking outside the modal content
+            tutorialModal.addEventListener('click', (e) => {
+                if (e.target === tutorialModal) {
+                    tutorialModal.style.display = 'none';
+                }
+            });
+            
+            // Close on escape key
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && tutorialModal.style.display === 'flex') {
+                    tutorialModal.style.display = 'none';
+                }
             });
         }
     }

@@ -16,7 +16,7 @@
       content="https://playsumosumo.com/thumbnail.png"
     />
     <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="800" />
+    <meta property="og:image:height" content="630" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://playsumosumo.com" />
 
@@ -43,6 +43,17 @@
   </head>
   <body>
     <div id="game-container">
+      <!-- Tutorial button -->
+      <button id="tutorial-btn" aria-label="Show Tutorial">?</button>
+      
+      <!-- Tutorial modal -->
+      <div id="tutorial-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+          <span id="close-tutorial" class="close-btn">&times;</span>
+          <img src="tutorial.png" alt="SumoSumo Game Tutorial" class="tutorial-image">
+        </div>
+      </div>
+
       <!-- Improved Game Info Panel -->
       <div id="game-info" class="ui-panel">
         <h1 class="game-title">SumoSumo!</h1>
