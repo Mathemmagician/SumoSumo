@@ -153,6 +153,7 @@ export class Renderer {
     this.controls.dampingFactor = 0.05;
     this.controls.minDistance = 5;
     this.controls.maxDistance = 100;
+    this.controls.maxPolarAngle = Math.PI / 2;
     console.log("Orbit controls initialized");
 
     // Set up lighting
@@ -170,10 +171,13 @@ export class Renderer {
     this.createStadium();
     console.log("Stadium created");
 
-    // Create FPS display - commented out for now
-    if (!this.isMobile) {
-      this.createFpsDisplay();
-      console.log("FPS display created");
+    // Create FPS display and stats container (always create it, visibility controlled by UI)
+    this.createFpsDisplay();
+    
+    // Ensure stats container is hidden by default
+    const statsContainer = document.getElementById('stats-container');
+    if (statsContainer) {
+        statsContainer.style.display = 'none';
     }
 
     // Start a timer to update the game state debug info every 100ms

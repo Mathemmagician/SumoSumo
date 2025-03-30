@@ -21,6 +21,18 @@ class UIManager {
         } else {
             this.initialize();
         }
+
+        // Hide stats container by default
+        const statsContainer = document.getElementById('stats-container');
+        if (statsContainer) {
+            statsContainer.style.display = 'none';
+        }
+
+        // Ensure Developer Mode toggle is unchecked by default
+        const developerModeToggle = document.getElementById('developer-mode-toggle');
+        if (developerModeToggle) {
+            developerModeToggle.checked = false;
+        }
     }
 
     initialize() {
@@ -341,6 +353,19 @@ class UIManager {
             detail: { enabled: freeCameraMode } 
         });
         document.dispatchEvent(event);
+    }
+
+    toggleDeveloperMode(checkbox) {
+        const statsContainer = document.getElementById('stats-container');
+        if (statsContainer) {
+            statsContainer.style.display = checkbox.checked ? 'block' : 'none';
+            
+            // Also emit an event for any other components that might need to know about developer mode
+            const event = new CustomEvent('developerModeToggled', {
+                detail: { enabled: checkbox.checked }
+            });
+            document.dispatchEvent(event);
+        }
     }
     
     // Helper method to get username from player ID
