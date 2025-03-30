@@ -760,13 +760,26 @@ export class Renderer {
     socketClient.on("matchEnd", (data) => {
       console.log("Match ended. Winner:", data.winnerId, "Loser:", data.loserId);
       
-      // Only animate if we have a valid loser ID
-      if (data.loserId) {
-        // Add a small delay for dramatic effect
-        setTimeout(() => {
-          this.animateFighterFall(data.loserId);
-        }, 500);
+      // Extract winner and loser objects from the scene
+      const winnerId = data.winnerId;
+      const loserId = data.loserId;
+      
+      // Find the 3D objects for these players
+      const winnerObject = this.scene.getObjectByName(`player-${winnerId}`);
+      const loserObject = this.scene.getObjectByName(`player-${loserId}`);
+      
+      // Store loser's current position for the camera tracking
+      if (loserObject) {
+        loserObject.previousPosition = loserObject.position.clone();
       }
+      
+      // If we have both objects, trigger the knockout camera sequence
+      if (winnerObject && loserObject) {
+        this.cameraSystem.startKnockoutSequence(winnerObject, loserObject);
+      }
+      
+      // Animate the loser falling as you currently do
+      this.animateFighterFall(loserId);
     });
   }
 

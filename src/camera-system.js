@@ -28,6 +28,7 @@ export class CameraSystem {
     this.MODES = {
       WAITING_OVERVIEW: 'waitingOverview',
       CEREMONY: 'ceremony',
+      KNOCKOUT_SEQUENCE: 'knockoutSequence',
       // We'll add more modes later
     };
     
@@ -57,6 +58,14 @@ export class CameraSystem {
         closeupDistance: 1.0,    // How far from the face to position camera
         closeupHeight: 1.6,      // Height adjustment for close-ups
         cineBarsEnabled: true    // Whether to show cinematic bars
+      },
+      [this.MODES.KNOCKOUT_SEQUENCE]: {
+        winner: null,
+        loser: null,
+        duration: 5000, // 5 seconds for the knockout sequence
+        initialDelay: 0, // Brief delay before sequence begins
+        behindWinnerTime: 1200, // Time to stay behind winner
+        followLoserTime: 3300, // Time to follow loser flying through the air
       }
     };
     
@@ -94,8 +103,8 @@ export class CameraSystem {
   setMode(modeName, params = {}) {
     if (!this._initialized) return;
     
-    // For now, only allow WAITING_OVERVIEW and CEREMONY modes
-    if (modeName !== this.MODES.CEREMONY) {
+    // For now, only allow WAITING_OVERVIEW, CEREMONY, and KNOCKOUT_SEQUENCE modes
+    if (modeName !== this.MODES.CEREMONY && modeName !== this.MODES.WAITING_OVERVIEW && modeName !== this.MODES.KNOCKOUT_SEQUENCE) {
       modeName = this.MODES.WAITING_OVERVIEW;
     }
 
@@ -166,6 +175,14 @@ export class CameraSystem {
   update() {
     if (!this._initialized) return;
     
+    // Add knockout mode handling
+    if (this.currentMode === this.MODES.KNOCKOUT_SEQUENCE) {
+      const elapsedTime = Date.now() - this.animationStartTime;
+      const settings = this.cameraSettings[this.MODES.KNOCKOUT_SEQUENCE];
+      this.updateKnockoutCamera(settings, elapsedTime);
+      return;
+    }
+    
     // Default to WAITING_OVERVIEW for all non-ceremony stages
     if (this.currentMode !== this.MODES.CEREMONY) {
       if (this.currentMode !== this.MODES.WAITING_OVERVIEW) {
@@ -197,6 +214,9 @@ export class CameraSystem {
         break;
       case this.MODES.CEREMONY:
         this.updateCeremonyCamera(settings, elapsedTime);
+        break;
+      case this.MODES.KNOCKOUT_SEQUENCE:
+        this.updateKnockoutCamera(settings, elapsedTime);
         break;
       default:
         console.warn(`No update handler for camera mode: ${this.currentMode}`);
@@ -545,5 +565,196 @@ export class CameraSystem {
     return x < 0.5 
       ? 4 * x * x * x 
       : 1 - Math.pow(-2 * x + 2, 3) / 2;
+  }
+
+  /**
+   * Start the knockout camera sequence
+   * @param {Object} winner - The winning fighter
+   * @param {Object} loser - The losing fighter
+   */
+  startKnockoutSequence(winner, loser) {
+    // Don't start a new sequence if one is already running
+    if (this.currentMode === this.MODES.KNOCKOUT_SEQUENCE) {
+      return;
+    }
+    
+    const settings = this.cameraSettings[this.MODES.KNOCKOUT_SEQUENCE];
+    settings.winner = winner;
+    settings.loser = loser;
+    
+    // Store original camera position for later restoration
+    this._preKnockoutPosition = this.camera.position.clone();
+    this._preKnockoutTarget = this.getTargetFromCamera();
+    
+    // Set the knockback mode
+    this.setMode(this.MODES.KNOCKOUT_SEQUENCE);
+    
+    // Optional: Show cinematic bars for knockout
+    if (this.ceremonyCineBars) {
+      this.ceremonyCineBars.show();
+    }
+    
+    // Reset animation start time
+    this.animationStartTime = Date.now();
+    
+    console.log("Starting knockout camera sequence");
+  }
+
+  /**
+   * Clean up knockout sequence resources and reset state
+   */
+  cleanupKnockoutSequence() {
+    // Hide cinematic bars if they exist
+    if (this.ceremonyCineBars) {
+      this.ceremonyCineBars.hide();
+    }
+    
+    // Reset knockout settings
+    const knockoutSettings = this.cameraSettings[this.MODES.KNOCKOUT_SEQUENCE];
+    knockoutSettings.winner = null;
+    knockoutSettings.loser = null;
+  }
+
+  /**
+   * Update camera for knockout sequence
+   * @param {Object} settings - Camera settings for this mode
+   * @param {number} elapsedTime - Time elapsed since mode was set
+   */
+  updateKnockoutCamera(settings, elapsedTime) {
+    // Early exit if we don't have required participants
+    if (!settings.winner || !settings.loser) {
+      console.warn('Knockout sequence is missing participants, falling back to overview');
+      this.cleanupKnockoutSequence();
+      this.setMode(this.MODES.WAITING_OVERVIEW);
+      return;
+    }
+    
+    // If the sequence is complete, return to overview
+    if (elapsedTime >= settings.duration) {
+      this.cleanupKnockoutSequence();
+      this.setMode(this.MODES.WAITING_OVERVIEW);
+      return;
+    }
+    
+    // Wait for initial delay before starting the sequence
+    if (elapsedTime < settings.initialDelay) {
+      return;
+    }
+    
+    const activeTime = elapsedTime - settings.initialDelay;
+    
+    // Phase 1: Position behind winner looking at loser
+    if (activeTime < settings.behindWinnerTime) {
+      const progress = activeTime / settings.behindWinnerTime;
+      this.updateBehindWinnerCamera(settings, progress);
+    } 
+    // Phase 2: Follow loser flying through the air
+    else if (activeTime < settings.behindWinnerTime + settings.followLoserTime) {
+      const progress = (activeTime - settings.behindWinnerTime) / settings.followLoserTime;
+      this.updateFollowLoserCamera(settings, progress);
+    }
+  }
+
+  /**
+   * Position camera behind winner looking at loser
+   * @param {Object} settings - Knockout camera settings
+   * @param {number} progress - Progress through this phase (0-1)
+   */
+  updateBehindWinnerCamera(settings, progress) {
+    const winner = settings.winner;
+    const loser = settings.loser;
+    
+    if (!winner || !loser) return;
+    
+    // Get positions
+    const winnerPos = winner.position.clone();
+    const loserPos = loser.position.clone();
+    
+    // Calculate direction from winner to loser
+    const direction = new THREE.Vector3().subVectors(loserPos, winnerPos).normalize();
+    
+    // Position camera behind winner
+    const offset = 4; // Distance behind winner
+    const height = 2; // Height above ground
+    
+    // Calculate camera position - behind winner, facing loser
+    const cameraPos = new THREE.Vector3(
+      winnerPos.x - direction.x * offset,
+      winnerPos.y + height,
+      winnerPos.z - direction.z * offset
+    );
+    
+    // Smoothly move camera to this position
+    const eased = this.easeOutCubic(progress);
+    this.camera.position.lerp(cameraPos, eased);
+    
+    // Calculate look target (loser position with some height adjustment)
+    const lookTarget = new THREE.Vector3(
+      loserPos.x,
+      loserPos.y + 1.5, // Look at loser's upper body
+      loserPos.z
+    );
+    
+    // Look at the loser
+    this.camera.lookAt(lookTarget);
+    this.camera.up.set(0, 1, 0);
+    
+    // Change FOV for more dramatic effect
+    this.camera.fov = 50 - progress * 10; // Gradually zoom in
+    this.camera.updateProjectionMatrix();
+  }
+
+  /**
+   * Follow loser flying through the air
+   * @param {Object} settings - Knockout camera settings
+   * @param {number} progress - Progress through this phase (0-1)
+   */
+  updateFollowLoserCamera(settings, progress) {
+    const winner = settings.winner;
+    const loser = settings.loser;
+    if (!winner || !loser) return;
+    
+    // Get positions
+    const winnerPos = winner.position.clone();
+    const loserPos = loser.position.clone();
+    
+    // Calculate direction from winner to loser
+    const direction = new THREE.Vector3().subVectors(loserPos, winnerPos).normalize();
+    
+    // Position camera in an over-the-shoulder perspective from winner
+    const shoulderOffset = 1.5; // Distance to the side of the winner
+    const heightOffset = 2.0;   // Height above the winner
+    const backOffset = 2.0;     // Distance behind the winner
+    
+    // Position camera over winner's shoulder - maintain this position throughout
+    const cameraPos = new THREE.Vector3(
+      winnerPos.x + (direction.z * shoulderOffset) - (direction.x * backOffset),
+      winnerPos.y + heightOffset,
+      winnerPos.z - (direction.x * shoulderOffset) - (direction.z * backOffset)
+    );
+    
+    // Apply subtle cinematic motion to the camera (slight shake decreasing over time)
+    const shakeMagnitude = 0.05 * (1 - progress);
+    cameraPos.x += (Math.random() - 0.5) * shakeMagnitude;
+    cameraPos.y += (Math.random() - 0.5) * shakeMagnitude;
+    cameraPos.z += (Math.random() - 0.5) * shakeMagnitude;
+    
+    // Set camera position
+    this.camera.position.copy(cameraPos);
+    
+    // Look target is always at the loser as they fly away
+    const lookTarget = new THREE.Vector3(
+      loserPos.x,
+      loserPos.y + 1.0, // Look at loser's upper body
+      loserPos.z
+    );
+    
+    // Look at target
+    this.camera.lookAt(lookTarget);
+    this.camera.up.set(0, 1, 0);
+    
+    // Slightly adjust FOV for more dramatic effect as loser flies away
+    this.camera.fov = 45 + progress * 10; // 45 to 55, less dramatic change
+    this.camera.updateProjectionMatrix();
   }
 } 
