@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "express": "^4.17.1",
+    "posthog-js": "^1.234.1",
     "socket.io": "^4.8.1",
     "stripe": "^17.7.0",
     "three": "^0.174.0"

@@ -1,8 +1,16 @@
+// Disable all console logs
+// console.log = () => {};
+// console.error = () => {};
+// console.warn = () => {};
+// console.info = () => {};
+// console.debug = () => {};
+
 import "./styles.css";
 import { socketClient } from "./socket-client";
 import { uiManager } from "./ui-manager";
 import { renderer } from "./renderer";
 // import { stripeManager } from './stripe-manager.js';  // Don't delete this
+import './analytics';
 
 let stripeManager = null;
 

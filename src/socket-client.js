@@ -1,5 +1,6 @@
 import { io } from "socket.io-client";
 import { STAGE_DISPLAY_NAMES, DEFAULT_SOCKET_STATS } from "./constants";
+import { trackUserJoined } from './analytics';
 
 class SocketClient {
   constructor() {
@@ -27,6 +28,9 @@ class SocketClient {
       this.updateSocketStats();
       console.log("Connected to server with ID:", this.socket.id);
       this.gameState.myId = this.socket.id;
+      
+      // Track user joining with PostHog
+      trackUserJoined(this.socket.id);
       
       // When we connect, request the initial game state
       this.socket.emit("requestGameState");
