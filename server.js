@@ -605,8 +605,8 @@ io.on('connect', (socket) => {
   // Handle player message
   socket.on('message', (message) => {
     // Simple validation
-    if (message.length > 50) {
-      message = message.substring(0, 50);
+    if (message.length > 100) {
+      message = message.substring(0, 100);
     }
 
     player.message = message;
