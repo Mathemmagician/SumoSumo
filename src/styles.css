@@ -559,7 +559,7 @@ body {
   justify-content: center;
   align-items: center;
   cursor: pointer;
-  z-index: 1000;
+  z-index: 25;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
   transition: all 0.2s ease;
 }

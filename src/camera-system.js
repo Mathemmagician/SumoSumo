@@ -403,6 +403,37 @@ export class CameraSystem {
     
     this.camera.lookAt(lookTarget);
     this.camera.up.set(0, 1, 0);
+
+    // Show player stats during the closeup
+    if (this.ceremonyCineBars) {
+        // Use mock data for now - we'll replace this with real data later
+        const mockStats = {
+            [settings.fighter1.userData.playerId]: {
+                name: "Thunder Sumo",
+                rank: "S+",
+                wins: 42
+            },
+            [settings.fighter2.userData.playerId]: {
+                name: "Mountain Mover",
+                rank: "A",
+                wins: 28
+            }
+        };
+
+        const fighterId = fighter.userData.playerId;
+        const stats = mockStats[fighterId];
+        
+        if (stats) {
+            // Show stats when closeup starts
+            if (progress > 0.9) {
+                this.ceremonyCineBars.showPlayerStats(stats.name, stats.rank, stats.wins);
+            }
+            // Hide stats when closeup is ending
+            else if (progress < 0.1) {
+                this.ceremonyCineBars.hidePlayerStats();
+            }
+        }
+    }
   }
   
   /**
@@ -482,39 +513,66 @@ export class CameraSystem {
     const container = document.createElement('div');
     container.id = 'cinematic-bars';
     container.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      z-index: 10; /* Lower z-index to appear below UI elements */
-      opacity: 0;
-      transition: opacity 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 10;
+        opacity: 0;
+        transition: opacity 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
     `;
 
     const topBar = document.createElement('div');
     topBar.style.cssText = `
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: ${CINEMA_BAR_HEIGHT * 100}%;
-      background-color: black;
-      transform: translateY(-100%);
-      transition: transform 0.8s cubic-bezier(0.4, 0.0, 0.2, 1);
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: ${CINEMA_BAR_HEIGHT * 100}%;
+        background-color: black;
+        transform: translateY(-100%);
+        transition: transform 0.8s cubic-bezier(0.4, 0.0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
     `;
+
+    // Add player stats container
+    const statsContainer = document.createElement('div');
+    statsContainer.id = 'player-stats';
+    statsContainer.style.cssText = `
+        position: absolute;
+        color: white;
+        font-family: 'Sawarabi Mincho', serif;
+        font-size: 28px;
+        white-space: nowrap;
+        opacity: 0;
+        transform: translateX(100%) scale(0.8);
+        transition: all 0.8s cubic-bezier(0.4, 0.0, 0.2, 1);
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        letter-spacing: 2px;
+        padding: 0 30px;
+        background: linear-gradient(90deg, 
+            rgba(0,0,0,0) 0%, 
+            rgba(255,255,255,0.1) 50%, 
+            rgba(0,0,0,0) 100%
+        );
+    `;
+    topBar.appendChild(statsContainer);
 
     const bottomBar = document.createElement('div');
     bottomBar.style.cssText = `
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      height: ${CINEMA_BAR_HEIGHT * 100}%;
-      background-color: black;
-      transform: translateY(100%);
-      transition: transform 0.8s cubic-bezier(0.4, 0.0, 0.2, 1);
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: ${CINEMA_BAR_HEIGHT * 100}%;
+        background-color: black;
+        transform: translateY(100%);
+        transition: transform 0.8s cubic-bezier(0.4, 0.0, 0.2, 1);
     `;
 
     container.appendChild(topBar);
@@ -522,19 +580,129 @@ export class CameraSystem {
     document.body.appendChild(container);
 
     return {
-      container,
-      topBar,
-      bottomBar,
-      show() {
-        container.style.opacity = '1';
-        topBar.style.transform = 'translateY(0)';
-        bottomBar.style.transform = 'translateY(0)';
-      },
-      hide() {
-        container.style.opacity = '0';
-        topBar.style.transform = 'translateY(-100%)';
-        bottomBar.style.transform = 'translateY(100%)';
-      }
+        container,
+        topBar,
+        bottomBar,
+        statsContainer: statsContainer,
+        show() {
+            container.style.opacity = '1';
+            topBar.style.transform = 'translateY(0)';
+            bottomBar.style.transform = 'translateY(0)';
+        },
+        hide() {
+            container.style.opacity = '0';
+            topBar.style.transform = 'translateY(-100%)';
+            bottomBar.style.transform = 'translateY(100%)';
+            // Hide stats when bars are hidden
+            if (statsContainer) {
+                statsContainer.style.opacity = '0';
+                statsContainer.style.transform = 'translateX(-100%) scale(0.8)';
+            }
+        },
+        showPlayerStats(name, rank, wins) {
+            if (statsContainer) {
+                statsContainer.innerHTML = `
+                    <div style="
+                        display: flex;
+                        align-items: center;
+                        gap: 20px;
+                        padding: 10px 0;
+                    ">
+                        <div style="
+                            color: #FFD700;
+                            font-size: 1.4em;
+                            font-weight: bold;
+                            text-shadow: 
+                                0 0 10px rgba(255, 215, 0, 0.5),
+                                0 0 20px rgba(255, 215, 0, 0.3);
+                            transform: scale(0);
+                            animation: nameReveal 0.5s forwards 0.3s;
+                        ">${name}</div>
+
+                        <div style="
+                            width: 2px;
+                            height: 30px;
+                            background: linear-gradient(to bottom, 
+                                rgba(255,255,255,0), 
+                                rgba(255,255,255,0.8), 
+                                rgba(255,255,255,0)
+                            );
+                        "></div>
+
+                        <div style="
+                            color: #ADD8E6;
+                            opacity: 0;
+                            animation: fadeIn 0.5s forwards 0.6s;
+                        ">
+                            <span style="
+                                font-size: 0.8em;
+                                text-transform: uppercase;
+                                letter-spacing: 3px;
+                                opacity: 0.8;
+                            ">Rank</span><br>
+                            <span style="
+                                font-size: 1.2em;
+                                font-weight: bold;
+                                text-shadow: 0 0 10px rgba(173, 216, 230, 0.5);
+                            ">${rank}</span>
+                        </div>
+
+                        <div style="
+                            width: 2px;
+                            height: 30px;
+                            background: linear-gradient(to bottom, 
+                                rgba(255,255,255,0), 
+                                rgba(255,255,255,0.8), 
+                                rgba(255,255,255,0)
+                            );
+                        "></div>
+
+                        <div style="
+                            color: #98FB98;
+                            opacity: 0;
+                            animation: fadeIn 0.5s forwards 0.9s;
+                        ">
+                            <span style="
+                                font-size: 0.8em;
+                                text-transform: uppercase;
+                                letter-spacing: 3px;
+                                opacity: 0.8;
+                            ">Wins</span><br>
+                            <span style="
+                                font-size: 1.2em;
+                                font-weight: bold;
+                                text-shadow: 0 0 10px rgba(152, 251, 152, 0.5);
+                            ">${wins}</span>
+                        </div>
+                    </div>
+                `;
+
+                // Add keyframe animations
+                const style = document.createElement('style');
+                style.textContent = `
+                    @keyframes nameReveal {
+                        0% { transform: scale(0) rotate(-10deg); }
+                        70% { transform: scale(1.2) rotate(5deg); }
+                        100% { transform: scale(1) rotate(0deg); }
+                    }
+                    @keyframes fadeIn {
+                        from { opacity: 0; transform: translateY(10px); }
+                        to { opacity: 1; transform: translateY(0); }
+                    }
+                `;
+                document.head.appendChild(style);
+
+                // Trigger main container animation
+                statsContainer.style.opacity = '1';
+                statsContainer.style.transform = 'translateX(0) scale(1)';
+            }
+        },
+        hidePlayerStats() {
+            if (statsContainer) {
+                statsContainer.style.opacity = '0';
+                statsContainer.style.transform = 'translateX(-100%) scale(0.8)';
+            }
+        }
     };
   }
 
