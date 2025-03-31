@@ -480,8 +480,8 @@ class UIManager {
             this.toggleFullscreen();
         });
         
-        document.body.appendChild(this.fullscreenBtn);
-        
+        const gameContainer = document.getElementById('game-container');
+        gameContainer.appendChild(this.fullscreenBtn);
     }
     
     // Toggle fullscreen
