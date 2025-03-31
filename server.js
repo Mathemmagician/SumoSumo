@@ -40,20 +40,6 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Game constants
-const RING_RADIUS = 8;
-const STAGE_NAMES = {
-  WAITING_FOR_PLAYERS: 'Waiting for Players',
-  FIGHTER_SELECTION: 'Fighter Selection',
-  PRE_MATCH_CEREMONY: 'Pre-Match Ceremony',
-  MATCH_IN_PROGRESS: 'Match in Progress',
-  VICTORY_CEREMONY: 'Victory Ceremony',
-  POST_MATCH_COOLDOWN: 'Post-Match Cooldown'
-};
-
-// Define fixed movement speed as a constant
-const FIGHTER_MOVE_SPEED = 0.08;
-
 // Game state
 const gameState = {
   fighters: [], // (max 2)
@@ -92,7 +78,7 @@ const FAKE_USERS = {
   count: 0,
   users: new Map(), // Store fake user data
   intervals: new Map(), // Store intervals for each fake user
-  targetCount: 10, // Set the target count for fake users
+  targetCount: 0, // Set the target count for fake users
   disconnectInterval: null,
   reconnectInterval: null
 };
@@ -495,34 +481,37 @@ io.on('connect', (socket) => {
       dirToOpponent.z /= length;
     }
     
+    // Movement speed
+    const moveSpeed = 0.08; // Reduced from 0.2 to 0.08 for more controlled movement
+    
     // Calculate movement based on direction relative to opponent
     switch(direction) {
       case 'forward': // Move toward opponent
-        fighter.position.x += dirToOpponent.x * FIGHTER_MOVE_SPEED;
-        fighter.position.z += dirToOpponent.z * FIGHTER_MOVE_SPEED;
+        fighter.position.x += dirToOpponent.x * moveSpeed;
+        fighter.position.z += dirToOpponent.z * moveSpeed;
         // Set rotation to face opponent
         fighter.rotation = Math.atan2(dirToOpponent.x, dirToOpponent.z);
         break;
         
       case 'backward': // Move away from opponent
-        fighter.position.x -= dirToOpponent.x * FIGHTER_MOVE_SPEED;
-        fighter.position.z -= dirToOpponent.z * FIGHTER_MOVE_SPEED;
+        fighter.position.x -= dirToOpponent.x * moveSpeed;
+        fighter.position.z -= dirToOpponent.z * moveSpeed;
         // Still face the opponent
         fighter.rotation = Math.atan2(dirToOpponent.x, dirToOpponent.z);
         break;
         
       case 'left': // Move left relative to opponent
         // Calculate perpendicular vector (left of direction to opponent)
-        fighter.position.x += -dirToOpponent.z * FIGHTER_MOVE_SPEED;
-        fighter.position.z += dirToOpponent.x * FIGHTER_MOVE_SPEED;
+        fighter.position.x += -dirToOpponent.z * moveSpeed;
+        fighter.position.z += dirToOpponent.x * moveSpeed;
         // Update rotation
         fighter.rotation = Math.atan2(dirToOpponent.x, dirToOpponent.z);
         break;
         
       case 'right': // Move right relative to opponent
         // Calculate perpendicular vector (right of direction to opponent)
-        fighter.position.x += dirToOpponent.z * FIGHTER_MOVE_SPEED;
-        fighter.position.z += -dirToOpponent.x * FIGHTER_MOVE_SPEED;
+        fighter.position.x += dirToOpponent.z * moveSpeed;
+        fighter.position.z += -dirToOpponent.x * moveSpeed;
         // Update rotation
         fighter.rotation = Math.atan2(dirToOpponent.x, dirToOpponent.z);
         break;
@@ -534,7 +523,7 @@ io.on('connect', (socket) => {
       fighter.position.z * fighter.position.z
     );
     
-    if (distanceFromCenter > RING_RADIUS) {
+    if (distanceFromCenter > gameState.ringRadius) {
       // Player fell out of the ring
       endRound(fighter.id);
       return;
@@ -573,7 +562,7 @@ io.on('connect', (socket) => {
           otherFighter.position.z * otherFighter.position.z
         );
         
-        if (otherDistanceFromCenter > RING_RADIUS) {
+        if (otherDistanceFromCenter > gameState.ringRadius) {
           endRound(otherFighter.id);
           return;
         }
@@ -725,8 +714,6 @@ function resetGameState() {
   // Move all fighters to viewers
   gameState.fighters.forEach(fighter => {
     fighter.role = 'viewer';
-    // Set position to null to force client to calculate proper seat position with correct height
-    fighter.position = null;
     gameState.viewers.push(fighter);
     io.emit('playerRoleChanged', { id: fighter.id, role: 'viewer' });
   });
@@ -734,8 +721,6 @@ function resetGameState() {
   // Move referee to viewers if exists
   if (gameState.referee) {
     gameState.referee.role = 'viewer';
-    // Set position to null to force client to calculate proper seat position with correct height
-    gameState.referee.position = null;
     gameState.viewers.push(gameState.referee);
     io.emit('playerRoleChanged', { id: gameState.referee.id, role: 'viewer' });
   }
