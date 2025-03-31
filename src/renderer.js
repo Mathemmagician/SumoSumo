@@ -67,6 +67,10 @@ export class Renderer {
       right: false
     };
 
+    // Add delta time tracking
+    this.lastFrameTime = performance.now();
+    this.deltaTime = 0;
+
     // Add properties for movement instructions
     this.movementInstructionsShown = false;
     this.matchStartTime = null;
@@ -443,8 +447,12 @@ export class Renderer {
   animate() {
     requestAnimationFrame(this.animate);
 
-    // Update FPS counter
+    // Calculate delta time
     const currentTime = performance.now();
+    this.deltaTime = (currentTime - this.lastFrameTime) / 1000; // Convert to seconds
+    this.lastFrameTime = currentTime;
+
+    // Update FPS counter
     this.frameCount++;
 
     // Update FPS counter every 500ms
@@ -467,7 +475,7 @@ export class Renderer {
       this.cameraSystem.update();
     }
 
-    // Update fighter movement
+    // Update fighter movement with delta time
     this.updateFighterMovement();
 
     // Log first frame render
@@ -1411,19 +1419,19 @@ export class Renderer {
     let movement = false;
     
     if (this.fighterMovement.forward) {
-      socketClient.sendMovement('forward');
+      socketClient.sendMovement('forward', this.deltaTime);
       movement = true;
     }
     if (this.fighterMovement.backward) {
-      socketClient.sendMovement('backward');
+      socketClient.sendMovement('backward', this.deltaTime);
       movement = true;
     }
     if (this.fighterMovement.left) {
-      socketClient.sendMovement('left');
+      socketClient.sendMovement('left', this.deltaTime);
       movement = true;
     }
     if (this.fighterMovement.right) {
-      socketClient.sendMovement('right');
+      socketClient.sendMovement('right', this.deltaTime);
       movement = true;
     }
   }
