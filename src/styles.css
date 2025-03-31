@@ -102,7 +102,7 @@ body {
 /* Reorganized Controls Layout */
 #controls-panel {
   position: absolute;
-  bottom: 20px;
+  bottom: 40px;
   right: 20px;
   width: auto;
   display: flex;
