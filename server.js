@@ -457,7 +457,7 @@ io.on('connect', (socket) => {
   }
 
   // Handle player movement
-  socket.on('move', (direction) => {
+  socket.on('move', (data) => {
     // Only fighters can move during the match
     if (player.role !== 'fighter' || gameState.stage !== GAME_STAGES.MATCH_IN_PROGRESS) return;
 
@@ -481,11 +481,14 @@ io.on('connect', (socket) => {
       dirToOpponent.z /= length;
     }
     
-    // Movement speed
-    const moveSpeed = 0.08; // Reduced from 0.2 to 0.08 for more controlled movement
+    // Base movement speed (units per second)
+    const baseSpeed = 3.0;
+    
+    // Calculate actual movement for this frame using delta time
+    const moveSpeed = baseSpeed * data.deltaTime;
     
     // Calculate movement based on direction relative to opponent
-    switch(direction) {
+    switch(data.direction) {
       case 'forward': // Move toward opponent
         fighter.position.x += dirToOpponent.x * moveSpeed;
         fighter.position.z += dirToOpponent.z * moveSpeed;
@@ -551,7 +554,7 @@ io.on('connect', (socket) => {
         }
         
         // Push strength is higher when moving toward opponent
-        const pushStrength = direction === 'forward' ? 0.25 : 0.15;
+        const pushStrength = data.direction === 'forward' ? 0.25 : 0.15;
         
         otherFighter.position.x += pushDir.x * pushStrength;
         otherFighter.position.z += pushDir.z * pushStrength;

@@ -67,6 +67,15 @@ export class Renderer {
       right: false
     };
 
+    // Add delta time tracking
+    this.lastFrameTime = performance.now();
+    this.deltaTime = 0;
+
+    // Add properties for movement instructions
+    this.movementInstructionsShown = false;
+    this.matchStartTime = null;
+    this.hasMoved = false;
+
     // Bind methods
     this.animate = this.animate.bind(this);
     this.onWindowResize = this.onWindowResize.bind(this);
@@ -438,8 +447,12 @@ export class Renderer {
   animate() {
     requestAnimationFrame(this.animate);
 
-    // Update FPS counter
+    // Calculate delta time
     const currentTime = performance.now();
+    this.deltaTime = (currentTime - this.lastFrameTime) / 1000; // Convert to seconds
+    this.lastFrameTime = currentTime;
+
+    // Update FPS counter
     this.frameCount++;
 
     // Update FPS counter every 500ms
@@ -462,7 +475,7 @@ export class Renderer {
       this.cameraSystem.update();
     }
 
-    // Update fighter movement
+    // Update fighter movement with delta time
     this.updateFighterMovement();
 
     // Log first frame render
@@ -691,7 +704,7 @@ export class Renderer {
 
     // Match stage transitions
     socketClient.on("matchStart", (data) => {
-      console.log("Renderer received matchStart:", data);
+      this.handleMatchStart();
       // Ensure fighters are in correct positions
       if (data.fighters && data.fighters.length) {
         data.fighters.forEach((fighter) => this.updateOrCreatePlayer(fighter));
@@ -774,36 +787,12 @@ export class Renderer {
       }
     });
 
-    // Listen for stage changes
-    socketClient.on("stageChanged", (data) => {
-      console.log("Stage changed to:", data.stage);
-
-      // Calculate seconds for display
-      const seconds = Math.ceil(data.duration / 1000);
-      
-      // Update the UI with both the display name and the seconds
-      uiManager.updateMatchStatus(data.displayName, seconds);
-      
-      // Reset fighter movement if stage is not MATCH_IN_PROGRESS
-      if (data.stage !== 'MATCH_IN_PROGRESS') {
-        this.resetFighterMovement();
-      }
-      
-      // When match ends and victory ceremony begins, make viewers excited
-      if (data.stage === "VICTORY_CEREMONY") {
-        console.log("Victory ceremony started, viewers getting excited!");
-        this.setViewersExcitedState(true);
-      } 
-      // When post-match cooldown starts, return to normal
-      else if (data.stage === "POST_MATCH_COOLDOWN") {
-        console.log("Post-match cooldown started, viewers calming down");
-        this.setViewersExcitedState(false);
-      }
-    });
-
     // Handle match end - trigger excitement immediately when match ends
     socketClient.on("matchEnd", (data) => {
       console.log("Match ended, winner:", data.winnerId, "loser:", data.loserId);
+      
+      // Hide movement instructions when match ends
+      this.hideMovementInstructions();
       
       // Extract winner and loser objects from the scene
       const winnerId = data.winnerId;
@@ -832,6 +821,40 @@ export class Renderer {
       // Set viewers to excited state immediately when match ends
       console.log("Match ended, viewers getting excited!");
       this.setViewersExcitedState(true);
+    });
+
+    // Also hide instructions when stage changes to post-match states
+    socketClient.on("stageChanged", (data) => {
+      console.log("Stage changed to:", data.stage);
+
+      // Hide movement instructions for post-match stages
+      if (data.stage === "VICTORY_CEREMONY" || 
+          data.stage === "POST_MATCH_COOLDOWN" || 
+          data.stage === "WAITING_FOR_PLAYERS") {
+        this.hideMovementInstructions();
+      }
+
+      // Calculate seconds for display
+      const seconds = Math.ceil(data.duration / 1000);
+      
+      // Update the UI with both the display name and the seconds
+      uiManager.updateMatchStatus(data.displayName, seconds);
+      
+      // Reset fighter movement if stage is not MATCH_IN_PROGRESS
+      if (data.stage !== 'MATCH_IN_PROGRESS') {
+        this.resetFighterMovement();
+      }
+      
+      // When match ends and victory ceremony begins, make viewers excited
+      if (data.stage === "VICTORY_CEREMONY") {
+        console.log("Victory ceremony started, viewers getting excited!");
+        this.setViewersExcitedState(true);
+      } 
+      // When post-match cooldown starts, return to normal
+      else if (data.stage === "POST_MATCH_COOLDOWN") {
+        console.log("Post-match cooldown started, viewers calming down");
+        this.setViewersExcitedState(false);
+      }
     });
   }
 
@@ -1314,6 +1337,12 @@ export class Renderer {
       return;
     }
 
+    // Track if any movement key is pressed
+    if (!this.hasMoved) {
+      this.hasMoved = true;
+      this.hideMovementInstructions();
+    }
+
     console.log(`Fighter control: ${event.key} down, mobile: ${isMobileEvent}`);
     
     switch (event.key.toLowerCase()) {
@@ -1390,19 +1419,19 @@ export class Renderer {
     let movement = false;
     
     if (this.fighterMovement.forward) {
-      socketClient.sendMovement('forward');
+      socketClient.sendMovement('forward', this.deltaTime);
       movement = true;
     }
     if (this.fighterMovement.backward) {
-      socketClient.sendMovement('backward');
+      socketClient.sendMovement('backward', this.deltaTime);
       movement = true;
     }
     if (this.fighterMovement.left) {
-      socketClient.sendMovement('left');
+      socketClient.sendMovement('left', this.deltaTime);
       movement = true;
     }
     if (this.fighterMovement.right) {
-      socketClient.sendMovement('right');
+      socketClient.sendMovement('right', this.deltaTime);
       movement = true;
     }
   }
@@ -1755,6 +1784,237 @@ export class Renderer {
     this.fighterMovement.backward = false;
     this.fighterMovement.left = false;
     this.fighterMovement.right = false;
+  }
+
+  // Add method to show movement instructions
+  showMovementInstructions() {
+    if (this.movementInstructionsShown) return;
+    
+    // Only show for fighters
+    if (socketClient.gameState.myRole !== 'fighter') {
+      return;
+    }
+
+    // Don't show on mobile devices
+    if (this.isMobile) {
+      return;
+    }
+    
+    const instructionsDiv = document.createElement('div');
+    instructionsDiv.id = 'movement-instructions';
+    instructionsDiv.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(60, 20, 0, 0.45);
+      border-radius: 8px;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+      padding: 8px 12px;
+      min-width: 160px;
+      backdrop-filter: blur(3px);
+      transition: all 0.3s ease;
+      border: 1px solid rgba(156, 102, 68, 0.5);
+      color: white;
+      text-align: center;
+      font-size: 16px;
+      z-index: 1000;
+      font-family: 'Arial', sans-serif;
+      animation: fadeIn 0.3s ease-out;
+    `;
+    
+    // Add keyframes for fade in animation
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes fadeIn {
+        0% { 
+          opacity: 0; 
+          transform: translate(-50%, -60%) scale(0.95);
+        }
+        100% { 
+          opacity: 1; 
+          transform: translate(-50%, -50%) scale(1);
+        }
+      }
+    `;
+    document.head.appendChild(style);
+    
+    instructionsDiv.innerHTML = `
+      <div style="
+        margin-bottom: 15px;
+        font-size: 18px;
+        font-weight: bold;
+        color: #ffd700;
+        text-shadow: 0 0 5px rgba(255, 215, 0, 0.3);
+      ">Move Your Fighter!</div>
+      
+      <div style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 15px;
+      ">
+        <!-- Top row with W -->
+        <div style="
+          background: rgba(156, 102, 68, 0.3);
+          padding: 8px 15px;
+          border-radius: 4px;
+          border: 1px solid rgba(156, 102, 68, 0.5);
+          transition: all 0.3s ease;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          width: 100px;
+          height: 60px;
+          justify-content: center;
+        ">
+          <div style="
+            font-size: 20px;
+            font-weight: bold;
+            color: #ffd700;
+            margin-bottom: 3px;
+          ">W</div>
+          <div style="
+            color: #ffffff;
+            font-size: 14px;
+            opacity: 0.9;
+          ">Forward</div>
+        </div>
+        
+        <!-- Bottom row with A S D -->
+        <div style="
+          display: flex;
+          gap: 8px;
+        ">
+          <div style="
+            background: rgba(156, 102, 68, 0.3);
+            padding: 8px 15px;
+            border-radius: 4px;
+            border: 1px solid rgba(156, 102, 68, 0.5);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100px;
+            height: 60px;
+            justify-content: center;
+          ">
+            <div style="
+              font-size: 20px;
+              font-weight: bold;
+              color: #ffd700;
+              margin-bottom: 3px;
+            ">A</div>
+            <div style="
+              color: #ffffff;
+              font-size: 14px;
+              opacity: 0.9;
+            ">Left</div>
+          </div>
+          
+          <div style="
+            background: rgba(156, 102, 68, 0.3);
+            padding: 8px 15px;
+            border-radius: 4px;
+            border: 1px solid rgba(156, 102, 68, 0.5);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100px;
+            height: 60px;
+            justify-content: center;
+          ">
+            <div style="
+              font-size: 20px;
+              font-weight: bold;
+              color: #ffd700;
+              margin-bottom: 3px;
+            ">S</div>
+            <div style="
+              color: #ffffff;
+              font-size: 14px;
+              opacity: 0.9;
+            ">Back</div>
+          </div>
+          
+          <div style="
+            background: rgba(156, 102, 68, 0.3);
+            padding: 8px 15px;
+            border-radius: 4px;
+            border: 1px solid rgba(156, 102, 68, 0.5);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100px;
+            height: 60px;
+            justify-content: center;
+          ">
+            <div style="
+              font-size: 20px;
+              font-weight: bold;
+              color: #ffd700;
+              margin-bottom: 3px;
+            ">D</div>
+            <div style="
+              color: #ffffff;
+              font-size: 14px;
+              opacity: 0.9;
+            ">Right</div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="
+        margin-top: 12px;
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.6);
+        font-style: italic;
+      ">Press any key to dismiss</div>
+    `;
+    
+    // Add hover effects to the key boxes
+    const keyBoxes = instructionsDiv.querySelectorAll('div[style*="background: rgba(156, 102, 68, 0.3)"]');
+    keyBoxes.forEach(box => {
+      box.addEventListener('mouseenter', () => {
+        box.style.background = 'rgba(156, 102, 68, 0.4)';
+        box.style.border = '1px solid rgba(156, 102, 68, 0.7)';
+        box.style.transform = 'scale(1.05)';
+      });
+      box.addEventListener('mouseleave', () => {
+        box.style.background = 'rgba(156, 102, 68, 0.3)';
+        box.style.border = '1px solid rgba(156, 102, 68, 0.5)';
+        box.style.transform = 'scale(1)';
+      });
+    });
+    
+    document.body.appendChild(instructionsDiv);
+    this.movementInstructionsShown = true;
+  }
+
+  // Add method to hide movement instructions
+  hideMovementInstructions() {
+    const instructionsDiv = document.getElementById('movement-instructions');
+    if (instructionsDiv) {
+      instructionsDiv.remove();
+      this.movementInstructionsShown = false;
+    }
+  }
+
+  // Add method to handle match start
+  handleMatchStart() {
+    this.matchStartTime = Date.now();
+    this.hasMoved = false;
+    this.movementInstructionsShown = false;
+    
+    // Show instructions after 3 seconds if no movement
+    setTimeout(() => {
+      if (!this.hasMoved && socketClient.gameState.stage === 'MATCH_IN_PROGRESS') {
+        this.showMovementInstructions();
+      }
+    }, 3000);
   }
 }
 

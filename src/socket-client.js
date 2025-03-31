@@ -313,9 +313,9 @@ class SocketClient {
     this.emit("viewerOnlyUpdated", isViewerOnly);
   }
 
-  sendMovement(direction) {
+  sendMovement(direction, deltaTime) {
     if (this.gameState.myRole === "fighter" && this.gameState.stage === "MATCH_IN_PROGRESS") {
-      this.socket.emit("move", direction);
+      this.socket.emit("move", { direction, deltaTime });
     }
   }
 
