@@ -777,6 +777,17 @@ export class Renderer {
     // Listen for stage changes
     socketClient.on("stageChanged", (data) => {
       console.log("Stage changed to:", data.stage);
+
+      // Calculate seconds for display
+      const seconds = Math.ceil(data.duration / 1000);
+      
+      // Update the UI with both the display name and the seconds
+      uiManager.updateMatchStatus(data.displayName, seconds);
+      
+      // Reset fighter movement if stage is not MATCH_IN_PROGRESS
+      if (data.stage !== 'MATCH_IN_PROGRESS') {
+        this.resetFighterMovement();
+      }
       
       // When match ends and victory ceremony begins, make viewers excited
       if (data.stage === "VICTORY_CEREMONY") {
@@ -814,6 +825,9 @@ export class Renderer {
       
       // Animate the loser falling
       this.animateFighterFall(loserId);
+      
+      // Reset fighter movement state to prevent continued movement after match
+      this.resetFighterMovement();
       
       // Set viewers to excited state immediately when match ends
       console.log("Match ended, viewers getting excited!");
@@ -1365,10 +1379,9 @@ export class Renderer {
       return;
     }
     
-    // On mobile, we're more lenient about the stage check
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
-    
-    // For non-mobile, enforce match in progress stage check
+
+    // On mobile, we're more lenient about the stage check
     if (!isMobile && socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
       return;
     }
@@ -1391,10 +1404,6 @@ export class Renderer {
     if (this.fighterMovement.right) {
       socketClient.sendMovement('right');
       movement = true;
-    }
-    
-    if (movement && isMobile) {
-      console.log("Mobile fighter movement detected");
     }
   }
 
@@ -1470,6 +1479,7 @@ export class Renderer {
     // Update camera mode based on game stage
     switch (currentStage) {
       case 'PRE_CEREMONY':
+      case 'PRE_MATCH_CEREMONY':
         // Set ceremony mode with fighters and referee
         if (gameState.fighters.length === 2 && gameState.referee) {
           const fighter1Model = this.playerModels.get(gameState.fighters[0].id);
@@ -1477,24 +1487,34 @@ export class Renderer {
           const refereeModel = this.playerModels.get(gameState.referee.id);
           
           if (fighter1Model && fighter2Model && refereeModel) {
-            console.log("Setting ceremony camera mode");
-            this.cameraSystem.setMode(this.cameraSystem.MODES.CEREMONY, {
-              fighter1: fighter1Model,
-              fighter2: fighter2Model,
-              referee: refereeModel
-            });
+            // Only change mode if needed
+            if (this.cameraSystem.getCurrentMode() !== this.cameraSystem.MODES.CEREMONY) {
+              console.log("Setting ceremony camera mode");
+              // Use longer transition for ceremony (1.5 seconds)
+              this.cameraSystem.setMode(this.cameraSystem.MODES.CEREMONY, {
+                fighter1: fighter1Model,
+                fighter2: fighter2Model,
+                referee: refereeModel
+              }, 1500);
+            }
           }
         }
         break;
         
       case 'MATCH_IN_PROGRESS':
         // During match, use the overview camera
-        this.cameraSystem.setMode(this.cameraSystem.MODES.WAITING_OVERVIEW);
+        if (this.cameraSystem.getCurrentMode() !== this.cameraSystem.MODES.WAITING_OVERVIEW) {
+          // Fast transition to match view (0.8 seconds)
+          this.cameraSystem.setMode(this.cameraSystem.MODES.WAITING_OVERVIEW, {}, 800);
+        }
         break;
         
       default:
         // Default to waiting overview
-        this.cameraSystem.setMode(this.cameraSystem.MODES.WAITING_OVERVIEW);
+        if (this.cameraSystem.getCurrentMode() !== this.cameraSystem.MODES.WAITING_OVERVIEW) {
+          // Standard transition (1 second)
+          this.cameraSystem.setMode(this.cameraSystem.MODES.WAITING_OVERVIEW);
+        }
         break;
     }
   }
@@ -1727,6 +1747,14 @@ export class Renderer {
     });
     
     console.log(`Setting viewer excited state to: ${excited}`);
+  }
+
+  // Add a helper method to reset fighter movement
+  resetFighterMovement() {
+    this.fighterMovement.forward = false;
+    this.fighterMovement.backward = false;
+    this.fighterMovement.left = false;
+    this.fighterMovement.right = false;
   }
 }
 
