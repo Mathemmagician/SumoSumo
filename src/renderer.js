@@ -1379,8 +1379,10 @@ export class Renderer {
       return;
     }
     
-    // Strictly enforce match in progress stage check - no mobile exception
-    if (socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+
+    // On mobile, we're more lenient about the stage check
+    if (!isMobile && socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
       return;
     }
 

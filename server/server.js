@@ -217,11 +217,6 @@ function selectFighters() {
     gameState.viewers = gameState.viewers.filter(v => v.id !== gameState.referee.id);
     gameState.referee.role = 'referee';
     gameState.referee.position = { x: 0, y: 2, z: -2 }; // Place referee at north side
-    
-    // Calculate the angle to face the center (0,0,0) from referee's position
-    const dx = 0 - gameState.referee.position.x;
-    const dz = 0 - gameState.referee.position.z;
-    gameState.referee.rotation = Math.atan2(dx, dz); // Make referee face center of ring
   } else {
     console.log("No eligible viewers for referee role");
     changeGameStage(GAME_STAGES.WAITING_FOR_PLAYERS);
@@ -262,21 +257,6 @@ function startPreMatchCeremony() {
   // Move fighters slightly apart and up in the air
   gameState.fighters[0].position = { x: -5, y: 2, z: 0 };
   gameState.fighters[1].position = { x: 5, y: 2, z: 0 };
-  
-  // Ensure the referee is looking at the center of the ring
-  if (gameState.referee) {
-    // Calculate angle to face the center (0,0,0) from referee's position
-    const dx = 0 - gameState.referee.position.x;
-    const dz = 0 - gameState.referee.position.z;
-    gameState.referee.rotation = Math.atan2(dx, dz);
-    
-    // Also broadcast referee's updated rotation
-    io.emit('playerMoved', {
-      id: gameState.referee.id,
-      position: gameState.referee.position,
-      rotation: gameState.referee.rotation
-    });
-  }
 
   // Broadcast updated positions
   gameState.fighters.forEach(fighter => {
@@ -453,7 +433,7 @@ io.on('connection', (socket) => {
     
     // Movement speed
     const moveSpeed = 0.2;
-
+    
     // Calculate movement based on direction relative to opponent
     switch(direction) {
       case 'forward': // Move toward opponent
@@ -685,8 +665,6 @@ function resetGameState() {
   // Move all fighters to viewers
   gameState.fighters.forEach(fighter => {
     fighter.role = 'viewer';
-    // Set position to null to force client to calculate proper seat position with correct height
-    fighter.position = null;
     gameState.viewers.push(fighter);
     io.emit('playerRoleChanged', { id: fighter.id, role: 'viewer' });
   });
