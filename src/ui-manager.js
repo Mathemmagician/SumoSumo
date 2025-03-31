@@ -6,6 +6,8 @@ class UIManager {
         // Cache DOM elements
         this.chatHistory = null;
         this.chatInput = null;
+        this.tutorialBtn = null;
+        this.tutorialArrow = null;
         
         // Mobile controls
         this.mobileControls = null;
@@ -39,8 +41,13 @@ class UIManager {
         // Get DOM elements
         this.chatHistory = document.getElementById('chat-history');
         this.chatInput = document.getElementById('chat-input');
+        this.tutorialBtn = document.getElementById('tutorial-btn');
+        this.tutorialArrow = document.getElementById('tutorial-arrow');
         
         console.log("UI Manager initializing, isMobile:", this.isMobile, "isLandscape:", this.isLandscape);
+        
+        // Check if this is first time visit
+        this.checkFirstTimeVisit();
         
         // Create mobile controls
         this.createMobileControls();
@@ -219,6 +226,12 @@ class UIManager {
         if (tutorialBtn && tutorialModal && closeBtn) {
             tutorialBtn.addEventListener('click', () => {
                 tutorialModal.style.display = 'flex';
+                // Mark tutorial as seen
+                localStorage.setItem('tutorial', 'true');
+                // Hide the tutorial arrow
+                if (this.tutorialArrow) {
+                    this.tutorialArrow.style.display = 'none';
+                }
             });
             
             closeBtn.addEventListener('click', () => {
@@ -589,6 +602,13 @@ class UIManager {
             key: key
         });
         document.dispatchEvent(event);
+    }
+
+    checkFirstTimeVisit() {
+        const hasSeenTutorial = localStorage.getItem('tutorial') === 'true';
+        if (!hasSeenTutorial && this.tutorialArrow) {
+            this.tutorialArrow.style.display = 'block';
+        }
     }
 }
 
