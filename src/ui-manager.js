@@ -114,11 +114,37 @@ class UIManager {
                     this.chatHistory.innerHTML = '';
                 }
                 
-                // Display each message in the history
+                // Keep track of displayed messages to avoid duplicates
+                const displayedMessages = new Set();
+                
+                // Display each message in the history, filtering out NPC messages
                 messages.forEach(messageObj => {
-                    const sender = messageObj.id === socketClient.gameState.myId ? 
-                        'You' : this.findPlayerUsername(messageObj.id);
-                    this.addMessageToHistory(sender, messageObj.message);
+                    // Skip messages from NPCs
+                    if (messageObj.id && (messageObj.id.startsWith('npc-') || messageObj.id.startsWith('fake-'))) {
+                        return;
+                    }
+                    
+                    // Create a unique key for this message
+                    const messageKey = `${messageObj.id}:${messageObj.message}:${messageObj.timestamp}`;
+                    
+                    // Skip if we've already displayed this message
+                    if (displayedMessages.has(messageKey)) {
+                        return;
+                    }
+                    
+                    // Mark this message as displayed
+                    displayedMessages.add(messageKey);
+                    
+                    // Use "You" for current user's messages, player name for others
+                    // If name is available in the message object, use it directly instead of looking up
+                    const sender = messageObj.id === socketClient.gameState.myId 
+                        ? 'You' 
+                        : (messageObj.name || this.findPlayerUsername(messageObj.id));
+                        
+                    // Display the message or emote
+                    if (messageObj.message) {
+                        this.addMessageToHistory(sender, messageObj.message);
+                    }
                 });
             }
         });
@@ -141,16 +167,28 @@ class UIManager {
         
         // Listen for emote/message events
         socketClient.on('playerEmote', (data) => {
-            if (data.id && data.id !== socketClient.gameState.myId) {
-                const username = this.findPlayerUsername(data.id);
-                this.debouncedAddMessage(username, data.emote);
+            if (data.id) {
+                // If it's your own message coming back from the server, don't display it again
+                if (data.id === socketClient.gameState.myId) {
+                    return;
+                }
+                
+                // Use name from the message object if available, otherwise look it up
+                const username = data.name || this.findPlayerUsername(data.id);
+                this.debouncedAddMessage(username, data.emote, data.id);
             }
         });
         
         socketClient.on('playerMessage', (data) => {
-            if (data.id && data.id !== socketClient.gameState.myId) {
-                const username = this.findPlayerUsername(data.id);
-                this.debouncedAddMessage(username, data.message);
+            if (data.id) {
+                // If it's your own message coming back from the server, don't display it again
+                if (data.id === socketClient.gameState.myId) {
+                    return;
+                }
+                
+                // Use name from the message object if available, otherwise look it up
+                const username = data.name || this.findPlayerUsername(data.id);
+                this.debouncedAddMessage(username, data.message, data.id);
             }
         });
     }
@@ -295,9 +333,9 @@ class UIManager {
         this.chatHistory.appendChild(fragment);
     }
 
-    debouncedAddMessage(sender, message) {
-        // Skip adding messages from fake users to the chat history
-        if (sender.startsWith('npc-')) {
+    debouncedAddMessage(sender, message, id) {
+        // Skip messages from NPC users (checking the actual ID if provided)
+        if (id && (id.startsWith('npc-') || id.startsWith('fake-'))) {
             return;
         }
         
@@ -313,14 +351,31 @@ class UIManager {
         const message = this.chatInput.value.trim();
         
         if (message) {
-            this.debouncedAddMessage('You', message);
+            // Get the player's ID but display as "You" for the current user
+            const myId = socketClient.gameState.myId;
+            
+            // Add to chat with "You" as sender
+            this.debouncedAddMessage("You", message, myId);
             socketClient.sendMessage(message);
             this.chatInput.value = '';
         }
     }
 
     sendEmote(emote) {
-        this.debouncedAddMessage('You', emote);
+        // Prevent rapid duplicate emoji submissions
+        if (this._lastEmote === emote && (Date.now() - this._lastEmoteTime) < 1000) {
+            return;
+        }
+        
+        // Store this emote as the last one sent
+        this._lastEmote = emote;
+        this._lastEmoteTime = Date.now();
+        
+        // Get the player's ID but display as "You" for the current user
+        const myId = socketClient.gameState.myId;
+        
+        // Add to chat with "You" as sender
+        this.debouncedAddMessage("You", emote, myId);
         socketClient.sendEmote(emote);
         
         // Add animation effect to button
