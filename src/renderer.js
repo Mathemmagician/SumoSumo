@@ -834,6 +834,14 @@ export class Renderer {
         this.hideMovementInstructions();
       }
 
+      // Ensure cinematic bars are hidden when transitioning to stages that don't need them
+      if (data.stage !== "PRE_MATCH_CEREMONY" && data.stage !== "VICTORY_CEREMONY" && this.cameraSystem) {
+        // Force hide cinematic bars to fix the bug where they sometimes remain visible
+        if (this.cameraSystem.ceremonyCineBars) {
+          this.cameraSystem.ceremonyCineBars.hide();
+        }
+      }
+
       // Calculate seconds for display
       const seconds = Math.ceil(data.duration / 1000);
       

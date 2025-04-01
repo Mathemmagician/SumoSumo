@@ -482,7 +482,7 @@ io.on('connect', (socket) => {
     }
     
     // Base movement speed (units per second)
-    const baseSpeed = 3.0;
+    const baseSpeed = 4.5;
     
     // Calculate actual movement for this frame using delta time
     const moveSpeed = baseSpeed * data.deltaTime;

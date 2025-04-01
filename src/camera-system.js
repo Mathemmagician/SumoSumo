@@ -121,6 +121,13 @@ export class CameraSystem {
       return;
     }
 
+    // Clean up previous mode if needed
+    if (this.currentMode === this.MODES.CEREMONY) {
+      this.cleanupCeremonyMode();
+    } else if (this.currentMode === this.MODES.KNOCKOUT_SEQUENCE) {
+      this.cleanupKnockoutSequence();
+    }
+
     // Handle specific setup for ceremony mode
     if (modeName === this.MODES.CEREMONY) {
       if (!params.fighter1 || !params.fighter2 || !params.referee) {
@@ -856,6 +863,10 @@ export class CameraSystem {
     if (!settings.winner || !settings.loser) {
       console.warn('Knockout sequence is missing participants, falling back to overview');
       this.cleanupKnockoutSequence();
+      // Force hide cinematic bars to fix the bug where they sometimes remain visible
+      if (this.ceremonyCineBars) {
+        this.ceremonyCineBars.hide();
+      }
       this.setMode(this.MODES.WAITING_OVERVIEW);
       return;
     }
@@ -863,6 +874,10 @@ export class CameraSystem {
     // If the sequence is complete, return to overview
     if (elapsedTime >= settings.duration) {
       this.cleanupKnockoutSequence();
+      // Force hide cinematic bars to fix the bug where they sometimes remain visible
+      if (this.ceremonyCineBars) {
+        this.ceremonyCineBars.hide();
+      }
       this.setMode(this.MODES.WAITING_OVERVIEW);
       return;
     }
