@@ -34,32 +34,50 @@ const messageHistory = [];
 const MAX_MESSAGE_HISTORY = 5;
 
 // List of Japanese names for players
-const JAPANESE_NAMES = [
-  "Takahashi", "Yamamoto", "Tanaka", "Nakamura", "Suzuki",
-  "Sato", "Watanabe", "Ito", "Kobayashi", "Kato",
-  "Yoshida", "Yamada", "Sasaki", "Yamaguchi", "Matsumoto",
-  "Inoue", "Kimura", "Hayashi", "Shimizu", "Saito"
+const JAPANESE_FIRST_NAMES = [
+  "Takashi", "Hiroshi", "Yuki", "Satoshi", "Kenji",
+  "Akira", "Kazuki", "Daiki", "Shota", "Ryo",
+  "Yuka", "Haruka", "Aoi", "Sakura", "Misaki",
+  "Rin", "Ayaka", "Hikari", "Nana", "Mei",
+  "Taro", "Jiro", "Ren", "Kaito", "Takeshi",
+  "Makoto", "Haruto", "Riku", "Shun", "Tsubasa",
+  "Emi", "Nao", "Hinata", "Miyu", "Risa",
+  "Asuka", "Kanna", "Tomoe", "Sayaka", "Chihiro"
 ];
+
+const JAPANESE_LAST_NAMES = [
+  "Tanaka", "Suzuki", "Sato", "Watanabe", "Ito",
+  "Yamamoto", "Nakamura", "Kobayashi", "Kato", "Yoshida",
+  "Yamada", "Sasaki", "Yamaguchi", "Matsumoto", "Inoue",
+  "Kimura", "Hayashi", "Shimizu", "Saito", "Nakajima",
+  "Fujimoto", "Hoshino", "Shibata", "Abe", "Ueno",
+  "Takeda", "Morita", "Okada", "Kawasaki", "Fukuda",
+  "Ono", "Ishikawa", "Hirano", "Takagi", "Kubo",
+  "Endo", "Miyamoto", "Noguchi", "Ota", "Imai"
+];
+
 
 // Keep track of used names
 const usedNames = new Set();
 
 // Function to get a random unused name
 function getRandomName() {
-  // If all names are used, reset the used names
-  if (usedNames.size >= JAPANESE_NAMES.length) {
+  // If all possible combinations are used, reset the used names
+  if (usedNames.size >= JAPANESE_FIRST_NAMES.length * JAPANESE_LAST_NAMES.length) {
     usedNames.clear();
   }
   
-  // Find an unused name
-  let name;
+  // Find an unused full name
+  let firstName, lastName, fullName;
   do {
-    name = JAPANESE_NAMES[Math.floor(Math.random() * JAPANESE_NAMES.length)];
-  } while (usedNames.has(name));
+    firstName = JAPANESE_FIRST_NAMES[Math.floor(Math.random() * JAPANESE_FIRST_NAMES.length)];
+    lastName = JAPANESE_LAST_NAMES[Math.floor(Math.random() * JAPANESE_LAST_NAMES.length)];
+    fullName = `${firstName} ${lastName}`;
+  } while (usedNames.has(fullName));
   
   // Mark this name as used
-  usedNames.add(name);
-  return name;
+  usedNames.add(fullName);
+  return fullName;
 }
 
 // Game state

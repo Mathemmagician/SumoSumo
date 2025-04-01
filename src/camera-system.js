@@ -1,6 +1,20 @@
 import * as THREE from 'three';
+import { socketClient } from './socket-client';
 import { RING_HEIGHT } from './constants';
 import { STAGE_DURATIONS } from './constants';
+
+// Rank lists - 30 primary ranks and 30 modifiers
+const RANKS = [
+  "S+", "S", "S-", "A+", "A", "A-", "B+", "B", "B-", "C+", 
+  "C", "C-", "D+", "D", "D-", "E+", "E", "E-", "F+", "F",
+  "Rookie", "Amateur", "Pro", "Elite", "Master", "Legend", "Champion", "Titan", "Immortal", "Deity"
+];
+
+const RANK_MODIFIERS = [
+  "Supreme", "Ultimate", "Grand", "Apex", "Prime", "Rising", "Veteran", "Elite", "Ascendant", "Limitless",
+  "Dominant", "Fierce", "Feared", "Fierce", "Ruthless", "Untamed", "Savage", "Mighty", "Powerful", "Unstoppable",
+  "Golden", "Diamond", "Platinum", "Silver", "Bronze", "Iron", "Jade", "Ruby", "Emerald", "Crystal"
+];
 
 /**
  * Camera System for SumoSumo
@@ -23,6 +37,8 @@ export class CameraSystem {
       this.renderer = renderer;
       this._initialized = true;
     }
+    
+    this.socketClient = socketClient; // Add socketClient reference
     
     // Camera mode constants
     this.MODES = {
@@ -476,27 +492,27 @@ export class CameraSystem {
 
     // Show player stats during the closeup
     if (this.ceremonyCineBars) {
-        // Use mock data for now - we'll replace this with real data later
-        const mockStats = {
-            [settings.fighter1.userData.playerId]: {
-                name: "Thunder Sumo",
-                rank: "S+",
-                wins: 42
-            },
-            [settings.fighter2.userData.playerId]: {
-                name: "Mountain Mover",
-                rank: "A",
-                wins: 28
-            }
-        };
-
         const fighterId = fighter.userData.playerId;
-        const stats = mockStats[fighterId];
         
-        if (stats) {
+        // Find the actual player in the scene
+        const player = this.socketClient.findPlayerInGameState(fighterId);
+        
+        // Create player stats with the player's actual name
+        if (player && player.name) {
+            // Create a deterministic rank and win count based on player name
+            const nameHash = this.hashString(player.name);
+            const rank = this.getDeterministicRank(nameHash);
+            const wins = this.getDeterministicWins(nameHash);
+            
+            const playerStats = {
+                name: player.name,
+                rank: rank,
+                wins: wins
+            };
+            
             // Show stats when closeup starts
             if (progress > 0.9) {
-                this.ceremonyCineBars.showPlayerStats(stats.name, stats.rank, stats.wins);
+                this.ceremonyCineBars.showPlayerStats(playerStats.name, playerStats.rank, playerStats.wins);
             }
             // Hide stats when closeup is ending
             else if (progress < 0.1) {
@@ -830,12 +846,81 @@ export class CameraSystem {
     // Optional: Show cinematic bars for knockout
     if (this.ceremonyCineBars) {
       this.ceremonyCineBars.show();
+      
+      // Show winner stats with their actual name
+      if (winner && winner.userData && winner.userData.playerId) {
+        const winnerId = winner.userData.playerId;
+        const player = this.socketClient.findPlayerInGameState(winnerId);
+        
+        // Use actual player name, with static rank and win count
+        // This ensures the same player always shows the same stats
+        if (player && player.name) {
+          // Create a deterministic rank and win count based on player name
+          const nameHash = this.hashString(player.name);
+          const rank = this.getDeterministicRank(nameHash);
+          const wins = this.getDeterministicWins(nameHash);
+          
+          const playerStats = {
+            name: player.name,
+            rank: rank,
+            wins: wins
+          };
+          
+          // Small delay to let bars show first
+          setTimeout(() => {
+            this.ceremonyCineBars.showPlayerStats(playerStats.name, playerStats.rank, playerStats.wins);
+          }, 500);
+        }
+      }
     }
     
     // Reset animation start time
     this.animationStartTime = Date.now();
     
     console.log("Starting knockout camera sequence");
+  }
+  
+  /**
+   * Create a simple hash from a string
+   * @param {string} str - The string to hash
+   * @returns {number} A numeric hash value
+   */
+  hashString(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash);
+  }
+  
+  /**
+   * Generate a deterministic rank based on hash
+   * @param {number} hash - A numeric hash value
+   * @returns {string} A rank string
+   */
+  getDeterministicRank(hash) {
+    // Use modulo to select from rank arrays
+    const useModifier = (hash % 10) < 7; // 70% chance for modifier
+    
+    if (useModifier) {
+      const modifierIndex = hash % RANK_MODIFIERS.length;
+      const rankIndex = (hash >> 4) % RANKS.length;
+      return `${RANK_MODIFIERS[modifierIndex]} ${RANKS[rankIndex]}`;
+    } else {
+      const rankIndex = hash % RANKS.length;
+      return RANKS[rankIndex];
+    }
+  }
+  
+  /**
+   * Generate deterministic wins based on hash
+   * @param {number} hash - A numeric hash value
+   * @returns {number} Number of wins (1-50)
+   */
+  getDeterministicWins(hash) {
+    return (hash % 50) + 1; // 1-50 wins
   }
 
   /**
@@ -844,6 +929,7 @@ export class CameraSystem {
   cleanupKnockoutSequence() {
     // Hide cinematic bars if they exist
     if (this.ceremonyCineBars) {
+      this.ceremonyCineBars.hidePlayerStats();
       this.ceremonyCineBars.hide();
     }
     

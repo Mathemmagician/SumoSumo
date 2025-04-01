@@ -75,6 +75,10 @@ body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .role-info {
@@ -137,6 +141,8 @@ body {
   font-size: 0.9rem;
   word-break: break-word;
   animation: fadeIn 0.3s ease;
+  margin-bottom: 4px; /* Add spacing between messages */
+  line-height: 1.4; /* Improve readability */
 }
 
 @keyframes fadeIn {
@@ -154,6 +160,12 @@ body {
   font-weight: bold;
   margin-right: 5px;
   color: #f9d9aa;
+  display: inline-block; /* Better display for long names */
+  max-width: 140px; /* Limit width for very long names */
+  overflow: hidden; /* Hide overflow */
+  text-overflow: ellipsis; /* Show ellipsis for overflow */
+  white-space: nowrap; /* Keep on one line */
+  vertical-align: top; /* Align with text */
 }
 
 /* Chat input */

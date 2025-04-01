@@ -70,6 +70,7 @@ class UIManager {
         // Force check of controls visibility with current state
         if (socketClient.gameState) {
             this.toggleMobileControls(socketClient.gameState.myRole, socketClient.gameState.stage);
+            this.updatePlayerName();
         }
     }
 
@@ -78,6 +79,7 @@ class UIManager {
         socketClient.on('gameStateUpdated', (gameState) => {
             this.updateRoleBadge(gameState.myRole);
             this.updatePlayerCount(this.countAllPlayers(gameState));
+            this.updatePlayerName();
             
             // Show/hide mobile controls based on role
             if (this.isMobile) {
@@ -680,6 +682,21 @@ class UIManager {
         const hasSeenTutorial = localStorage.getItem('tutorial') === 'true';
         if (!hasSeenTutorial && this.tutorialArrow) {
             this.tutorialArrow.style.display = 'block';
+        }
+    }
+
+    // Add this new method to update the player name
+    updatePlayerName() {
+        const playerNameElement = document.getElementById('player-name');
+        if (!playerNameElement) return;
+        
+        const myId = socketClient.gameState.myId;
+        if (!myId) return;
+        
+        // Find the player in the game state
+        const player = socketClient.findPlayerInGameState(myId);
+        if (player && player.name) {
+            playerNameElement.textContent = player.name;
         }
     }
 }
