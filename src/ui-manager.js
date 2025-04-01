@@ -106,6 +106,23 @@ class UIManager {
             this.updatePlayerCount(this.countAllPlayers(socketClient.gameState));
         });
         
+        // Listen for message history when connecting
+        socketClient.on('messageHistory', (messages) => {
+            if (Array.isArray(messages) && messages.length > 0) {
+                // Clear existing chat history
+                if (this.chatHistory) {
+                    this.chatHistory.innerHTML = '';
+                }
+                
+                // Display each message in the history
+                messages.forEach(messageObj => {
+                    const sender = messageObj.id === socketClient.gameState.myId ? 
+                        'You' : this.findPlayerUsername(messageObj.id);
+                    this.addMessageToHistory(sender, messageObj.message);
+                });
+            }
+        });
+        
         // Listen for stage changes
         socketClient.on('stageChanged', (data) => {
             const seconds = Math.ceil(data.duration / 1000);

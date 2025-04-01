@@ -29,6 +29,10 @@ app.use(cors({
   credentials: true
 }));
 
+// Store the last 5 messages
+const messageHistory = [];
+const MAX_MESSAGE_HISTORY = 5;
+
 // Serve static files - in production this serves the built Vite app
 if (process.env.NODE_ENV === 'production') {
   // In production, serve the static files from Vite's build output
@@ -448,6 +452,11 @@ io.on('connect', (socket) => {
       : 0
   });
 
+  // Send message history to the new player
+  if (messageHistory.length > 0) {
+    socket.emit('messageHistory', messageHistory);
+  }
+
   // Broadcast new player to everyone else
   socket.broadcast.emit('playerJoined', sanitizeForSocketIO(player));
 
@@ -613,10 +622,24 @@ io.on('connect', (socket) => {
     }
 
     player.message = message;
-    io.emit('playerMessage', {
+    
+    // Create a message object
+    const messageObj = {
       id: player.id,
-      message
-    });
+      message,
+      timestamp: Date.now()
+    };
+    
+    // Add to message history
+    messageHistory.push(messageObj);
+    
+    // Keep only the last MAX_MESSAGE_HISTORY messages
+    if (messageHistory.length > MAX_MESSAGE_HISTORY) {
+      messageHistory.shift(); // Remove the oldest message
+    }
+    
+    // Broadcast the message to all clients
+    io.emit('playerMessage', messageObj);
 
     // Clear message after a few seconds
     setTimeout(() => {
