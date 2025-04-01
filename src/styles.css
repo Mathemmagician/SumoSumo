@@ -81,6 +81,19 @@ body {
   max-width: 100%;
 }
 
+.player-name {
+  font-family: "Sawarabi Mincho", serif;
+  font-size: 1.2rem;
+  margin: 0 0 10px 0;
+  color: #f9d9aa;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7);
+  font-weight: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
 .role-info {
   font-size: 0.9rem; /* Smaller text */
   margin: 3px 0;
