@@ -29,15 +29,55 @@ app.use(cors({
   credentials: true
 }));
 
-// Serve static files - in production this serves the built Vite app
-if (process.env.NODE_ENV === 'production') {
-  // In production, serve the static files from Vite's build output
-  app.use(express.static(path.join(__dirname, '../dist')));
+// Store the last 5 messages
+const messageHistory = [];
+const MAX_MESSAGE_HISTORY = 5;
+
+// List of Japanese names for players
+const JAPANESE_FIRST_NAMES = [
+  "Mighty", "Fat", "Nimble", "Infamous", "Thunderous",
+  "Featherlight", "Gigantic", "Whispering", "Shimmering", "Rumbling",
+  "Voracious", "Bold", "Steadfast", "Sneaky", "Jolly",
+  "Grandiose", "Glistening", "Oblivious", "Nomadic", "Savage",
+  "Wise", "Cunning", "Fierce", "Ruthless", "Hilarious",
+  "Glorious", "Silent", "Merciless", "Stormy", "Stalwart",
+  "Devious", "Eager", "Playful", "Fearless", "Swift",
+  "Ancient", "Eccentric", "Harmonious", "Enigmatic", "Haunted"
+];
+
+const JAPANESE_LAST_NAMES = [
+  "Tanaka", "Suzuki", "Sato", "Watanabe", "Ito",
+  "Yamamoto", "Nakamura", "Kobayashi", "Kato", "Yoshida",
+  "Yamada", "Sasaki", "Yamaguchi", "Matsumoto", "Inoue",
+  "Kimura", "Hayashi", "Shimizu", "Saito", "Nakajima",
+  "Fujimoto", "Hoshino", "Shibata", "Abe", "Ueno",
+  "Takeda", "Morita", "Okada", "Kawasaki", "Fukuda",
+  "Ono", "Ishikawa", "Hirano", "Takagi", "Kubo",
+  "Endo", "Miyamoto", "Noguchi", "Ota", "Imai"
+];
+
+
+// Keep track of used names
+const usedNames = new Set();
+
+// Function to get a random unused name
+function getRandomName() {
+  // If all possible combinations are used, reset the used names
+  if (usedNames.size >= JAPANESE_FIRST_NAMES.length * JAPANESE_LAST_NAMES.length) {
+    usedNames.clear();
+  }
   
-  // For any other routes, send the index.html file from the build
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../dist/index.html'));
-  });
+  // Find an unused full name
+  let firstName, lastName, fullName;
+  do {
+    firstName = JAPANESE_FIRST_NAMES[Math.floor(Math.random() * JAPANESE_FIRST_NAMES.length)];
+    lastName = JAPANESE_LAST_NAMES[Math.floor(Math.random() * JAPANESE_LAST_NAMES.length)];
+    fullName = `${firstName} ${lastName}`;
+  } while (usedNames.has(fullName));
+  
+  // Mark this name as used
+  usedNames.add(fullName);
+  return fullName;
 }
 
 // Game state
@@ -420,6 +460,7 @@ io.on('connect', (socket) => {
   // Create a new player
   const player = {
     id: socket.id,
+    name: getRandomName(), // Assign a random Japanese name
     role: 'viewer',
     position: { x: 0, y: 3, z: 0 },
     rotation: 0,
@@ -447,6 +488,11 @@ io.on('connect', (socket) => {
       ? gameState.stageDuration - (Date.now() - gameState.stageStartTime)
       : 0
   });
+
+  // Send message history to the new player
+  if (messageHistory.length > 0) {
+    socket.emit('messageHistory', messageHistory);
+  }
 
   // Broadcast new player to everyone else
   socket.broadcast.emit('playerJoined', sanitizeForSocketIO(player));
@@ -590,8 +636,35 @@ io.on('connect', (socket) => {
   // Handle player emote
   socket.on('emote', (emoteType) => {
     player.emote = emoteType;
+    
+    // Create an emote object
+    const emoteObj = {
+      id: player.id,
+      name: player.name,
+      message: emoteType, // Store emote as message for consistency in history
+      timestamp: Date.now()
+    };
+    
+    // Check if this is a duplicate emote (happening within last second)
+    const isDuplicate = messageHistory.some(msg => 
+      msg.id === player.id && 
+      msg.message === emoteType && 
+      (Date.now() - msg.timestamp) < 1000
+    );
+    
+    // Only add to message history if it's not a duplicate
+    if (!isDuplicate) {
+      messageHistory.push(emoteObj);
+      
+      // Keep only the last MAX_MESSAGE_HISTORY messages
+      if (messageHistory.length > MAX_MESSAGE_HISTORY) {
+        messageHistory.shift(); // Remove the oldest message
+      }
+    }
+    
     io.emit('playerEmote', {
       id: player.id,
+      name: player.name,
       emote: emoteType
     });
 
@@ -600,6 +673,7 @@ io.on('connect', (socket) => {
       player.emote = null;
       io.emit('playerEmote', {
         id: player.id,
+        name: player.name,
         emote: null
       });
     }, 3000);
@@ -613,16 +687,32 @@ io.on('connect', (socket) => {
     }
 
     player.message = message;
-    io.emit('playerMessage', {
+    
+    // Create a message object
+    const messageObj = {
       id: player.id,
-      message
-    });
+      name: player.name,
+      message,
+      timestamp: Date.now()
+    };
+    
+    // Add to message history
+    messageHistory.push(messageObj);
+    
+    // Keep only the last MAX_MESSAGE_HISTORY messages
+    if (messageHistory.length > MAX_MESSAGE_HISTORY) {
+      messageHistory.shift(); // Remove the oldest message
+    }
+    
+    // Broadcast the message to all clients
+    io.emit('playerMessage', messageObj);
 
     // Clear message after a few seconds
     setTimeout(() => {
       player.message = null;
       io.emit('playerMessage', {
         id: player.id,
+        name: player.name,
         message: null
       });
     }, 5000);
@@ -776,6 +866,7 @@ function addFakeUser() {
   // Create fake user with random properties
   const fakeUser = {
     id: fakeId,
+    name: getRandomName(), // Assign a random Japanese name
     role: 'viewer',
     position: { x: 0, y: 3, z: 0 },
     rotation: 0,
@@ -803,8 +894,20 @@ function addFakeUser() {
       const emotes = ['👋', '👍', '🎉', '❤️', '😊'];
       const emote = emotes[Math.floor(Math.random() * emotes.length)];
       
+      // Create an emote object
+      const emoteObj = {
+        id: fakeId,
+        name: fakeUser.name,
+        message: emote, // Store emote as message for consistency in history
+        timestamp: Date.now()
+      };
+      
+      // Skip adding NPC emotes to the message history to avoid clutter
+      // messageHistory.push(emoteObj);
+      
       io.emit('playerEmote', {
         id: fakeId,
+        name: fakeUser.name,
         emote: emote
       });
 
@@ -812,6 +915,7 @@ function addFakeUser() {
       setTimeout(() => {
         io.emit('playerEmote', {
           id: fakeId,
+          name: fakeUser.name,
           emote: null
         });
       }, 2000 + Math.random() * 2000);
@@ -831,8 +935,20 @@ function addFakeUser() {
       ];
       const message = messages[Math.floor(Math.random() * messages.length)];
       
+      // Create a message object
+      const messageObj = {
+        id: fakeId,
+        name: fakeUser.name,
+        message: message,
+        timestamp: Date.now()
+      };
+      
+      // Skip adding NPC messages to the message history to avoid clutter
+      // messageHistory.push(messageObj);
+      
       io.emit('playerMessage', {
         id: fakeId,
+        name: fakeUser.name,
         message: message
       });
 
@@ -840,6 +956,7 @@ function addFakeUser() {
       setTimeout(() => {
         io.emit('playerMessage', {
           id: fakeId,
+          name: fakeUser.name,
           message: null
         });
       }, 3000 + Math.random() * 2000);
@@ -934,6 +1051,17 @@ app.post('/create-checkout-session', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Serve static files - in production this serves the built Vite app
+if (process.env.NODE_ENV === 'production') {
+  // In production, serve the static files from Vite's build output
+  app.use(express.static(path.join(__dirname, '../dist')));
+  
+  // For any other routes, send the index.html file from the build
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../dist/index.html'));
+  });
+}
 
 // Start the server
 const PORT = process.env.PORT || 3001;

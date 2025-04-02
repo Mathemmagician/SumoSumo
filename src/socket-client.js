@@ -79,6 +79,7 @@ class SocketClient {
     this.socket.on("playerMoved", (data) => this.handlePlayerMoved(data));
     this.socket.on("playerEmote", (data) => this.handlePlayerEmote(data));
     this.socket.on("playerMessage", (data) => this.handlePlayerMessage(data));
+    this.socket.on("messageHistory", (messages) => this.handleMessageHistory(messages));
     this.socket.on("playerRoleChanged", (data) => this.handlePlayerRoleChanged(data));
     this.socket.on("fightersSelected", (data) => this.handleFightersSelected(data));
     this.socket.on("preCeremonyStart", (data) => this.handlePreCeremonyStart(data));
@@ -163,6 +164,13 @@ class SocketClient {
     this.updateSocketStats();
     // console.log("Player message:", data);
     this.emit("playerMessage", data);
+  }
+
+  handleMessageHistory(messages) {
+    this.socketStats.messageHistory = (this.socketStats.messageHistory || 0) + 1;
+    this.updateSocketStats();
+    console.log("Received message history:", messages);
+    this.emit("messageHistory", messages);
   }
 
   handlePlayerRoleChanged({ id, role }) {

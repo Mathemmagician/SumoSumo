@@ -9,6 +9,11 @@ class UIManager {
         this.tutorialBtn = null;
         this.tutorialArrow = null;
         
+        // Music related properties
+        this.backgroundMusic = null;
+        this.isMusicPlaying = false;
+        this.musicBtn = null;
+        
         // Mobile controls
         this.mobileControls = null;
         this.fullscreenBtn = null;
@@ -43,11 +48,16 @@ class UIManager {
         this.chatInput = document.getElementById('chat-input');
         this.tutorialBtn = document.getElementById('tutorial-btn');
         this.tutorialArrow = document.getElementById('tutorial-arrow');
+        this.backgroundMusic = document.getElementById('background-music');
+        this.musicBtn = document.getElementById('music-btn');
         
         console.log("UI Manager initializing, isMobile:", this.isMobile, "isLandscape:", this.isLandscape);
         
         // Check if this is first time visit
         this.checkFirstTimeVisit();
+        
+        // Initialize background music
+        this.initializeBackgroundMusic();
         
         // Create mobile controls
         this.createMobileControls();
@@ -70,6 +80,7 @@ class UIManager {
         // Force check of controls visibility with current state
         if (socketClient.gameState) {
             this.toggleMobileControls(socketClient.gameState.myRole, socketClient.gameState.stage);
+            this.updatePlayerName();
         }
     }
 
@@ -78,6 +89,7 @@ class UIManager {
         socketClient.on('gameStateUpdated', (gameState) => {
             this.updateRoleBadge(gameState.myRole);
             this.updatePlayerCount(this.countAllPlayers(gameState));
+            this.updatePlayerName();
             
             // Show/hide mobile controls based on role
             if (this.isMobile) {
@@ -106,6 +118,49 @@ class UIManager {
             this.updatePlayerCount(this.countAllPlayers(socketClient.gameState));
         });
         
+        // Listen for message history when connecting
+        socketClient.on('messageHistory', (messages) => {
+            if (Array.isArray(messages) && messages.length > 0) {
+                // Clear existing chat history
+                if (this.chatHistory) {
+                    this.chatHistory.innerHTML = '';
+                }
+                
+                // Keep track of displayed messages to avoid duplicates
+                const displayedMessages = new Set();
+                
+                // Display each message in the history, filtering out NPC messages
+                messages.forEach(messageObj => {
+                    // Skip messages from NPCs
+                    if (messageObj.id && (messageObj.id.startsWith('npc-') || messageObj.id.startsWith('fake-'))) {
+                        return;
+                    }
+                    
+                    // Create a unique key for this message
+                    const messageKey = `${messageObj.id}:${messageObj.message}:${messageObj.timestamp}`;
+                    
+                    // Skip if we've already displayed this message
+                    if (displayedMessages.has(messageKey)) {
+                        return;
+                    }
+                    
+                    // Mark this message as displayed
+                    displayedMessages.add(messageKey);
+                    
+                    // Use "You" for current user's messages, player name for others
+                    // If name is available in the message object, use it directly instead of looking up
+                    const sender = messageObj.id === socketClient.gameState.myId 
+                        ? 'You' 
+                        : (messageObj.name || this.findPlayerUsername(messageObj.id));
+                        
+                    // Display the message or emote
+                    if (messageObj.message) {
+                        this.addMessageToHistory(sender, messageObj.message);
+                    }
+                });
+            }
+        });
+        
         // Listen for stage changes
         socketClient.on('stageChanged', (data) => {
             const seconds = Math.ceil(data.duration / 1000);
@@ -124,16 +179,28 @@ class UIManager {
         
         // Listen for emote/message events
         socketClient.on('playerEmote', (data) => {
-            if (data.id && data.id !== socketClient.gameState.myId) {
-                const username = this.findPlayerUsername(data.id);
-                this.debouncedAddMessage(username, data.emote);
+            if (data.id) {
+                // If it's your own message coming back from the server, don't display it again
+                if (data.id === socketClient.gameState.myId) {
+                    return;
+                }
+                
+                // Use name from the message object if available, otherwise look it up
+                const username = data.name || this.findPlayerUsername(data.id);
+                this.debouncedAddMessage(username, data.emote, data.id);
             }
         });
         
         socketClient.on('playerMessage', (data) => {
-            if (data.id && data.id !== socketClient.gameState.myId) {
-                const username = this.findPlayerUsername(data.id);
-                this.debouncedAddMessage(username, data.message);
+            if (data.id) {
+                // If it's your own message coming back from the server, don't display it again
+                if (data.id === socketClient.gameState.myId) {
+                    return;
+                }
+                
+                // Use name from the message object if available, otherwise look it up
+                const username = data.name || this.findPlayerUsername(data.id);
+                this.debouncedAddMessage(username, data.message, data.id);
             }
         });
     }
@@ -177,6 +244,11 @@ class UIManager {
         const sendBtn = document.getElementById('send-btn');
         if (sendBtn) {
             sendBtn.addEventListener('click', () => this.sendMessage());
+        }
+        
+        // Music toggle button
+        if (this.musicBtn) {
+            this.musicBtn.addEventListener('click', () => this.toggleMusic());
         }
         
         // Set up emote buttons
@@ -278,9 +350,9 @@ class UIManager {
         this.chatHistory.appendChild(fragment);
     }
 
-    debouncedAddMessage(sender, message) {
-        // Skip adding messages from fake users to the chat history
-        if (sender.startsWith('npc-')) {
+    debouncedAddMessage(sender, message, id) {
+        // Skip messages from NPC users (checking the actual ID if provided)
+        if (id && (id.startsWith('npc-') || id.startsWith('fake-'))) {
             return;
         }
         
@@ -296,14 +368,31 @@ class UIManager {
         const message = this.chatInput.value.trim();
         
         if (message) {
-            this.debouncedAddMessage('You', message);
+            // Get the player's ID but display as "You" for the current user
+            const myId = socketClient.gameState.myId;
+            
+            // Add to chat with "You" as sender
+            this.debouncedAddMessage("You", message, myId);
             socketClient.sendMessage(message);
             this.chatInput.value = '';
         }
     }
 
     sendEmote(emote) {
-        this.debouncedAddMessage('You', emote);
+        // Prevent rapid duplicate emoji submissions
+        if (this._lastEmote === emote && (Date.now() - this._lastEmoteTime) < 1000) {
+            return;
+        }
+        
+        // Store this emote as the last one sent
+        this._lastEmote = emote;
+        this._lastEmoteTime = Date.now();
+        
+        // Get the player's ID but display as "You" for the current user
+        const myId = socketClient.gameState.myId;
+        
+        // Add to chat with "You" as sender
+        this.debouncedAddMessage("You", emote, myId);
         socketClient.sendEmote(emote);
         
         // Add animation effect to button
@@ -440,8 +529,8 @@ class UIManager {
         // Define arrow directions and their positions
         const arrows = [
             { direction: 'up', text: '▲', key: 'ArrowUp' },
-            { direction: 'left', text: '◄', key: 'ArrowLeft' },
-            { direction: 'right', text: '►', key: 'ArrowRight' },
+            { direction: 'left', text: '◄', key: 'ArrowRight' },
+            { direction: 'right', text: '►', key: 'ArrowLeft' },
             { direction: 'down', text: '▼', key: 'ArrowDown' }
         ];
         
@@ -486,11 +575,34 @@ class UIManager {
     createFullscreenButton() {
         this.fullscreenBtn = document.createElement('button');
         this.fullscreenBtn.id = 'fullscreen-btn';
-        this.fullscreenBtn.innerHTML = '⛶';
+        
+        // Use clear SVG icons instead of Unicode characters
+        const enterFullscreenSVG = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+            </svg>
+        `;
+        
+        const exitFullscreenSVG = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
+            </svg>
+        `;
+        
+        this.fullscreenBtn.innerHTML = enterFullscreenSVG;
         this.fullscreenBtn.title = 'Toggle Fullscreen';
         
         this.fullscreenBtn.addEventListener('click', () => {
             this.toggleFullscreen();
+        });
+        
+        // Listen for fullscreen change events to update the icon
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                this.fullscreenBtn.innerHTML = exitFullscreenSVG;
+            } else {
+                this.fullscreenBtn.innerHTML = enterFullscreenSVG;
+            }
         });
         
         const gameContainer = document.getElementById('game-container');
@@ -503,11 +615,9 @@ class UIManager {
             document.documentElement.requestFullscreen().catch(err => {
                 console.error(`Error attempting to enable fullscreen: ${err.message}`);
             });
-            this.fullscreenBtn.innerHTML = '⮻';
         } else {
             if (document.exitFullscreen) {
                 document.exitFullscreen();
-                this.fullscreenBtn.innerHTML = '⛶';
             }
         }
     }
@@ -608,6 +718,96 @@ class UIManager {
         const hasSeenTutorial = localStorage.getItem('tutorial') === 'true';
         if (!hasSeenTutorial && this.tutorialArrow) {
             this.tutorialArrow.style.display = 'block';
+        }
+    }
+
+    // Add this new method to update the player name
+    updatePlayerName() {
+        const playerNameElement = document.getElementById('player-name');
+        if (!playerNameElement) return;
+        
+        const myId = socketClient.gameState.myId;
+        if (!myId) return;
+        
+        // Find the player in the game state
+        const player = socketClient.findPlayerInGameState(myId);
+        if (player && player.name) {
+            playerNameElement.textContent = player.name;
+        }
+    }
+
+    // Initialize and play background music
+    initializeBackgroundMusic() {
+        if (this.backgroundMusic) {
+            // Set initial volume
+            this.backgroundMusic.volume = 0.6;
+            
+            // Add event listeners to update button state
+            this.backgroundMusic.addEventListener('play', () => {
+                this.isMusicPlaying = true;
+                this.updateMusicToggleButton(true);
+            });
+            
+            this.backgroundMusic.addEventListener('pause', () => {
+                this.isMusicPlaying = false;
+                this.updateMusicToggleButton(false);
+            });
+            
+            // Start playing the music after a short delay to allow the page to load fully
+            setTimeout(() => {
+                this.backgroundMusic.play()
+                    .then(() => {
+                        console.log('Background music started playing');
+                        this.isMusicPlaying = true;
+                        this.updateMusicToggleButton(true);
+                    })
+                    .catch(err => {
+                        console.warn('Failed to autoplay background music:', err);
+                        // Most browsers require user interaction before playing audio
+                        // We'll show a "Play Music" button style for the toggle button
+                        this.isMusicPlaying = false;
+                        this.updateMusicToggleButton(false);
+                    });
+            }, 1000);
+        }
+    }
+    
+    // Toggle music on/off
+    toggleMusic() {
+        if (!this.backgroundMusic) return;
+        
+        if (this.isMusicPlaying) {
+            // Pause the music
+            this.backgroundMusic.pause();
+            this.isMusicPlaying = false;
+        } else {
+            // Play the music
+            this.backgroundMusic.play()
+                .then(() => {
+                    console.log('Background music resumed');
+                    this.isMusicPlaying = true;
+                })
+                .catch(err => {
+                    console.warn('Failed to play background music:', err);
+                });
+        }
+        
+        // Update the button appearance
+        this.updateMusicToggleButton(this.isMusicPlaying);
+    }
+    
+    // Update the music toggle button appearance
+    updateMusicToggleButton(isPlaying) {
+        if (this.musicBtn) {
+            if (isPlaying) {
+                this.musicBtn.textContent = '🔊';
+                this.musicBtn.classList.remove('muted');
+                this.musicBtn.setAttribute('aria-label', 'Mute Music');
+            } else {
+                this.musicBtn.textContent = '🔇';
+                this.musicBtn.classList.add('muted');
+                this.musicBtn.setAttribute('aria-label', 'Play Music');
+            }
         }
     }
 }
