@@ -5,16 +5,14 @@ import { STAGE_DURATIONS } from './constants';
 
 // Rank lists - 30 primary ranks and 30 modifiers
 const RANKS = [
-  "S+", "S", "S-", "A+", "A", "A-", "B+", "B", "B-", "C+", 
-  "C", "C-", "D+", "D", "D-", "E+", "E", "E-", "F+", "F",
-  "Rookie", "Amateur", "Pro", "Elite", "Master", "Legend", "Champion", "Titan", "Immortal", "Deity"
+  "S+", "S", "A+", "A", "B+", "B", "C+", "C", "D+", "D", "E+", "E", "F+", "F",
 ];
 
-const RANK_MODIFIERS = [
-  "Supreme", "Ultimate", "Grand", "Apex", "Prime", "Rising", "Veteran", "Elite", "Ascendant", "Limitless",
-  "Dominant", "Fierce", "Feared", "Fierce", "Ruthless", "Untamed", "Savage", "Mighty", "Powerful", "Unstoppable",
-  "Golden", "Diamond", "Platinum", "Silver", "Bronze", "Iron", "Jade", "Ruby", "Emerald", "Crystal"
-];
+// const RANK_MODIFIERS = [
+//   "Supreme", "Ultimate", "Grand", "Apex", "Prime", "Rising", "Veteran", "Elite", "Ascendant", "Limitless",
+//   "Dominant", "Fierce", "Feared", "Fierce", "Ruthless", "Untamed", "Savage", "Mighty", "Powerful", "Unstoppable",
+//   "Golden", "Diamond", "Platinum", "Silver", "Bronze", "Iron", "Jade", "Ruby", "Emerald", "Crystal"
+// ];
 
 /**
  * Camera System for SumoSumo
@@ -846,32 +844,6 @@ export class CameraSystem {
     // Optional: Show cinematic bars for knockout
     if (this.ceremonyCineBars) {
       this.ceremonyCineBars.show();
-      
-      // Show winner stats with their actual name
-      if (winner && winner.userData && winner.userData.playerId) {
-        const winnerId = winner.userData.playerId;
-        const player = this.socketClient.findPlayerInGameState(winnerId);
-        
-        // Use actual player name, with static rank and win count
-        // This ensures the same player always shows the same stats
-        if (player && player.name) {
-          // Create a deterministic rank and win count based on player name
-          const nameHash = this.hashString(player.name);
-          const rank = this.getDeterministicRank(nameHash);
-          const wins = this.getDeterministicWins(nameHash);
-          
-          const playerStats = {
-            name: player.name,
-            rank: rank,
-            wins: wins
-          };
-          
-          // Small delay to let bars show first
-          setTimeout(() => {
-            this.ceremonyCineBars.showPlayerStats(playerStats.name, playerStats.rank, playerStats.wins);
-          }, 500);
-        }
-      }
     }
     
     // Reset animation start time
@@ -904,14 +876,17 @@ export class CameraSystem {
     // Use modulo to select from rank arrays
     const useModifier = (hash % 10) < 7; // 70% chance for modifier
     
-    if (useModifier) {
-      const modifierIndex = hash % RANK_MODIFIERS.length;
-      const rankIndex = (hash >> 4) % RANKS.length;
-      return `${RANK_MODIFIERS[modifierIndex]} ${RANKS[rankIndex]}`;
-    } else {
-      const rankIndex = hash % RANKS.length;
-      return RANKS[rankIndex];
-    }
+    // if (useModifier) {
+    //   const modifierIndex = hash % RANK_MODIFIERS.length;
+    //   const rankIndex = (hash >> 4) % RANKS.length;
+    //   return `${RANK_MODIFIERS[modifierIndex]} ${RANKS[rankIndex]}`;
+    // } else {
+    //   const rankIndex = hash % RANKS.length;
+    //   return RANKS[rankIndex];
+    // }
+
+    const rankIndex = hash % RANKS.length;
+    return RANKS[rankIndex];
   }
   
   /**
