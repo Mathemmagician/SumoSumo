@@ -951,22 +951,51 @@ body {
 /* Buy Your Spot Button Styles */
 #buy-spot-btn {
   position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 170px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #9c6644;
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+  border: 2px solid #f9d9aa;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   z-index: 50;
-  background-color: #a92;
-  border: 2px solid #fd8;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-  animation: pulse 2s infinite;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
-#buy-spot-btn:hover {
-  background-color: #c93;
-  transform: translateX(-50%) scale(1.05);
+#buy-spot-btn.expanded {
+  width: auto;
+  padding: 0 16px;
+  border-radius: 20px;
+  background-color: #a97755;
+}
+
+#buy-spot-btn.expanded .btn-text {
+  display: inline;
+  margin-left: 5px;
+}
+
+/* Only show hover effect when not expanded */
+#buy-spot-btn:not(.expanded):hover {
+  background-color: #a97755;
+  transform: scale(1.05);
+}
+
+.btn-text {
+  display: none;
+  font-size: 14px;
 }
 
 #buy-spot-btn:active {
-  background-color: #b82;
-  transform: translateX(-50%) scale(0.98);
+  background-color: #8b5533;
+  transform: scale(0.98);
 }
