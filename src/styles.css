@@ -947,3 +947,26 @@ body {
     transform: translateY(-50%) translateX(10px);
   }
 }
+
+/* Buy Your Spot Button Styles */
+#buy-spot-btn {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  background-color: #a92;
+  border: 2px solid #fd8;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  animation: pulse 2s infinite;
+}
+
+#buy-spot-btn:hover {
+  background-color: #c93;
+  transform: translateX(-50%) scale(1.05);
+}
+
+#buy-spot-btn:active {
+  background-color: #b82;
+  transform: translateX(-50%) scale(0.98);
+}

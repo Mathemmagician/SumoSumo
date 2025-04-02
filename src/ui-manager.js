@@ -810,6 +810,21 @@ class UIManager {
             }
         }
     }
+
+    // Redirect to X (Twitter) with pre-filled advertisement message
+    buySpotOnWall() {
+        const twitterId = '1898876929089961984';
+        const message = 'Hi, I would like to advertise in your game. My offer is $1000 for 1 month of exclusive placement.';
+        
+        // Encode the message for URL
+        const encodedMessage = encodeURIComponent(message);
+        
+        // Create the Twitter URL with pre-filled message
+        const twitterUrl = `https://twitter.com/messages/compose?recipient_id=${twitterId}&text=${encodedMessage}`;
+        
+        // Open in a new tab
+        window.open(twitterUrl, '_blank');
+    }
 }
 
 // Export a singleton instance of the UIManager
