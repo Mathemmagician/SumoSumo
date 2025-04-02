@@ -9,6 +9,11 @@ class UIManager {
         this.tutorialBtn = null;
         this.tutorialArrow = null;
         
+        // Music related properties
+        this.backgroundMusic = null;
+        this.isMusicPlaying = false;
+        this.musicBtn = null;
+        
         // Mobile controls
         this.mobileControls = null;
         this.fullscreenBtn = null;
@@ -43,11 +48,16 @@ class UIManager {
         this.chatInput = document.getElementById('chat-input');
         this.tutorialBtn = document.getElementById('tutorial-btn');
         this.tutorialArrow = document.getElementById('tutorial-arrow');
+        this.backgroundMusic = document.getElementById('background-music');
+        this.musicBtn = document.getElementById('music-btn');
         
         console.log("UI Manager initializing, isMobile:", this.isMobile, "isLandscape:", this.isLandscape);
         
         // Check if this is first time visit
         this.checkFirstTimeVisit();
+        
+        // Initialize background music
+        this.initializeBackgroundMusic();
         
         // Create mobile controls
         this.createMobileControls();
@@ -234,6 +244,11 @@ class UIManager {
         const sendBtn = document.getElementById('send-btn');
         if (sendBtn) {
             sendBtn.addEventListener('click', () => this.sendMessage());
+        }
+        
+        // Music toggle button
+        if (this.musicBtn) {
+            this.musicBtn.addEventListener('click', () => this.toggleMusic());
         }
         
         // Set up emote buttons
@@ -697,6 +712,81 @@ class UIManager {
         const player = socketClient.findPlayerInGameState(myId);
         if (player && player.name) {
             playerNameElement.textContent = player.name;
+        }
+    }
+
+    // Initialize and play background music
+    initializeBackgroundMusic() {
+        if (this.backgroundMusic) {
+            // Set initial volume
+            this.backgroundMusic.volume = 0.6;
+            
+            // Add event listeners to update button state
+            this.backgroundMusic.addEventListener('play', () => {
+                this.isMusicPlaying = true;
+                this.updateMusicToggleButton(true);
+            });
+            
+            this.backgroundMusic.addEventListener('pause', () => {
+                this.isMusicPlaying = false;
+                this.updateMusicToggleButton(false);
+            });
+            
+            // Start playing the music after a short delay to allow the page to load fully
+            setTimeout(() => {
+                this.backgroundMusic.play()
+                    .then(() => {
+                        console.log('Background music started playing');
+                        this.isMusicPlaying = true;
+                        this.updateMusicToggleButton(true);
+                    })
+                    .catch(err => {
+                        console.warn('Failed to autoplay background music:', err);
+                        // Most browsers require user interaction before playing audio
+                        // We'll show a "Play Music" button style for the toggle button
+                        this.isMusicPlaying = false;
+                        this.updateMusicToggleButton(false);
+                    });
+            }, 1000);
+        }
+    }
+    
+    // Toggle music on/off
+    toggleMusic() {
+        if (!this.backgroundMusic) return;
+        
+        if (this.isMusicPlaying) {
+            // Pause the music
+            this.backgroundMusic.pause();
+            this.isMusicPlaying = false;
+        } else {
+            // Play the music
+            this.backgroundMusic.play()
+                .then(() => {
+                    console.log('Background music resumed');
+                    this.isMusicPlaying = true;
+                })
+                .catch(err => {
+                    console.warn('Failed to play background music:', err);
+                });
+        }
+        
+        // Update the button appearance
+        this.updateMusicToggleButton(this.isMusicPlaying);
+    }
+    
+    // Update the music toggle button appearance
+    updateMusicToggleButton(isPlaying) {
+        if (this.musicBtn) {
+            if (isPlaying) {
+                this.musicBtn.textContent = '🔊';
+                this.musicBtn.classList.remove('muted');
+                this.musicBtn.setAttribute('aria-label', 'Mute Music');
+            } else {
+                this.musicBtn.textContent = '🔇';
+                this.musicBtn.classList.add('muted');
+                this.musicBtn.setAttribute('aria-label', 'Play Music');
+            }
         }
     }
 }

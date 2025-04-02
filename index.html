@@ -65,6 +65,11 @@
         >🕹️ Vibe Jam 2025</a
       >
 
+      <!-- Background music audio element -->
+      <audio id="background-music" loop>
+        <source src="/audio/sumosumo-battle.wav" type="audio/wav">
+      </audio>
+
       <!-- Tutorial button -->
       <button id="tutorial-btn" aria-label="Show Tutorial">?</button>
       <div id="tutorial-arrow" class="tutorial-arrow" style="display: none;">
@@ -73,6 +78,9 @@
           <div class="arrow"></div>
         </div>
       </div>
+
+      <!-- Music toggle button positioned below tutorial -->
+      <button id="music-btn" aria-label="Toggle Music">♪</button>
 
       <!-- Tutorial modal -->
       <div id="tutorial-modal" class="modal" style="display: none">
