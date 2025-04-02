@@ -621,11 +621,19 @@ body {
   z-index: 50;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
   transition: all 0.2s ease;
+  padding: 0;
 }
 
 #fullscreen-btn:hover {
   background-color: #a97755;
   transform: scale(1.1);
+}
+
+#fullscreen-btn svg {
+  stroke: white;
+  fill: none;
+  width: 22px;
+  height: 22px;
 }
 
 /* Debug button styles */
@@ -732,6 +740,19 @@ body {
   .player-count {
     font-size: 0.8rem;
   }
+
+  /* Fullscreen button adjustments for mobile */
+  #fullscreen-btn {
+    top: 120px;
+    right: 20px;
+    width: 40px;
+    height: 40px;
+  }
+  
+  #fullscreen-btn svg {
+    width: 20px;
+    height: 20px;
+  }
 }
 
 /* For very small screens (phones in portrait) */
@@ -765,7 +786,13 @@ body {
   #fullscreen-btn {
     width: 35px;
     height: 35px;
-    font-size: 18px;
+    top: 120px;
+    right: 15px;
+  }
+  
+  #fullscreen-btn svg {
+    width: 18px;
+    height: 18px;
   }
 }
 

@@ -529,8 +529,8 @@ class UIManager {
         // Define arrow directions and their positions
         const arrows = [
             { direction: 'up', text: '▲', key: 'ArrowUp' },
-            { direction: 'left', text: '◄', key: 'ArrowLeft' },
-            { direction: 'right', text: '►', key: 'ArrowRight' },
+            { direction: 'left', text: '◄', key: 'ArrowRight' },
+            { direction: 'right', text: '►', key: 'ArrowLeft' },
             { direction: 'down', text: '▼', key: 'ArrowDown' }
         ];
         
@@ -575,11 +575,34 @@ class UIManager {
     createFullscreenButton() {
         this.fullscreenBtn = document.createElement('button');
         this.fullscreenBtn.id = 'fullscreen-btn';
-        this.fullscreenBtn.innerHTML = '⛶';
+        
+        // Use clear SVG icons instead of Unicode characters
+        const enterFullscreenSVG = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+            </svg>
+        `;
+        
+        const exitFullscreenSVG = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
+            </svg>
+        `;
+        
+        this.fullscreenBtn.innerHTML = enterFullscreenSVG;
         this.fullscreenBtn.title = 'Toggle Fullscreen';
         
         this.fullscreenBtn.addEventListener('click', () => {
             this.toggleFullscreen();
+        });
+        
+        // Listen for fullscreen change events to update the icon
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                this.fullscreenBtn.innerHTML = exitFullscreenSVG;
+            } else {
+                this.fullscreenBtn.innerHTML = enterFullscreenSVG;
+            }
         });
         
         const gameContainer = document.getElementById('game-container');
@@ -592,11 +615,9 @@ class UIManager {
             document.documentElement.requestFullscreen().catch(err => {
                 console.error(`Error attempting to enable fullscreen: ${err.message}`);
             });
-            this.fullscreenBtn.innerHTML = '⮻';
         } else {
             if (document.exitFullscreen) {
                 document.exitFullscreen();
-                this.fullscreenBtn.innerHTML = '⛶';
             }
         }
     }

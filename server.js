@@ -35,14 +35,14 @@ const MAX_MESSAGE_HISTORY = 5;
 
 // List of Japanese names for players
 const JAPANESE_FIRST_NAMES = [
-  "Takashi", "Hiroshi", "Yuki", "Satoshi", "Kenji",
-  "Akira", "Kazuki", "Daiki", "Shota", "Ryo",
-  "Yuka", "Haruka", "Aoi", "Sakura", "Misaki",
-  "Rin", "Ayaka", "Hikari", "Nana", "Mei",
-  "Taro", "Jiro", "Ren", "Kaito", "Takeshi",
-  "Makoto", "Haruto", "Riku", "Shun", "Tsubasa",
-  "Emi", "Nao", "Hinata", "Miyu", "Risa",
-  "Asuka", "Kanna", "Tomoe", "Sayaka", "Chihiro"
+  "Mighty", "Fat", "Nimble", "Infamous", "Thunderous",
+  "Featherlight", "Gigantic", "Whispering", "Shimmering", "Rumbling",
+  "Voracious", "Bold", "Steadfast", "Sneaky", "Jolly",
+  "Grandiose", "Glistening", "Oblivious", "Nomadic", "Savage",
+  "Wise", "Cunning", "Fierce", "Ruthless", "Hilarious",
+  "Glorious", "Silent", "Merciless", "Stormy", "Stalwart",
+  "Devious", "Eager", "Playful", "Fearless", "Swift",
+  "Ancient", "Eccentric", "Harmonious", "Enigmatic", "Haunted"
 ];
 
 const JAPANESE_LAST_NAMES = [
