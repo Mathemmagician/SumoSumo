@@ -532,11 +532,11 @@ export class StadiumFactory {
         subFontSize: 40
       },
       {
-        text: "r3nd3r.com",
-        subtext: "The Haven't Sponsored Me Yet\nBut They Should",
-        color: 0x000000, // Almost black
+        text: "SUMO SNACKS",
+        subtext: "Gain Weight Fast!\nResults Guaranteed or\nDouble Your Mass Back",
+        color: 0xFF8C00, // Dark orange
         mainFontSize: 55,  // Slightly smaller due to longer text
-        subFontSize: 35
+        subFontSize: 30
       },
       {
         text: "Make $1,000,000",

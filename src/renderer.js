@@ -559,11 +559,11 @@ export class Renderer {
       case "s":
         this.cameraMovement.backward = true;
         break;
-      case "a": // Swapped: A key now controls right movement
-        this.cameraMovement.right = true;
-        break;
-      case "d": // Swapped: D key now controls left movement
+      case "a": // A key now controls left movement
         this.cameraMovement.left = true;
+        break;
+      case "d": // D key now controls right movement
+        this.cameraMovement.right = true;
         break;
       case "arrowup":
         this.cameraMovement.up = true;
@@ -1362,13 +1362,11 @@ export class Renderer {
       case "arrowdown":
         this.fighterMovement.backward = true;
         break;
-      case "a": // Swapped: A key now controls right movement
-      case "arrowright":
-        this.fighterMovement.right = true;
-        break;
-      case "d": // Swapped: D key now controls left movement
-      case "arrowleft":
+      case "a": // Swapped: A key now controls left movement
         this.fighterMovement.left = true;
+        break;
+      case "d": // Swapped: D key now controls right movement
+        this.fighterMovement.right = true;
         break;
     }
   }
@@ -1399,13 +1397,11 @@ export class Renderer {
       case "arrowdown":
         this.fighterMovement.backward = false;
         break;
-      case "a": // Swapped: A key now controls right movement
-      case "arrowright":
-        this.fighterMovement.right = false;
-        break;
-      case "d": // Swapped: D key now controls left movement
-      case "arrowleft":
+      case "a": // Swapped: A key now controls left movement
         this.fighterMovement.left = false;
+        break;
+      case "d": // Swapped: D key now controls right movement
+        this.fighterMovement.right = false;
         break;
     }
   }
@@ -1918,7 +1914,7 @@ export class Renderer {
               color: #ffffff;
               font-size: 14px;
               opacity: 0.9;
-            ">Right</div>
+            ">Left</div>
           </div>
           
           <div style="
@@ -1970,7 +1966,7 @@ export class Renderer {
               color: #ffffff;
               font-size: 14px;
               opacity: 0.9;
-            ">Left</div>
+            ">Right</div>
           </div>
         </div>
       </div>

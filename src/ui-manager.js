@@ -823,8 +823,8 @@ class UIManager {
             btn.style.backgroundColor = '#3a9';
             
             setTimeout(() => {
-                const twitterId = '1898876929089961984';
-                const message = 'Hi, I would like to advertise in your game. My offer is $1000 for 1 month of exclusive placement.';
+                const twitterId = '1009846161379864577';
+                const message = 'Hi, I would like to advertise in your game. My offer is $500 for 1 week of exclusive placement. <Include relevant details and reasonable requests>.';
                 
                 // Encode the message for URL
                 const encodedMessage = encodeURIComponent(message);
