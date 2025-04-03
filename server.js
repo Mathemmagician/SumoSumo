@@ -140,8 +140,21 @@ const FAKE_USERS = {
   reconnectInterval: null
 };
 
+// Add near the top with other state variables (after FAKE_USERS declaration)
+const playerCountState = {
+  lastCounts: {
+    realUsers: 0,
+    botFighters: 0,
+    botReferee: 0
+  }
+};
+
 // Initialize Stripe with your secret key (make sure this is not exposed in client-side code)
 const stripe = Stripe('sk_test_your_secret_key');
+
+// Add throttling to broadcastPlayerCount to prevent rapid successive calls
+let lastBroadcastTime = 0;
+const BROADCAST_THROTTLE = 1000; // Minimum 1 second between broadcasts
 
 // Function to change the game stage
 function changeGameStage(newStage) {
@@ -1456,8 +1469,20 @@ function broadcastPlayerCount() {
   const botFighterCount = gameState.fighters.filter(f => f.isBot).length;
   const botRefereeCount = (gameState.referee && gameState.referee.isBot) ? 1 : 0;
   
-  console.log(`Real users: ${realUserCount} | Bot fighters: ${botFighterCount} | Bot referee: ${botRefereeCount}`);
-  
+  // Only log if counts have changed
+  if (playerCountState.lastCounts.realUsers !== realUserCount || 
+      playerCountState.lastCounts.botFighters !== botFighterCount ||
+      playerCountState.lastCounts.botReferee !== botRefereeCount) {
+    
+    console.log(`Real users: ${realUserCount} | Bot fighters: ${botFighterCount} | Bot referee: ${botRefereeCount}`);
+    
+    playerCountState.lastCounts = {
+      realUsers: realUserCount,
+      botFighters: botFighterCount,
+      botReferee: botRefereeCount
+    };
+  }
+
   const playerCount = {
     total: gameState.viewers.length + gameState.fighters.length + (gameState.referee ? 1 : 0),
     viewers: gameState.viewers.length,
