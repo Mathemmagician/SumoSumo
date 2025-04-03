@@ -425,18 +425,38 @@ class UIManager {
         const gameState = document.getElementById('game-state');
         const gameTime = document.getElementById('game-time');
         
-        if (!gameState || !gameTime) return;
+        // Also update the top center game state display
+        const gameStateTop = document.getElementById('game-state-top');
+        const gameTimeTop = document.getElementById('game-time-top');
         
-        gameState.textContent = status;
-        gameTime.textContent = timeLeft + 's';
+        // Update original game state elements if they exist
+        if (gameState && gameTime) {
+            gameState.textContent = status;
+            gameTime.textContent = timeLeft + 's';
+            
+            gameState.className = '';
+            if (status === 'Match in Progress') {
+                gameState.classList.add('state-active');
+            } else if (status === 'Waiting for Players') {
+                gameState.classList.add('state-waiting');
+            } else {
+                gameState.classList.add('state-ended');
+            }
+        }
         
-        gameState.className = '';
-        if (status === 'Match in Progress') {
-            gameState.classList.add('state-active');
-        } else if (status === 'Waiting for Players') {
-            gameState.classList.add('state-waiting');
-        } else {
-            gameState.classList.add('state-ended');
+        // Update top center game state elements if they exist
+        if (gameStateTop && gameTimeTop) {
+            gameStateTop.textContent = status;
+            gameTimeTop.textContent = timeLeft + 's';
+            
+            gameStateTop.className = '';
+            if (status === 'Match in Progress') {
+                gameStateTop.classList.add('state-active');
+            } else if (status === 'Waiting for Players') {
+                gameStateTop.classList.add('state-waiting');
+            } else {
+                gameStateTop.classList.add('state-ended');
+            }
         }
     }
 
@@ -494,9 +514,16 @@ class UIManager {
             timeRemaining = Math.max(0, duration - elapsed);
             const seconds = Math.ceil(timeRemaining / 1000);
             
+            // Update original game time element
             const gameTime = document.getElementById('game-time');
             if (gameTime) {
                 gameTime.textContent = seconds + 's';
+            }
+            
+            // Update top center game time element
+            const gameTimeTop = document.getElementById('game-time-top');
+            if (gameTimeTop) {
+                gameTimeTop.textContent = seconds + 's';
             }
             
             if (timeRemaining <= 0) {
@@ -809,82 +836,6 @@ class UIManager {
                 this.musicBtn.setAttribute('aria-label', 'Play Music');
             }
         }
-    }
-
-    // Two-step process for Twitter ad spot button
-    buySpotOnWall() {
-        const btn = document.getElementById('buy-spot-btn');
-        
-        if (!btn) return;
-        
-        // If button is already expanded, proceed to Twitter
-        if (btn.classList.contains('expanded')) {
-            // Visual feedback before redirecting
-            btn.style.backgroundColor = '#3a9';
-            
-            setTimeout(() => {
-                const twitterId = '1009846161379864577';
-                const message = 'Hi, I would like to advertise in your game. My offer is $500 for 1 week of exclusive placement. <Include relevant details and reasonable requests>.';
-                
-                // Encode the message for URL
-                const encodedMessage = encodeURIComponent(message);
-                
-                // Create the Twitter URL with pre-filled message
-                const twitterUrl = `https://twitter.com/messages/compose?recipient_id=${twitterId}&text=${encodedMessage}`;
-                
-                // Open in a new tab
-                window.open(twitterUrl, '_blank');
-                
-                // Reset button style and state
-                this.resetBuyButton();
-            }, 400);
-        } else {
-            // First click - just expand the button
-            btn.classList.add('expanded');
-            btn.style.width = 'auto';
-            btn.style.paddingRight = '16px';
-            btn.style.borderRadius = '20px';
-            
-            const btnText = btn.querySelector('.btn-text');
-            if (btnText) {
-                btnText.style.display = 'inline';
-                btnText.style.marginLeft = '5px';
-            }
-            
-            // Add event listener for clicks outside the button
-            document.addEventListener('click', this.handleOutsideClick);
-        }
-    }
-    
-    // Handle clicks outside the button
-    handleOutsideClick = (event) => {
-        const btn = document.getElementById('buy-spot-btn');
-        
-        // If the click is outside the button, reset it
-        if (btn && !btn.contains(event.target) && btn.classList.contains('expanded')) {
-            this.resetBuyButton();
-        }
-    }
-    
-    // Reset the buy button to initial state
-    resetBuyButton() {
-        const btn = document.getElementById('buy-spot-btn');
-        if (!btn) return;
-        
-        btn.classList.remove('expanded');
-        btn.style.width = '';
-        btn.style.paddingRight = '';
-        btn.style.borderRadius = '';
-        btn.style.backgroundColor = '';
-        
-        const btnText = btn.querySelector('.btn-text');
-        if (btnText) {
-            btnText.style.display = '';
-            btnText.style.marginLeft = '';
-        }
-        
-        // Remove the outside click event listener
-        document.removeEventListener('click', this.handleOutsideClick);
     }
 }
 

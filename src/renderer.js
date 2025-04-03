@@ -111,6 +111,9 @@ export class Renderer {
     // Initialize ModelFactory first
     await this.modelFactory.initialize();
     
+    // Make renderer instance available globally
+    window.renderer = this;
+    
     // Check if running on mobile
     this.isMobile = this.checkIsMobile();
     console.log("Mobile device detected:", this.isMobile);
@@ -1624,7 +1627,7 @@ export class Renderer {
       const progress = Math.min(elapsed / duration, 1.0);
       
       // Use easing functions for more natural motion
-      const positionEase = this.easeOutQuart(progress);
+      const positionEase = this.easeOutQuad(progress);
       const rotationEase = this.easeInOutQuad(progress);
       
       // Calculate current position with arc trajectory
