@@ -888,10 +888,10 @@ export class StadiumFactory {
       const importedRoof = modelLoader.loadedModels.roof.clone();
       
       // Position the imported roof below the existing roof structure
-      importedRoof.position.set(0, height - 3, 0);
+      importedRoof.position.set(0, height - 1.5, 0);
       
       // Scale the imported roof to match the stadium dimensions
-      const roofScale = 10; // Increased scale by adjusting divisor
+      const roofScale = 15; // Increased scale by adjusting divisor
       importedRoof.scale.set(roofScale, roofScale, roofScale);
       
       // Rotate the roof by 90 degrees around the Y axis

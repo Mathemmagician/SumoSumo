@@ -1067,7 +1067,7 @@ body {
 /* Game State Display at top center */
 #game-state-display {
   position: fixed;
-  bottom: 20px;
+  top: 10px;
   left: 50%;
   transform: translateX(-50%);
   background-color: rgba(60, 20, 0, 0.45);

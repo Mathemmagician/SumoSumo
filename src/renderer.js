@@ -1365,11 +1365,17 @@ export class Renderer {
       case "arrowdown":
         this.fighterMovement.backward = true;
         break;
-      case "a": // Swapped: A key now controls left movement
+      case "a":
         this.fighterMovement.left = true;
         break;
-      case "d": // Swapped: D key now controls right movement
+      case "d":
         this.fighterMovement.right = true;
+        break;
+      case "arrowleft": // Swap: Arrow left now controls right movement
+        this.fighterMovement.right = true;
+        break;
+      case "arrowright": // Swap: Arrow right now controls left movement
+        this.fighterMovement.left = true;
         break;
     }
   }
@@ -1400,11 +1406,17 @@ export class Renderer {
       case "arrowdown":
         this.fighterMovement.backward = false;
         break;
-      case "a": // Swapped: A key now controls left movement
+      case "a":
         this.fighterMovement.left = false;
         break;
-      case "d": // Swapped: D key now controls right movement
+      case "d":
         this.fighterMovement.right = false;
+        break;
+      case "arrowleft": // Swap: Arrow left now controls right movement
+        this.fighterMovement.right = false;
+        break;
+      case "arrowright": // Swap: Arrow right now controls left movement
+        this.fighterMovement.left = false;
         break;
     }
   }
