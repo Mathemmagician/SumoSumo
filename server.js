@@ -5,6 +5,16 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import Stripe from 'stripe';
+import dotenv from 'dotenv';
+import fetch from 'node-fetch';
+import { createRequire } from 'module';
+
+// Use createRequire for CommonJS modules
+const require = createRequire(import.meta.url);
+const geoip = require('geoip-lite');
+
+// Load environment variables
+dotenv.config();
 
 // Get the directory name using ES modules approach
 const __filename = fileURLToPath(import.meta.url);
@@ -28,6 +38,62 @@ app.use(cors({
   origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
   credentials: true
 }));
+
+// Discord webhook configuration
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || 'https://discordapp.com/api/webhooks/1357783158283833435/8ldVN1kp1sz-GyBiqlTl0TGut0I61gwtXZnKdTd9ICTd1uZosextbyj4dHkl5mBW7IG4';
+
+// Function to get geo location data from IP address
+// Try local geoip first, then use API if needed
+async function getLocationFromIp(ip) {
+  // Skip lookup for localhost IPs
+  if (ip === '::1' || ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
+    return '(Local Connection)';
+  }
+  
+  // First try local geoip lookup
+  const geo = geoip.lookup(ip);
+  if (geo && geo.country) {
+    return `${geo.country}${geo.city ? `, ${geo.city}` : ''}`;
+  }
+  
+  // If local lookup fails or is incomplete, try ipapi.co as fallback
+  try {
+    const response = await fetch(`https://ipapi.co/${ip}/json/`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data && !data.error) {
+        // Return more detailed location
+        const country = data.country_name || data.country || '(Unknown Country)';
+        const city = data.city || '';
+        return city ? `${country}, ${city}` : country;
+      }
+    }
+  } catch (error) {
+    console.error('IP API lookup error:', error);
+  }
+  
+  // Return unknown if all lookups fail
+  return '(Unknown)';
+}
+
+// Function to send Discord webhook notification
+async function sendDiscordNotification(content) {
+  try {
+    const response = await fetch(DISCORD_WEBHOOK_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ content }),
+    });
+    
+    if (!response.ok) {
+      console.error('Error sending Discord notification:', await response.text());
+    }
+  } catch (error) {
+    console.error('Failed to send Discord notification:', error);
+  }
+}
 
 // Store the last 5 messages
 const messageHistory = [];
@@ -1053,7 +1119,7 @@ function sanitizeForSocketIO(obj) {
 }
 
 // When a client connects
-io.on('connect', (socket) => {
+io.on('connect', async (socket) => {
   console.log('User connected:', socket.id);
 
   // Create a new player
@@ -1071,6 +1137,34 @@ io.on('connect', (socket) => {
 
   // Add to viewers
   gameState.viewers.push(player);
+
+  // Send Discord notification for real users (not NPCs)
+  if (!player.id.startsWith('npc-')) {
+    // Get IP address (with fallbacks for different proxy setups)
+    const ipAddress = socket.handshake.headers['x-forwarded-for'] || 
+                      socket.handshake.headers['x-real-ip'] || 
+                      socket.handshake.address;
+    
+    // Clean the IP address (remove port if present)
+    const cleanIp = ipAddress.includes(':') ? ipAddress.split(':')[0] : ipAddress;
+    
+    // Look up geolocation data
+    let locationInfo = '(Unknown)';
+    if (cleanIp !== '::1' && cleanIp !== '127.0.0.1') {
+      locationInfo = await getLocationFromIp(cleanIp);
+    } else {
+      locationInfo = '(Local Connection)';
+    }
+    
+    // Create notification message
+    const notificationMsg = `🎮 **New User Connected**\n` +
+                           `**Name:** ${player.name}\n` +
+                           `**ID:** ${player.id}\n` +
+                           `**Location:** ${locationInfo}`;
+    
+    // Send the notification
+    sendDiscordNotification(notificationMsg);
+  }
 
   // Debug info
   console.log(
@@ -1321,18 +1415,24 @@ io.on('connect', (socket) => {
   });
 
   // Handle disconnect
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     console.log('User disconnected:', socket.id);
 
     let playerRole = null;
+    let playerName = null;
 
     // Determine the player's role before removing them
     if (gameState.fighters.some(f => f.id === socket.id)) {
+      const fighter = gameState.fighters.find(f => f.id === socket.id);
       playerRole = 'fighter';
+      playerName = fighter ? fighter.name : 'Unknown';
     } else if (gameState.referee && gameState.referee.id === socket.id) {
       playerRole = 'referee';
+      playerName = gameState.referee.name;
     } else if (gameState.viewers.some(v => v.id === socket.id)) {
+      const viewer = gameState.viewers.find(v => v.id === socket.id);
       playerRole = 'viewer';
+      playerName = viewer ? viewer.name : 'Unknown';
     }
 
     // Remove player from appropriate array
@@ -1342,7 +1442,7 @@ io.on('connect', (socket) => {
       
       // Don't remove bot fighters from the match when disconnected (should never happen, but just in case)
       if (disconnectedFighter && !disconnectedFighter.isBot) {
-      gameState.fighters = gameState.fighters.filter(f => f.id !== socket.id);
+        gameState.fighters = gameState.fighters.filter(f => f.id !== socket.id);
       }
 
       // If a fighter leaves during the match, the other fighter wins automatically
@@ -1375,7 +1475,7 @@ io.on('connect', (socket) => {
     } else if (playerRole === 'referee') {
       // Only remove the referee if it's not a bot
       if (gameState.referee && !gameState.referee.isBot) {
-      gameState.referee = null;
+        gameState.referee = null;
       }
       // We do NOT reassign a referee immediately here—it's chosen at next FIGHTER_SELECTION
     } else if (playerRole === 'viewer') {
@@ -1435,9 +1535,9 @@ function resetGameState() {
       }
     } else {
       // Move real fighters to viewers
-    fighter.role = 'viewer';
-    gameState.viewers.push(fighter);
-    io.emit('playerRoleChanged', { id: fighter.id, role: 'viewer' });
+      fighter.role = 'viewer';
+      gameState.viewers.push(fighter);
+      io.emit('playerRoleChanged', { id: fighter.id, role: 'viewer' });
     }
   });
 
@@ -1448,9 +1548,9 @@ function resetGameState() {
       gameState.botPool.referees.push(gameState.referee);
     } else {
       // Move real referee to viewers
-    gameState.referee.role = 'viewer';
-    gameState.viewers.push(gameState.referee);
-    io.emit('playerRoleChanged', { id: gameState.referee.id, role: 'viewer' });
+      gameState.referee.role = 'viewer';
+      gameState.viewers.push(gameState.referee);
+      io.emit('playerRoleChanged', { id: gameState.referee.id, role: 'viewer' });
     }
   }
 
