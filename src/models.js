@@ -891,7 +891,7 @@ export class StadiumFactory {
       importedRoof.position.set(0, height - 3, 0);
       
       // Scale the imported roof to match the stadium dimensions
-      const roofScale = (distance * 2) / 15; // Increased scale by adjusting divisor
+      const roofScale = 10; // Increased scale by adjusting divisor
       importedRoof.scale.set(roofScale, roofScale, roofScale);
       
       // Rotate the roof by 90 degrees around the Y axis
@@ -905,7 +905,7 @@ export class StadiumFactory {
       
       // Add "SumoSumo" sign as a 2D plane with the same width as the roof model
       // Use PlaneGeometry instead of BoxGeometry for a 2D sign
-      const signWidth = 0.5; // Width based on the roof scale
+      const signWidth = 0.58; // Width based on the roof scale
       const signHeight = 0.15; // Height proportional to width
       const signGeometry = new THREE.PlaneGeometry(signWidth, signHeight);
       
@@ -915,17 +915,8 @@ export class StadiumFactory {
       canvas.height = 256;
       const ctx = canvas.getContext('2d');
       
-      // Fill background with brighter color
-      ctx.fillStyle = '#9c2a1c'; // Brighter reddish background
-      ctx.fillRect(0, 0, 1024, 256);
-      
-      // Add border
-      ctx.strokeStyle = '#ffd700'; // Brighter gold border
-      ctx.lineWidth = 20;
-      ctx.strokeRect(10, 10, 1004, 236);
-      
       // Add text
-      ctx.fillStyle = '#ffd700'; // Brighter gold text
+      ctx.fillStyle = '#917536'; // Brighter gold text
       ctx.font = 'bold 160px Arial, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -953,7 +944,7 @@ export class StadiumFactory {
       const sign = new THREE.Mesh(signGeometry, signMaterial);
       
       // Position the sign in front of the roof model
-      sign.position.set(-0.3, -0.2, 0); // Just slightly in front
+      sign.position.set(-0.22, -0.075, 0); // Just slightly in front
       sign.rotation.y = -Math.PI / 2; // Rotate -90 degrees to fix reversed text
       
       // Add the sign directly to the imported roof model
