@@ -111,6 +111,9 @@ export class Renderer {
     // Initialize ModelFactory first
     await this.modelFactory.initialize();
     
+    // Make renderer instance available globally
+    window.renderer = this;
+    
     // Check if running on mobile
     this.isMobile = this.checkIsMobile();
     console.log("Mobile device detected:", this.isMobile);
@@ -680,7 +683,7 @@ export class Renderer {
 
     // Individual player updates
     socketClient.on("playerMoved", (data) => {
-      console.log("Renderer received playerMoved:", data);
+      // console.log("Renderer received playerMoved:", data);
       this.updatePlayerPosition(data);
     });
 
@@ -1221,7 +1224,7 @@ export class Renderer {
   updatePlayerPosition(data) {
     const model = this.playerModels.get(data.id);
     if (model) {
-      console.log(`Updating position for ${data.id}:`, data.position);
+      // console.log(`Updating position for ${data.id}:`, data.position);
       if (data.position) {
         model.position.set(data.position.x, model.position.y, data.position.z);
       }
@@ -1241,9 +1244,9 @@ export class Renderer {
     if (model) {
       this.scene.remove(model);
       this.playerModels.delete(playerId);
-      console.log(
-        `Removed player model. Total models: ${this.playerModels.size}`
-      );
+      // console.log(
+      //   `Removed player model. Total models: ${this.playerModels.size}`
+      // );
     }
   }
 
@@ -1362,11 +1365,17 @@ export class Renderer {
       case "arrowdown":
         this.fighterMovement.backward = true;
         break;
-      case "a": // Swapped: A key now controls left movement
+      case "a":
         this.fighterMovement.left = true;
         break;
-      case "d": // Swapped: D key now controls right movement
+      case "d":
         this.fighterMovement.right = true;
+        break;
+      case "arrowleft": // Swap: Arrow left now controls right movement
+        this.fighterMovement.right = true;
+        break;
+      case "arrowright": // Swap: Arrow right now controls left movement
+        this.fighterMovement.left = true;
         break;
     }
   }
@@ -1397,11 +1406,17 @@ export class Renderer {
       case "arrowdown":
         this.fighterMovement.backward = false;
         break;
-      case "a": // Swapped: A key now controls left movement
+      case "a":
         this.fighterMovement.left = false;
         break;
-      case "d": // Swapped: D key now controls right movement
+      case "d":
         this.fighterMovement.right = false;
+        break;
+      case "arrowleft": // Swap: Arrow left now controls right movement
+        this.fighterMovement.right = false;
+        break;
+      case "arrowright": // Swap: Arrow right now controls left movement
+        this.fighterMovement.left = false;
         break;
     }
   }
@@ -1624,7 +1639,7 @@ export class Renderer {
       const progress = Math.min(elapsed / duration, 1.0);
       
       // Use easing functions for more natural motion
-      const positionEase = this.easeOutQuart(progress);
+      const positionEase = this.easeOutQuad(progress);
       const rotationEase = this.easeInOutQuad(progress);
       
       // Calculate current position with arc trajectory

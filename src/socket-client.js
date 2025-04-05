@@ -148,7 +148,7 @@ class SocketClient {
   handlePlayerMoved(data) {
     this.socketStats.playerMoved++;
     this.updateSocketStats();
-    console.log("Player moved:", data);
+    // console.log("Player moved:", data);
     this.emit("playerMoved", data);
   }
 

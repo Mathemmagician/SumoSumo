@@ -324,6 +324,17 @@ class UIManager {
                 }
             });
         }
+
+        // Listen for free camera toggle changes to update mobile controls
+        document.getElementById('free-camera-toggle')?.addEventListener('change', (e) => {
+            if (this.isMobile) {
+                const freeCameraMode = e.target.checked;
+                const joystickControls = document.getElementById('joystick-controls');
+                if (joystickControls) {
+                    joystickControls.style.display = freeCameraMode ? 'flex' : 'none';
+                }
+            }
+        });
     }
 
     addMessageToHistory(sender, message) {
@@ -425,18 +436,38 @@ class UIManager {
         const gameState = document.getElementById('game-state');
         const gameTime = document.getElementById('game-time');
         
-        if (!gameState || !gameTime) return;
+        // Also update the top center game state display
+        const gameStateTop = document.getElementById('game-state-top');
+        const gameTimeTop = document.getElementById('game-time-top');
         
-        gameState.textContent = status;
-        gameTime.textContent = timeLeft + 's';
+        // Update original game state elements if they exist
+        if (gameState && gameTime) {
+            gameState.textContent = status;
+            gameTime.textContent = timeLeft + 's';
+            
+            gameState.className = '';
+            if (status === 'Match in Progress') {
+                gameState.classList.add('state-active');
+            } else if (status === 'Waiting for Players') {
+                gameState.classList.add('state-waiting');
+            } else {
+                gameState.classList.add('state-ended');
+            }
+        }
         
-        gameState.className = '';
-        if (status === 'Match in Progress') {
-            gameState.classList.add('state-active');
-        } else if (status === 'Waiting for Players') {
-            gameState.classList.add('state-waiting');
-        } else {
-            gameState.classList.add('state-ended');
+        // Update top center game state elements if they exist
+        if (gameStateTop && gameTimeTop) {
+            gameStateTop.textContent = status;
+            gameTimeTop.textContent = timeLeft + 's';
+            
+            gameStateTop.className = '';
+            if (status === 'Match in Progress') {
+                gameStateTop.classList.add('state-active');
+            } else if (status === 'Waiting for Players') {
+                gameStateTop.classList.add('state-waiting');
+            } else {
+                gameStateTop.classList.add('state-ended');
+            }
         }
     }
 
@@ -455,6 +486,14 @@ class UIManager {
             detail: { enabled: freeCameraMode } 
         });
         document.dispatchEvent(event);
+        
+        // Update joystick controls visibility for free camera mode
+        if (this.isMobile) {
+            const joystickControls = document.getElementById('joystick-controls');
+            if (joystickControls) {
+                joystickControls.style.display = freeCameraMode ? 'flex' : 'none';
+            }
+        }
     }
 
     toggleDeveloperMode(checkbox) {
@@ -494,9 +533,16 @@ class UIManager {
             timeRemaining = Math.max(0, duration - elapsed);
             const seconds = Math.ceil(timeRemaining / 1000);
             
+            // Update original game time element
             const gameTime = document.getElementById('game-time');
             if (gameTime) {
                 gameTime.textContent = seconds + 's';
+            }
+            
+            // Update top center game time element
+            const gameTimeTop = document.getElementById('game-time-top');
+            if (gameTimeTop) {
+                gameTimeTop.textContent = seconds + 's';
             }
             
             if (timeRemaining <= 0) {
@@ -522,9 +568,10 @@ class UIManager {
         this.mobileControls.id = 'mobile-controls';
         this.mobileControls.style.display = 'none'; // Hidden by default
         
-        // Create arrows container
+        // Create fighter controls (existing arrow controls) - we'll keep these for fighter mode
         const arrowsContainer = document.createElement('div');
         arrowsContainer.className = 'arrows-container';
+        arrowsContainer.id = 'fighter-controls';
         
         // Define arrow directions and their positions
         const arrows = [
@@ -534,7 +581,6 @@ class UIManager {
             { direction: 'down', text: '▼', key: 'ArrowDown' }
         ];
         
-        // Create arrow buttons
         arrows.forEach(arrow => {
             const btn = document.createElement('button');
             btn.className = `mobile-control-btn ${arrow.direction}`;
@@ -564,8 +610,39 @@ class UIManager {
             arrowsContainer.appendChild(btn);
         });
         
+        // Create joystick controls for fly-around mode
+        const joystickContainer = document.createElement('div');
+        joystickContainer.id = 'joystick-controls';
+        joystickContainer.style.display = 'none'; // Hidden by default
+        
+        // Create left joystick for movement (WASD)
+        const leftJoystickOuter = document.createElement('div');
+        leftJoystickOuter.className = 'joystick-outer left-joystick';
+        
+        const leftJoystickInner = document.createElement('div');
+        leftJoystickInner.className = 'joystick-inner';
+        leftJoystickOuter.appendChild(leftJoystickInner);
+        
+        // Create right joystick for up/down and rotation
+        const rightJoystickOuter = document.createElement('div');
+        rightJoystickOuter.className = 'joystick-outer right-joystick';
+        
+        const rightJoystickInner = document.createElement('div');
+        rightJoystickInner.className = 'joystick-inner';
+        rightJoystickOuter.appendChild(rightJoystickInner);
+        
+        // Add joysticks to container
+        joystickContainer.appendChild(leftJoystickOuter);
+        joystickContainer.appendChild(rightJoystickOuter);
+        
+        // Add both control sets to mobile controls container
         this.mobileControls.appendChild(arrowsContainer);
+        this.mobileControls.appendChild(joystickContainer);
         document.body.appendChild(this.mobileControls);
+        
+        // Initialize joystick controls
+        this.initializeJoystickControls(leftJoystickOuter, leftJoystickInner, 'movement');
+        this.initializeJoystickControls(rightJoystickOuter, rightJoystickInner, 'rotation');
         
         // For testing: uncomment to force show controls
         // this.mobileControls.style.display = 'block';
@@ -691,13 +768,31 @@ class UIManager {
             return;
         }
         
-        // Always show controls on mobile if user is a fighter, regardless of stage
-        if (this.isMobile && role === 'fighter') {
-            console.log("Showing mobile controls");
+        // Get container elements
+        const fighterControls = document.getElementById('fighter-controls');
+        const joystickControls = document.getElementById('joystick-controls');
+        
+        // Always show the main container if on mobile and in landscape
+        if (this.isMobile && this.isLandscape) {
             this.mobileControls.style.display = 'block';
         } else {
-            console.log("Hiding mobile controls");
             this.mobileControls.style.display = 'none';
+        }
+        
+        // Handle fighter controls - show only if user is a fighter
+        if (this.isMobile && this.isLandscape && role === 'fighter') {
+            console.log("Showing fighter mobile controls");
+            if (fighterControls) fighterControls.style.display = 'block';
+        } else {
+            if (fighterControls) fighterControls.style.display = 'none';
+        }
+        
+        // Handle fly around controls - show only if free camera is enabled
+        if (this.isMobile && this.isLandscape && document.getElementById('free-camera-toggle')?.checked) {
+            console.log("Showing joystick mobile controls for free camera");
+            if (joystickControls) joystickControls.style.display = 'flex';
+        } else {
+            if (joystickControls) joystickControls.style.display = 'none';
         }
     }
     
@@ -721,6 +816,82 @@ class UIManager {
         }
     }
 
+        // Two-step process for Twitter ad spot button
+        buySpotOnWall() {
+            const btn = document.getElementById('buy-spot-btn');
+    
+            if (!btn) return;
+    
+            // If button is already expanded, proceed to Twitter
+            if (btn.classList.contains('expanded')) {
+                // Visual feedback before redirecting
+                btn.style.backgroundColor = '#3a9';
+    
+                setTimeout(() => {
+                    const twitterId = '1009846161379864577';
+                    const message = 'Hi, I would like to advertise in your game. My offer is $500 for 1 week of exclusive placement. <Include relevant details and reasonable requests>.';
+    
+                    // Encode the message for URL
+                    const encodedMessage = encodeURIComponent(message);
+    
+                    // Create the Twitter URL with pre-filled message
+                    const twitterUrl = `https://twitter.com/messages/compose?recipient_id=${twitterId}&text=${encodedMessage}`;
+    
+                    // Open in a new tab
+                    window.open(twitterUrl, '_blank');
+    
+                    // Reset button style and state
+                    this.resetBuyButton();
+                }, 400);
+            } else {
+                // First click - just expand the button
+                btn.classList.add('expanded');
+                btn.style.width = 'auto';
+                btn.style.paddingRight = '16px';
+                btn.style.borderRadius = '20px';
+    
+                const btnText = btn.querySelector('.btn-text');
+                if (btnText) {
+                    btnText.style.display = 'inline';
+                    btnText.style.marginLeft = '5px';
+                }
+    
+                // Add event listener for clicks outside the button
+                document.addEventListener('click', this.handleOutsideClick);
+            }
+        }
+    
+        // Handle clicks outside the button
+        handleOutsideClick = (event) => {
+            const btn = document.getElementById('buy-spot-btn');
+    
+            // If the click is outside the button, reset it
+            if (btn && !btn.contains(event.target) && btn.classList.contains('expanded')) {
+                this.resetBuyButton();
+            }
+        }
+    
+        // Reset the buy button to initial state
+        resetBuyButton() {
+            const btn = document.getElementById('buy-spot-btn');
+            if (!btn) return;
+    
+            btn.classList.remove('expanded');
+            btn.style.width = '';
+            btn.style.paddingRight = '';
+            btn.style.borderRadius = '';
+            btn.style.backgroundColor = '';
+    
+            const btnText = btn.querySelector('.btn-text');
+            if (btnText) {
+                btnText.style.display = '';
+                btnText.style.marginLeft = '';
+            }
+    
+            // Remove the outside click event listener
+            document.removeEventListener('click', this.handleOutsideClick);
+        }
+        
     // Add this new method to update the player name
     updatePlayerName() {
         const playerNameElement = document.getElementById('player-name');
@@ -811,80 +982,209 @@ class UIManager {
         }
     }
 
-    // Two-step process for Twitter ad spot button
-    buySpotOnWall() {
-        const btn = document.getElementById('buy-spot-btn');
+    // Initialize joystick controls with touch and mouse events
+    initializeJoystickControls(outerElement, innerElement, joystickType) {
+        let active = false;
+        let startX, startY;
+        let currentX, currentY;
+        const maxDistance = 40; // Maximum distance the joystick can move
         
-        if (!btn) return;
+        // Maps to track which keys are currently pressed
+        const keysPressed = {
+            movement: {
+                w: false, // forward
+                s: false, // backward
+                a: false, // left
+                d: false  // right
+            },
+            rotation: {
+                ArrowUp: false,    // up
+                ArrowDown: false,  // down
+                ArrowLeft: false,  // rotate left
+                ArrowRight: false  // rotate right
+            }
+        };
         
-        // If button is already expanded, proceed to Twitter
-        if (btn.classList.contains('expanded')) {
-            // Visual feedback before redirecting
-            btn.style.backgroundColor = '#3a9';
+        // Set up touch event handlers
+        outerElement.addEventListener('touchstart', handleStart, { passive: false });
+        outerElement.addEventListener('touchmove', handleMove, { passive: false });
+        outerElement.addEventListener('touchend', handleEnd, { passive: false });
+        
+        // Set up mouse event handlers for testing on desktop
+        outerElement.addEventListener('mousedown', handleStart);
+        document.addEventListener('mousemove', handleMove);
+        document.addEventListener('mouseup', handleEnd);
+        
+        function handleStart(e) {
+            e.preventDefault();
+            active = true;
             
-            setTimeout(() => {
-                const twitterId = '1009846161379864577';
-                const message = 'Hi, I would like to advertise in your game. My offer is $500 for 1 week of exclusive placement. <Include relevant details and reasonable requests>.';
-                
-                // Encode the message for URL
-                const encodedMessage = encodeURIComponent(message);
-                
-                // Create the Twitter URL with pre-filled message
-                const twitterUrl = `https://twitter.com/messages/compose?recipient_id=${twitterId}&text=${encodedMessage}`;
-                
-                // Open in a new tab
-                window.open(twitterUrl, '_blank');
-                
-                // Reset button style and state
-                this.resetBuyButton();
-            }, 400);
-        } else {
-            // First click - just expand the button
-            btn.classList.add('expanded');
-            btn.style.width = 'auto';
-            btn.style.paddingRight = '16px';
-            btn.style.borderRadius = '20px';
-            
-            const btnText = btn.querySelector('.btn-text');
-            if (btnText) {
-                btnText.style.display = 'inline';
-                btnText.style.marginLeft = '5px';
+            // Get starting position
+            if (e.type === 'touchstart') {
+                const touch = e.touches[0];
+                const rect = outerElement.getBoundingClientRect();
+                startX = rect.left + rect.width / 2;
+                startY = rect.top + rect.height / 2;
+                currentX = touch.clientX;
+                currentY = touch.clientY;
+            } else {
+                const rect = outerElement.getBoundingClientRect();
+                startX = rect.left + rect.width / 2;
+                startY = rect.top + rect.height / 2;
+                currentX = e.clientX;
+                currentY = e.clientY;
             }
             
-            // Add event listener for clicks outside the button
-            document.addEventListener('click', this.handleOutsideClick);
-        }
-    }
-    
-    // Handle clicks outside the button
-    handleOutsideClick = (event) => {
-        const btn = document.getElementById('buy-spot-btn');
-        
-        // If the click is outside the button, reset it
-        if (btn && !btn.contains(event.target) && btn.classList.contains('expanded')) {
-            this.resetBuyButton();
-        }
-    }
-    
-    // Reset the buy button to initial state
-    resetBuyButton() {
-        const btn = document.getElementById('buy-spot-btn');
-        if (!btn) return;
-        
-        btn.classList.remove('expanded');
-        btn.style.width = '';
-        btn.style.paddingRight = '';
-        btn.style.borderRadius = '';
-        btn.style.backgroundColor = '';
-        
-        const btnText = btn.querySelector('.btn-text');
-        if (btnText) {
-            btnText.style.display = '';
-            btnText.style.marginLeft = '';
+            // Initialize joystick position
+            updateJoystickPosition();
         }
         
-        // Remove the outside click event listener
-        document.removeEventListener('click', this.handleOutsideClick);
+        function handleMove(e) {
+            if (!active) return;
+            e.preventDefault();
+            
+            // Update current position
+            if (e.type === 'touchmove') {
+                const touch = e.touches[0];
+                currentX = touch.clientX;
+                currentY = touch.clientY;
+            } else {
+                currentX = e.clientX;
+                currentY = e.clientY;
+            }
+            
+            // Update joystick position and send control events
+            updateJoystickPosition();
+            sendControlEvents();
+        }
+        
+        function handleEnd(e) {
+            if (!active) return;
+            e.preventDefault();
+            active = false;
+            
+            // Reset joystick position
+            innerElement.style.transform = 'translate(0px, 0px)';
+            
+            // Reset all keys for this joystick
+            const keys = keysPressed[joystickType];
+            for (const key in keys) {
+                if (keys[key]) {
+                    keys[key] = false;
+                    uiManager.sendMobileControlEvent(key, false);
+                }
+            }
+        }
+        
+        function updateJoystickPosition() {
+            // Calculate distance from center
+            let deltaX = currentX - startX;
+            let deltaY = currentY - startY;
+            
+            // Calculate distance
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            
+            // Limit distance to max
+            if (distance > maxDistance) {
+                const ratio = maxDistance / distance;
+                deltaX *= ratio;
+                deltaY *= ratio;
+            }
+            
+            // Move joystick inner element
+            innerElement.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+        }
+        
+        function sendControlEvents() {
+            // Calculate normalized direction
+            const deltaX = currentX - startX;
+            const deltaY = currentY - startY;
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            
+            // Don't send events if joystick is in center position (with small deadzone)
+            if (distance < 5) {
+                // Reset all keys for this joystick
+                const keys = keysPressed[joystickType];
+                for (const key in keys) {
+                    if (keys[key]) {
+                        keys[key] = false;
+                        uiManager.sendMobileControlEvent(key, false);
+                    }
+                }
+                return;
+            }
+            
+            // Normalize delta values
+            const normX = deltaX / Math.max(distance, 1);
+            const normY = deltaY / Math.max(distance, 1);
+            
+            // Determine which keys to press based on joystick type
+            if (joystickType === 'movement') {
+                // Forward/backward (W/S)
+                const shouldPressW = normY < -0.3;
+                const shouldPressS = normY > 0.3;
+                
+                // Left/right (A/D)
+                const shouldPressA = normX < -0.3;
+                const shouldPressD = normX > 0.3;
+                
+                // Update W key
+                if (shouldPressW !== keysPressed.movement.w) {
+                    keysPressed.movement.w = shouldPressW;
+                    uiManager.sendMobileControlEvent('w', shouldPressW);
+                }
+                
+                // Update S key
+                if (shouldPressS !== keysPressed.movement.s) {
+                    keysPressed.movement.s = shouldPressS;
+                    uiManager.sendMobileControlEvent('s', shouldPressS);
+                }
+                
+                // Update A key
+                if (shouldPressA !== keysPressed.movement.a) {
+                    keysPressed.movement.a = shouldPressA;
+                    uiManager.sendMobileControlEvent('a', shouldPressA);
+                }
+                
+                // Update D key
+                if (shouldPressD !== keysPressed.movement.d) {
+                    keysPressed.movement.d = shouldPressD;
+                    uiManager.sendMobileControlEvent('d', shouldPressD);
+                }
+            } else if (joystickType === 'rotation') {
+                // Up/down (ArrowUp/ArrowDown)
+                const shouldPressUp = normY < -0.3;
+                const shouldPressDown = normY > 0.3;
+                
+                // Rotate left/right (ArrowLeft/ArrowRight)
+                const shouldPressLeft = normX < -0.3;
+                const shouldPressRight = normX > 0.3;
+                
+                // Update ArrowUp key
+                if (shouldPressUp !== keysPressed.rotation.ArrowUp) {
+                    keysPressed.rotation.ArrowUp = shouldPressUp;
+                    uiManager.sendMobileControlEvent('ArrowUp', shouldPressUp);
+                }
+                
+                // Update ArrowDown key
+                if (shouldPressDown !== keysPressed.rotation.ArrowDown) {
+                    keysPressed.rotation.ArrowDown = shouldPressDown;
+                    uiManager.sendMobileControlEvent('ArrowDown', shouldPressDown);
+                }
+                
+                // Update ArrowLeft key
+                if (shouldPressLeft !== keysPressed.rotation.ArrowLeft) {
+                    keysPressed.rotation.ArrowLeft = shouldPressLeft;
+                    uiManager.sendMobileControlEvent('ArrowLeft', shouldPressLeft);
+                }
+                
+                // Update ArrowRight key
+                if (shouldPressRight !== keysPressed.rotation.ArrowRight) {
+                    keysPressed.rotation.ArrowRight = shouldPressRight;
+                    uiManager.sendMobileControlEvent('ArrowRight', shouldPressRight);
+                }
+            }
+        }
     }
 }
 

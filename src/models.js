@@ -101,7 +101,8 @@ export class ModelLoader {
     this.loadedModels = {
       fighters: [], // Change to array to hold multiple fighter models
       referee: null,
-      viewers: []
+      viewers: [],
+      roof: null // Add roof model
     };
     this.isLoading = false;
     this.loadPromise = null;
@@ -115,7 +116,7 @@ export class ModelLoader {
     }
     
     // If models are already loaded, return immediately
-    if (this.loadedModels.fighters.length >= 2 && this.loadedModels.referee && this.loadedModels.viewers.length === 4) {
+    if (this.loadedModels.fighters.length >= 2 && this.loadedModels.referee && this.loadedModels.viewers.length === 4 && this.loadedModels.roof) {
       console.log('Models already loaded, returning immediately');
       return this.loadedModels;
     }
@@ -127,7 +128,7 @@ export class ModelLoader {
     this.loadPromise = new Promise(async (resolve, reject) => {
       try {
         // Load all models in parallel
-        const [sumo0Gltf, sumo1Gltf, sumo2Gltf, refereeGltf, viewer0Gltf, viewer1Gltf, viewer2Gltf, viewer3Gltf] = await Promise.all([
+        const [sumo0Gltf, sumo1Gltf, sumo2Gltf, refereeGltf, viewer0Gltf, viewer1Gltf, viewer2Gltf, viewer3Gltf, roofGltf] = await Promise.all([
           this.loadModel('/models3d/sumo.glb'),
           this.loadModel('/models3d/sumo_1.glb'),
           this.loadModel('/models3d/sumo_2.glb'),
@@ -135,7 +136,8 @@ export class ModelLoader {
           this.loadModel('/models3d/viewer_0.glb'),
           this.loadModel('/models3d/viewer_1.glb'),
           this.loadModel('/models3d/viewer_2.glb'),
-          this.loadModel('/models3d/viewer_3.glb')
+          this.loadModel('/models3d/viewer_3.glb'),
+          this.loadModel('/models3d/roof.glb')
         ]);
 
         // Process and store the models
@@ -151,6 +153,7 @@ export class ModelLoader {
           this.processModel(viewer2Gltf.scene),
           this.processModel(viewer3Gltf.scene)
         ];
+        this.loadedModels.roof = this.processModel(roofGltf.scene);
 
         console.log('All models loaded successfully');
         resolve(this.loadedModels);
@@ -495,6 +498,10 @@ export class StadiumFactory {
     const roofHeight = s.WALL_HEIGHT + 2;
     const roofStructure = this.createRoofStructure(roofDistance, roofHeight);
     stadiumGroup.add(roofStructure);
+    
+    // Add the imported roof.glb model
+    const importedRoof = this.addImportedRoof(roofDistance, roofHeight);
+    stadiumGroup.add(importedRoof);
     
     // Add some lanterns for ambient lighting
     this.addStageLighting(stadiumGroup, wallDistance);
@@ -864,6 +871,109 @@ export class StadiumFactory {
     roofGroup.add(peakOrnament);
     
     return roofGroup;
+  }
+
+  /**
+   * Adds the imported roof.glb model to the stadium
+   * @param {number} distance - Distance from center to roof edge
+   * @param {number} height - Height of the roof from ground
+   * @returns {THREE.Group} The imported roof group
+   */
+  static addImportedRoof(distance, height) {
+    const importedRoofGroup = new THREE.Group();
+    
+    // Add the imported roof.glb model if it has been loaded
+    const modelLoader = this.getModelLoader();
+    if (modelLoader && modelLoader.loadedModels && modelLoader.loadedModels.roof) {
+      const importedRoof = modelLoader.loadedModels.roof.clone();
+      
+      // Position the imported roof below the existing roof structure
+      importedRoof.position.set(0, height - 3, 0);
+      
+      // Scale the imported roof to match the stadium dimensions
+      const roofScale = 10; // Increased scale by adjusting divisor
+      importedRoof.scale.set(roofScale, roofScale, roofScale);
+      
+      // Rotate the roof by 90 degrees around the Y axis
+      importedRoof.rotation.y = Math.PI / 2; // 90 degrees in radians
+      
+      // Name the imported roof for easy identification
+      importedRoof.name = "imported-roof";
+      
+      // Add the roof to the group
+      importedRoofGroup.add(importedRoof);
+      
+      // Add "SumoSumo" sign as a 2D plane with the same width as the roof model
+      // Use PlaneGeometry instead of BoxGeometry for a 2D sign
+      const signWidth = 0.58; // Width based on the roof scale
+      const signHeight = 0.15; // Height proportional to width
+      const signGeometry = new THREE.PlaneGeometry(signWidth, signHeight);
+      
+      // Create canvas for the sign texture
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      
+      // Add text
+      ctx.fillStyle = '#917536'; // Brighter gold text
+      ctx.font = 'bold 160px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      // Add stronger shadow for depth
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+      ctx.shadowBlur = 15;
+      ctx.shadowOffsetX = 5;
+      ctx.shadowOffsetY = 5;
+      
+      // Draw the text
+      ctx.fillText('SumoSumo', 512, 128);
+      
+      // Create texture from canvas
+      const signTexture = new THREE.CanvasTexture(canvas);
+      signTexture.needsUpdate = true;
+      
+      const signMaterial = new THREE.MeshBasicMaterial({
+        map: signTexture,
+        side: THREE.DoubleSide, // Make it visible from both sides
+        transparent: true, // Enable transparency
+        opacity: 1.0
+      });
+      
+      const sign = new THREE.Mesh(signGeometry, signMaterial);
+      
+      // Position the sign in front of the roof model
+      sign.position.set(-0.22, -0.075, 0); // Just slightly in front
+      sign.rotation.y = -Math.PI / 2; // Rotate -90 degrees to fix reversed text
+      
+      // Add the sign directly to the imported roof model
+      importedRoof.add(sign);
+      
+      console.log("Added imported roof.glb model to stadium with 2D sign");
+    } else {
+      console.warn("roof.glb model not loaded, skipping imported roof");
+    }
+    
+    return importedRoofGroup;
+  }
+
+  // Helper method to get the model loader singleton
+  static getModelLoader() {
+    // If we already have a reference, return it
+    if (this._modelLoader) {
+      return this._modelLoader;
+    }
+    
+    // Check if the renderer has initialized it
+    if (window.renderer && window.renderer.modelFactory) {
+      this._modelLoader = window.renderer.modelFactory.modelLoader;
+      return this._modelLoader;
+    }
+    
+    // Otherwise create a new instance
+    this._modelLoader = new ModelLoader();
+    return this._modelLoader;
   }
 
   // Add method for creating stadium lighting

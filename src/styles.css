@@ -542,8 +542,17 @@ body {
 #mobile-controls {
   position: fixed;
   bottom: 20px;
-  left: 30px;
+  left: 0;
+  right: 0;
   z-index: 10;
+  width: auto;
+  height: auto;
+}
+
+#fighter-controls {
+  position: absolute;
+  bottom: 20px;
+  left: 30px;
   width: 170px;
   height: 170px;
 }
@@ -599,6 +608,61 @@ body {
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
+}
+
+/* Joystick Controls Styles */
+#joystick-controls {
+  position: fixed;
+  bottom: 20px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 30px;
+  z-index: 10;
+}
+
+.joystick-outer {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  background-color: rgba(60, 20, 0, 0.4);
+  border: 2px solid rgba(156, 102, 68, 0.6);
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  touch-action: none;
+}
+
+.joystick-inner {
+  width: 50px;
+  height: 50px;
+  background-color: rgba(156, 102, 68, 0.9);
+  border: 2px solid rgba(200, 160, 120, 0.8);
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.left-joystick:after {
+  position: absolute;
+  top: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  font-size: 14px;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+}
+
+.right-joystick:after {
+  position: absolute;
+  top: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  font-size: 14px;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
 }
 
 /* Fullscreen Button Styles */
@@ -998,4 +1062,118 @@ body {
 #buy-spot-btn:active {
   background-color: #8b5533;
   transform: scale(0.98);
+}
+
+/* Game State Display at top center */
+#game-state-display {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(60, 20, 0, 0.45);
+  border: 1px solid rgba(156, 102, 68, 0.5);
+  border-radius: 8px;
+  padding: 6px 12px;
+  min-width: unset;
+  width: auto;
+  z-index: 50;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(3px);
+  transition: all 0.3s ease;
+}
+
+#game-state-display:hover {
+  background-color: rgba(70, 25, 0, 0.55);
+}
+
+#game-state-display .game-status-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0;
+  gap: 15px;
+  padding: 0;
+}
+
+#game-state-top,
+#game-time-top {
+  color: white;
+  font-weight: normal;
+  font-size: 0.9rem;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Hide game state elements in game-info panel */
+#game-info .game-status-line:last-of-type {
+  display: none;
+}
+
+/* Intro Animation Styles */
+#intro-animation-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    overflow: hidden;
+    pointer-events: none;
+    background-color: rgba(0, 0, 0, 0.8);
+    transition: background-color 0.8s ease;
+}
+
+.intro-title {
+    font-family: 'Yuji Mai', serif;
+    font-size: 12vw;
+    color: #917536;
+    display: flex;
+    flex-direction: row;
+    position: relative;
+    text-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+    gap: 1vw;
+}
+
+.title-part {
+    position: relative;
+    transition: transform 1.5s cubic-bezier(0.6, 0.2, 0.1, 1), 
+                rotate 1.5s cubic-bezier(0.6, 0.1, 0.3, 1),
+                opacity 0.3s ease;
+    transform-origin: center;
+}
+
+.slash-line {
+    position: absolute;
+    width: 0;
+    height: 8px;
+    background-color: #ff0000;
+    transform-origin: center;
+    box-shadow: 0 0 15px #ff0000, 0 0 30px rgba(255, 0, 0, 0.8);
+    z-index: 10001;
+    transition: width 0.2s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.5s ease;
+    opacity: 0;
+}
+
+.intro-flash {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0);
+    z-index: 10000;
+    pointer-events: none;
+    transition: background-color 0.1s ease-out;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); text-shadow: 0 0 15px rgba(0, 0, 0, 0.7); }
+    50% { transform: scale(1.05); text-shadow: 0 0 25px rgba(145, 117, 54, 0.3); }
+    100% { transform: scale(1); text-shadow: 0 0 15px rgba(0, 0, 0, 0.7); }
+}
+
+.title-pulse {
+    animation: pulse 2s infinite ease-in-out;
 }
