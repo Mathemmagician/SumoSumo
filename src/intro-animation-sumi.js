@@ -6,7 +6,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 const INTRO_IMAGES = [
   { path: './Intro.png', weight: 40 },
   { path: './Intro2.png', weight: 30 },
-  { path: './Intro3.jpeg', weight: 30 },
+  { path: './Intro3.png', weight: 30 },
 ];
 
 class SumiEAnimation {
