@@ -164,9 +164,6 @@ export class CameraSystem {
 
     this.currentMode = modeName;
     this.animationStartTime = Date.now();
-
-    // Initialize position for this mode, but don't apply it immediately (will be handled by transition)
-    // We'll call updateCameraForCurrentMode in the update method during transition
   }
   
   /**
@@ -267,15 +264,8 @@ export class CameraSystem {
       return;
     }
     
-    // Default to WAITING_OVERVIEW for all non-ceremony stages
-    if (this.currentMode !== this.MODES.CEREMONY) {
-      if (this.currentMode !== this.MODES.WAITING_OVERVIEW) {
-        this.setMode(this.MODES.WAITING_OVERVIEW);
-        return;
-      }
-    }
-
-    const elapsedTime = Date.now() - this.animationStartTime;
+    // Normal mode updates - no transition in progress
+    const elapsedTime = now - this.animationStartTime;
     this.updateCameraForCurrentMode(elapsedTime);
   }
   
@@ -291,7 +281,6 @@ export class CameraSystem {
       return;
     }
     
-    // Handle based on specific mode
     switch (this.currentMode) {
       case this.MODES.WAITING_OVERVIEW:
         this.updateWaitingOverviewCamera(settings, elapsedTime);
