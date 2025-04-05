@@ -683,7 +683,7 @@ export class Renderer {
 
     // Individual player updates
     socketClient.on("playerMoved", (data) => {
-      console.log("Renderer received playerMoved:", data);
+      // console.log("Renderer received playerMoved:", data);
       this.updatePlayerPosition(data);
     });
 
@@ -1224,7 +1224,7 @@ export class Renderer {
   updatePlayerPosition(data) {
     const model = this.playerModels.get(data.id);
     if (model) {
-      console.log(`Updating position for ${data.id}:`, data.position);
+      // console.log(`Updating position for ${data.id}:`, data.position);
       if (data.position) {
         model.position.set(data.position.x, model.position.y, data.position.z);
       }
@@ -1244,9 +1244,9 @@ export class Renderer {
     if (model) {
       this.scene.remove(model);
       this.playerModels.delete(playerId);
-      console.log(
-        `Removed player model. Total models: ${this.playerModels.size}`
-      );
+      // console.log(
+      //   `Removed player model. Total models: ${this.playerModels.size}`
+      // );
     }
   }
 
