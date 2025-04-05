@@ -1177,3 +1177,152 @@ body {
 .title-pulse {
     animation: pulse 2s infinite ease-in-out;
 }
+
+/* Art Slideshow Button */
+#art-btn {
+  position: fixed;
+  top: 20px;
+  right: 70px; /* Position to the left of tutorial button */
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #9c6644;
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+  border: 2px solid #f9d9aa;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+#art-btn:hover {
+  background-color: #a97755;
+  transform: scale(1.1);
+}
+
+/* Art Slideshow Container */
+#art-slideshow {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 1); /* Fully black background */
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.art-slide {
+  position: absolute;
+  width: 105%; /* Increase width to allow for more movement */
+  height: 105%; /* Increase height to allow for vertical movement */
+  top: -2.5%;
+  left: -3.5%; /* Start slightly off-screen to allow for movement in all directions */
+  object-fit: cover; /* Cover instead of contain to fill the screen */
+  opacity: 0;
+  transition: opacity 2s ease, transform 20s cubic-bezier(0.1, 0.1, 0.25, 1); /* Slower, smoother movement */
+  transform-origin: center center;
+  will-change: transform, opacity;
+}
+
+.art-slide.active {
+  opacity: 1;
+  z-index: 10000;
+  animation: slowMove 20s infinite alternate ease-in-out;
+}
+
+.art-slide.slide-left {
+  transform: translateX(-3%);
+}
+
+.art-slide.slide-right {
+  transform: translateX(3%);
+}
+
+/* Slide transition animations */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slowMove {
+  0% {
+    transform: scale(1.02) translate(-2%, -1%);
+  }
+  50% {
+    transform: scale(1.04) translate(2%, 1%);
+  }
+  100% {
+    transform: scale(1.03) translate(-1%, 2%);
+  }
+}
+
+/* Additional movement animations with different patterns */
+@keyframes panRight {
+  0% {
+    transform: scale(1.03) translate(-4%, 0%);
+  }
+  100% {
+    transform: scale(1.06) translate(4%, 0%);
+  }
+}
+
+@keyframes panLeft {
+  0% {
+    transform: scale(1.03) translate(4%, 0%);
+  }
+  100% {
+    transform: scale(1.06) translate(-4%, 0%);
+  }
+}
+
+@keyframes slowZoom {
+  0% {
+    transform: scale(1.0);
+  }
+  100% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes diagonalMove {
+  0% {
+    transform: scale(1.02) translate(-3%, -3%);
+  }
+  50% {
+    transform: scale(1.05) translate(0%, 0%);
+  }
+  100% {
+    transform: scale(1.04) translate(3%, 3%);
+  }
+}

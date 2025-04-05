@@ -14,6 +14,14 @@ class UIManager {
         this.isMusicPlaying = false;
         this.musicBtn = null;
         
+        // Art slideshow related properties
+        this.artBtn = null;
+        this.artSlideshow = null;
+        this.exitSlideshow = null;
+        this.currentSlide = 0;
+        this.slideshowInterval = null;
+        this.artDirectionRight = true;
+        
         // Mobile controls
         this.mobileControls = null;
         this.fullscreenBtn = null;
@@ -50,6 +58,8 @@ class UIManager {
         this.tutorialArrow = document.getElementById('tutorial-arrow');
         this.backgroundMusic = document.getElementById('background-music');
         this.musicBtn = document.getElementById('music-btn');
+        this.artBtn = document.getElementById('art-btn');
+        this.artSlideshow = document.getElementById('art-slideshow');
         
         console.log("UI Manager initializing, isMobile:", this.isMobile, "isLandscape:", this.isLandscape);
         
@@ -333,6 +343,30 @@ class UIManager {
                 if (joystickControls) {
                     joystickControls.style.display = freeCameraMode ? 'flex' : 'none';
                 }
+            }
+        });
+
+        // Art slideshow event listeners
+        if (this.artBtn) {
+            this.artBtn.addEventListener('click', () => this.startArtSlideshow());
+        }
+        
+        // Allow clicking anywhere to exit art slideshow
+        document.addEventListener('click', (e) => {
+            if (this.artSlideshow && this.artSlideshow.style.display === 'block') {
+                // Don't close if clicking the art button itself
+                if (e.target === this.artBtn) {
+                    e.stopPropagation();
+                    return;
+                }
+                this.stopArtSlideshow();
+            }
+        });
+        
+        // Allow pressing any key to exit art slideshow
+        document.addEventListener('keydown', (e) => {
+            if (this.artSlideshow && this.artSlideshow.style.display === 'block') {
+                this.stopArtSlideshow();
             }
         });
     }
@@ -816,82 +850,252 @@ class UIManager {
         }
     }
 
-        // Two-step process for Twitter ad spot button
-        buySpotOnWall() {
-            const btn = document.getElementById('buy-spot-btn');
-    
-            if (!btn) return;
-    
-            // If button is already expanded, proceed to Twitter
-            if (btn.classList.contains('expanded')) {
-                // Visual feedback before redirecting
-                btn.style.backgroundColor = '#3a9';
-    
-                setTimeout(() => {
-                    const twitterId = '1009846161379864577';
-                    const message = 'Hi, I would like to advertise in your game. My offer is $500 for 1 week of exclusive placement. <Include relevant details and reasonable requests>.';
-    
-                    // Encode the message for URL
-                    const encodedMessage = encodeURIComponent(message);
-    
-                    // Create the Twitter URL with pre-filled message
-                    const twitterUrl = `https://twitter.com/messages/compose?recipient_id=${twitterId}&text=${encodedMessage}`;
-    
-                    // Open in a new tab
-                    window.open(twitterUrl, '_blank');
-    
-                    // Reset button style and state
-                    this.resetBuyButton();
-                }, 400);
-            } else {
-                // First click - just expand the button
-                btn.classList.add('expanded');
-                btn.style.width = 'auto';
-                btn.style.paddingRight = '16px';
-                btn.style.borderRadius = '20px';
-    
-                const btnText = btn.querySelector('.btn-text');
-                if (btnText) {
-                    btnText.style.display = 'inline';
-                    btnText.style.marginLeft = '5px';
+    // Art slideshow methods
+    startArtSlideshow() {
+        // Get all art images from the public/art directory
+        const artPaths = [
+            '/art/sumoArt (0).jpg',
+            '/art/sumoArt (1).jpg',
+            '/art/sumoArt (2).jpg',
+            '/art/sumoArt (3).jpg',
+            '/art/sumoArt (4).jpg',
+            '/art/sumoArt (5).jpg',
+            '/art/sumoArt (6).jpg',
+            '/art/sumoArt (7).jpg',
+            '/art/sumoArt (8).jpg',
+            '/art/sumoArt (9).jpg',
+            '/art/sumoArt (10).jpg'
+        ];
+        
+        // Clear any existing slides
+        this.artSlideshow.querySelectorAll('.art-slide').forEach(slide => {
+            slide.remove();
+        });
+        
+        // Create image elements for each art piece
+        artPaths.forEach((path, index) => {
+            const img = document.createElement('img');
+            img.src = path;
+            img.alt = `Sumo Art ${index}`;
+            img.className = 'art-slide';
+            img.style.animation = 'none'; // Reset any animation
+            
+            // Preload images
+            img.onload = () => {
+                // Once loaded, image is ready for display
+                if (index === 0) {
+                    requestAnimationFrame(() => {
+                        img.classList.add('active');
+                        img.style.animation = 'slideIn 2s forwards';
+                        // Randomly assign initial movement pattern
+                        this.setRandomMovementPattern(img);
+                    });
                 }
+            };
+            
+            this.artSlideshow.appendChild(img);
+        });
+        
+        // Show the slideshow container
+        this.artSlideshow.style.display = 'block';
+        
+        // Start the slideshow timer
+        this.currentSlide = 0;
+        this.slideshowInterval = setInterval(() => this.changeSlide(), 10000);
+    }
     
-                // Add event listener for clicks outside the button
-                document.addEventListener('click', this.handleOutsideClick);
-            }
+    // Helper to set random movement pattern for a slide
+    setRandomMovementPattern(slideElement) {
+        // Clear any existing animations and transforms
+        slideElement.style.animation = '';
+        slideElement.style.transform = '';
+        
+        // Apply a random animation from our set of predefined animations
+        const pattern = Math.floor(Math.random() * 8); // 0-7 for more variety
+        
+        switch (pattern) {
+            case 0:
+                slideElement.style.animation = 'slowMove 20s infinite alternate ease-in-out';
+                break;
+                
+            case 1:
+                slideElement.style.animation = 'panRight 25s infinite alternate ease-in-out';
+                break;
+                
+            case 2:
+                slideElement.style.animation = 'panLeft 22s infinite alternate ease-in-out';
+                break;
+                
+            case 3:
+                slideElement.style.animation = 'slowZoom 28s infinite alternate ease-in-out';
+                break;
+                
+            case 4:
+                slideElement.style.animation = 'diagonalMove 24s infinite alternate ease-in-out';
+                break;
+                
+            case 5: // Custom movement with Web Animations API
+                slideElement.animate([
+                    { transform: 'scale(1.02) translate(-3%, -2%)' },
+                    { transform: 'scale(1.07) translate(4%, 3%)' },
+                    { transform: 'scale(1.05) translate(2%, -3%)' }
+                ], {
+                    duration: 24000,
+                    iterations: Infinity,
+                    direction: 'alternate',
+                    easing: 'ease-in-out'
+                });
+                break;
+                
+            case 6: // Dramatic diagonal movement
+                slideElement.animate([
+                    { transform: 'scale(1.03) translate(-4%, -4%)' },
+                    { transform: 'scale(1.08) translate(4%, 4%)' }
+                ], {
+                    duration: 20000,
+                    iterations: Infinity,
+                    direction: 'alternate',
+                    easing: 'ease-in-out'
+                });
+                break;
+                
+            case 7: // Slow pan with zoom
+                slideElement.animate([
+                    { transform: 'scale(1.02) translate(-4%, 0%)' },
+                    { transform: 'scale(1.05) translate(0%, -2%)' },
+                    { transform: 'scale(1.08) translate(4%, 0%)' },
+                    { transform: 'scale(1.05) translate(0%, 2%)' }
+                ], {
+                    duration: 30000,
+                    iterations: Infinity,
+                    easing: 'ease-in-out'
+                });
+                break;
         }
+    }
     
-        // Handle clicks outside the button
-        handleOutsideClick = (event) => {
-            const btn = document.getElementById('buy-spot-btn');
+    changeSlide() {
+        const slides = this.artSlideshow.querySelectorAll('.art-slide');
+        if (slides.length === 0) return;
+        
+        // Fade out current slide
+        const currentSlide = slides[this.currentSlide];
+        currentSlide.style.transition = 'opacity 1.5s ease';
+        currentSlide.style.opacity = 0;
+        
+        // Remove active class after transition
+        setTimeout(() => {
+            currentSlide.classList.remove('active');
+            // Keep any animations running but make slide invisible
+            currentSlide.style.zIndex = '0';
+        }, 1500);
+        
+        // Move to next slide
+        this.currentSlide = (this.currentSlide + 1) % slides.length;
+        
+        // Prepare next slide
+        const nextSlide = slides[this.currentSlide];
+        nextSlide.style.opacity = 0;
+        nextSlide.style.transition = 'opacity 2s ease';
+        nextSlide.style.zIndex = '1001';
+        
+        // Add active class to new slide with animation
+        setTimeout(() => {
+            nextSlide.classList.add('active');
+            nextSlide.style.opacity = 1;
+            
+            // Apply random movement pattern
+            this.setRandomMovementPattern(nextSlide);
+        }, 500);
+    }
     
-            // If the click is outside the button, reset it
-            if (btn && !btn.contains(event.target) && btn.classList.contains('expanded')) {
-                this.resetBuyButton();
-            }
-        }
-    
-        // Reset the buy button to initial state
-        resetBuyButton() {
-            const btn = document.getElementById('buy-spot-btn');
-            if (!btn) return;
-    
-            btn.classList.remove('expanded');
-            btn.style.width = '';
-            btn.style.paddingRight = '';
-            btn.style.borderRadius = '';
-            btn.style.backgroundColor = '';
-    
-            const btnText = btn.querySelector('.btn-text');
-            if (btnText) {
-                btnText.style.display = '';
-                btnText.style.marginLeft = '';
-            }
-    
-            // Remove the outside click event listener
-            document.removeEventListener('click', this.handleOutsideClick);
+    stopArtSlideshow() {
+        // Clear the slideshow interval
+        if (this.slideshowInterval) {
+            clearInterval(this.slideshowInterval);
+            this.slideshowInterval = null;
         }
         
+        // Hide the slideshow
+        this.artSlideshow.style.display = 'none';
+    }
+
+    // Two-step process for Twitter ad spot button
+    buySpotOnWall() {
+        const btn = document.getElementById('buy-spot-btn');
+
+        if (!btn) return;
+
+        // If button is already expanded, proceed to Twitter
+        if (btn.classList.contains('expanded')) {
+            // Visual feedback before redirecting
+            btn.style.backgroundColor = '#3a9';
+
+            setTimeout(() => {
+                const twitterId = '1009846161379864577';
+                const message = 'Hi, I would like to advertise in your game. My offer is $500 for 1 week of exclusive placement. <Include relevant details and reasonable requests>.';
+
+                // Encode the message for URL
+                const encodedMessage = encodeURIComponent(message);
+                
+                // Create the Twitter URL with pre-filled message
+                const twitterUrl = `https://twitter.com/messages/compose?recipient_id=${twitterId}&text=${encodedMessage}`;
+
+                // Open in a new tab
+                window.open(twitterUrl, '_blank');
+                
+                // Reset button style and state
+                this.resetBuyButton();
+            }, 400);
+        } else {
+            // First click - just expand the button
+            btn.classList.add('expanded');
+            btn.style.width = 'auto';
+            btn.style.paddingRight = '16px';
+            btn.style.borderRadius = '20px';
+
+            const btnText = btn.querySelector('.btn-text');
+            if (btnText) {
+                btnText.style.display = 'inline';
+                btnText.style.marginLeft = '5px';
+            }
+
+            // Add event listener for clicks outside the button
+            document.addEventListener('click', this.handleOutsideClick);
+        }
+    }
+
+    // Handle clicks outside the button
+    handleOutsideClick = (event) => {
+        const btn = document.getElementById('buy-spot-btn');
+
+        // If the click is outside the button, reset it
+        if (btn && !btn.contains(event.target) && btn.classList.contains('expanded')) {
+            this.resetBuyButton();
+        }
+    }
+
+    // Reset the buy button to initial state
+    resetBuyButton() {
+        const btn = document.getElementById('buy-spot-btn');
+        if (!btn) return;
+
+        btn.classList.remove('expanded');
+        btn.style.width = '';
+        btn.style.paddingRight = '';
+        btn.style.borderRadius = '';
+        btn.style.backgroundColor = '';
+
+        const btnText = btn.querySelector('.btn-text');
+        if (btnText) {
+            btnText.style.display = '';
+            btnText.style.marginLeft = '';
+        }
+        
+        // Remove the outside click event listener
+        document.removeEventListener('click', this.handleOutsideClick);
+    }
+    
     // Add this new method to update the player name
     updatePlayerName() {
         const playerNameElement = document.getElementById('player-name');
