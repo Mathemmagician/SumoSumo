@@ -7,7 +7,7 @@ import "./styles.css";
 import { socketClient } from "./socket-client";
 import { uiManager } from "./ui-manager";
 import { renderer } from "./renderer";
-import { introAnimation } from "./intro-animation";
+import { sumiEAnimation } from "./intro-animation-sumi";
 // import { stripeManager } from './stripe-manager.js';  // Don't delete this
 import "./analytics";
 
@@ -21,16 +21,13 @@ window.addEventListener("load", async () => {
 
   try {
     // Initialize the intro animation
-    introAnimation.initialize();
+    await sumiEAnimation.play();
     
     // First, connect socket client
     socketClient.connect();
 
     // Wait for renderer to initialize (which involves model loading)
     await renderer.initialize();
-
-    // Play intro animation after everything is loaded
-    introAnimation.play();
 
     // Explicitly make sure the stripe manager is initialized
     if (stripeManager) {
