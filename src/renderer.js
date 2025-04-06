@@ -1606,7 +1606,7 @@ export class Renderer {
   }
 
   // Add new methods for text bubble management
-  createTextBubble(playerId, text, isEmote = false) {
+  createTextBubble(playerId, text, isEmote = false, isAnnouncement = false) {
     // Remove any existing bubble
     this.removeTextBubble(playerId);
 
@@ -1615,7 +1615,18 @@ export class Renderer {
 
     // Create container div
     const bubbleDiv = document.createElement('div');
-    bubbleDiv.className = isEmote ? 'text-bubble emote-bubble' : 'text-bubble';
+    
+    // Add appropriate class based on the type of message
+    if (isAnnouncement) {
+      bubbleDiv.className = 'text-bubble referee-announcement';
+      bubbleDiv.style.fontWeight = 'bold';
+      bubbleDiv.style.fontSize = '1.2em';
+      bubbleDiv.style.color = '#FFD700'; // Gold color for announcements
+    } else if (isEmote) {
+      bubbleDiv.className = 'text-bubble emote-bubble';
+    } else {
+      bubbleDiv.className = 'text-bubble';
+    }
     
     // Set text content
     bubbleDiv.textContent = text;
@@ -1631,13 +1642,66 @@ export class Renderer {
     player.add(textObject);
     this.textBubbles.set(playerId, textObject);
 
+    // For referee announcements, add animation
+    if (isAnnouncement && player.role === 'referee') {
+      this.animateRefereeAnnouncement(player);
+    }
+
     // Auto-remove after delay
     setTimeout(() => {
       if (this.textBubbles.has(playerId)) {
         bubbleDiv.style.opacity = '0';
         setTimeout(() => this.removeTextBubble(playerId), 300);
       }
-    }, isEmote ? 2000 : 5000);
+    }, isAnnouncement ? 5000 : (isEmote ? 2000 : 5000)); // Announcements stay visible longer
+  }
+
+  // Add a new method to animate the referee jumping up and down
+  animateRefereeAnnouncement(refereeModel) {
+    if (!refereeModel) return;
+    
+    const originalY = refereeModel.position.y;
+    const jumpHeight = 0.3; // How high to jump (in units)
+    const jumpDuration = 200; // Duration of each jump (in ms)
+    const jumpCount = 3; // Number of jumps
+    
+    let jumpIndex = 0;
+    let isGoingUp = true;
+    
+    // Store the interval ID so we can clear it later
+    const jumpInterval = setInterval(() => {
+      // Calculate jump progress
+      const jumpProgress = (Date.now() % jumpDuration) / jumpDuration;
+      
+      // Calculate new Y position based on jump phase
+      if (isGoingUp) {
+        // Going up - easeOutQuad for a natural jump
+        const t = this.easeOutQuad(jumpProgress);
+        refereeModel.position.y = originalY + jumpHeight * t;
+        
+        // Check if we've reached the top
+        if (jumpProgress >= 0.9) {
+          isGoingUp = false;
+        }
+      } else {
+        // Coming down - easeInQuad for a natural landing
+        const t = this.easeInQuad(jumpProgress);
+        refereeModel.position.y = originalY + jumpHeight * (1 - t);
+        
+        // Check if we've completed the jump
+        if (jumpProgress >= 0.9) {
+          isGoingUp = true;
+          jumpIndex++;
+          
+          // If we've done all jumps, stop the animation
+          if (jumpIndex >= jumpCount) {
+            clearInterval(jumpInterval);
+            // Make sure we land exactly at the original position
+            refereeModel.position.y = originalY;
+          }
+        }
+      }
+    }, 16); // ~60fps
   }
 
   removeTextBubble(playerId) {
@@ -2292,6 +2356,49 @@ export class Renderer {
     if (fpsCounter) {
       fpsCounter.textContent = `${this.fps} FPS`;
     }
+  }
+
+  handlePlayerMessage(data) {
+    console.log("Player message:", data);
+    
+    // Create text bubble for the player
+    this.createTextBubble(data.id, data.message, false, data.isAnnouncement);
+    
+    // Add to chat message log if visible
+    const chatLog = document.getElementById('chat-log');
+    if (chatLog) {
+      const playerName = this.getPlayerNameById(data.id) || 'Unknown Player';
+      
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'chat-message';
+      
+      // If this is an announcement, style it accordingly
+      if (data.isAnnouncement) {
+        messageDiv.className += ' announcement';
+      }
+      
+      const playerSpan = document.createElement('span');
+      playerSpan.className = 'player-name';
+      playerSpan.textContent = playerName + ': ';
+      
+      const messageSpan = document.createElement('span');
+      messageSpan.className = 'message-text';
+      messageSpan.textContent = data.message;
+      
+      messageDiv.appendChild(playerSpan);
+      messageDiv.appendChild(messageSpan);
+      
+      chatLog.appendChild(messageDiv);
+      
+      // Scroll to bottom
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+  }
+  
+  // Helper to get player name by ID
+  getPlayerNameById(id) {
+    const player = socketClient.findPlayerInGameState(id);
+    return player ? player.name : null;
   }
 }
 

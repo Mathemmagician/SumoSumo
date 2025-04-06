@@ -709,14 +709,6 @@ function startMatch() {
   startBotMovement();
 }
 
-// Declare a draw (if time runs out)
-function declareDraw() {
-  io.emit('matchDraw', {
-    fighters: gameState.fighters
-  });
-  changeGameStage(GAME_STAGES.VICTORY_CEREMONY);
-}
-
 // End a round with a winner and loser
 function endRound(loserId) {
   // Find the loser
@@ -725,6 +717,19 @@ function endRound(loserId) {
 
   // Find the winner (the other fighter)
   const winner = gameState.fighters.find(f => f.id !== loserId);
+
+  // Make referee announce the winner
+  if (gameState.referee) {
+    const winnerName = winner ? winner.name : "Unknown";
+    const announcement = `${winnerName} wins!`;
+    
+    // Send referee message
+    io.emit('playerMessage', {
+      id: gameState.referee.id,
+      message: announcement,
+      isAnnouncement: true
+    });
+  }
 
   // Announce the winner
   io.emit('matchEnd', {
@@ -737,6 +742,26 @@ function endRound(loserId) {
   
   // Update player count
   broadcastPlayerCount();
+}
+
+// Declare a draw (if time runs out)
+function declareDraw() {
+  // Make referee announce the draw
+  if (gameState.referee) {
+    const announcement = "It's a draw!";
+    
+    // Send referee message
+    io.emit('playerMessage', {
+      id: gameState.referee.id,
+      message: announcement,
+      isAnnouncement: true
+    });
+  }
+
+  io.emit('matchDraw', {
+    fighters: gameState.fighters
+  });
+  changeGameStage(GAME_STAGES.VICTORY_CEREMONY);
 }
 
 // Create a bot player

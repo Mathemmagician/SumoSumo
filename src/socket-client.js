@@ -199,7 +199,13 @@ class SocketClient {
     this.socketStats.playerMessage++;
     this.updateSocketStats();
     // console.log("Player message:", data);
-    this.emit("playerMessage", data);
+    
+    // Pass the isAnnouncement flag to the event listeners
+    this.emit("playerMessage", {
+      id: data.id,
+      message: data.message,
+      isAnnouncement: data.isAnnouncement || false
+    });
   }
 
   handleMessageHistory(messages) {
