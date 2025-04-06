@@ -67,6 +67,14 @@ export class Renderer {
       right: false
     };
 
+    // Add referee movement state
+    this.refereeMovement = {
+      forward: false,
+      backward: false,
+      left: false,
+      right: false
+    };
+    
     // Add delta time tracking
     this.lastFrameTime = performance.now();
     this.deltaTime = 0;
@@ -86,6 +94,9 @@ export class Renderer {
     this.handleFighterKeyDown = this.handleFighterKeyDown.bind(this);
     this.handleFighterKeyUp = this.handleFighterKeyUp.bind(this);
     this.updateFighterMovement = this.updateFighterMovement.bind(this);
+    this.handleRefereeKeyDown = this.handleRefereeKeyDown.bind(this);
+    this.handleRefereeKeyUp = this.handleRefereeKeyUp.bind(this);
+    this.updateRefereeMovement = this.updateRefereeMovement.bind(this);
 
     // Add ModelFactory instance
     this.modelFactory = new ModelFactory(/* pass face textures if needed */);
@@ -203,6 +214,8 @@ export class Renderer {
     window.addEventListener("keyup", this.handleKeyUp);
     window.addEventListener("keydown", this.handleFighterKeyDown);
     window.addEventListener("keyup", this.handleFighterKeyUp);
+    window.addEventListener("keydown", this.handleRefereeKeyDown);
+    window.addEventListener("keyup", this.handleRefereeKeyUp);
 
     // Listen for free camera toggle from UI Manager
     document.addEventListener("freeCameraToggled", (event) => {
@@ -448,27 +461,33 @@ export class Renderer {
   }
 
   animate() {
+    const now = performance.now();
+    this.deltaTime = (now - this.lastFrameTime) / 1000; // Convert to seconds
+    this.lastFrameTime = now;
+
     requestAnimationFrame(this.animate);
 
-    // Calculate delta time
-    const currentTime = performance.now();
-    this.deltaTime = (currentTime - this.lastFrameTime) / 1000; // Convert to seconds
-    this.lastFrameTime = currentTime;
+    // Skip first few frames to avoid NaN values in deltaTime
+    if (isNaN(this.deltaTime) || this.deltaTime > 1) {
+      this.deltaTime = 1/60;
+    }
+
+    // Log first frame render
+    if (!this.hasRenderedFrame) {
+      console.log("First frame rendered");
+      this.hasRenderedFrame = true;
+    }
+    
+    // Update position interpolations for smoother movement
+    this.updatePositionInterpolations();
 
     // Update FPS counter
     this.frameCount++;
-
-    // Update FPS counter every 500ms
-    if (currentTime - this.lastFpsUpdate > this.fpsUpdateInterval) {
-      this.fps = Math.round(
-        (this.frameCount * 1000) / (currentTime - this.lastFpsUpdate)
-      );
-      const fpsCounter = document.getElementById("fps-counter");
-      if (fpsCounter) {
-        fpsCounter.textContent = `${this.fps} FPS`;
-      }
+    if (now - this.lastFpsUpdate >= this.fpsUpdateInterval) {
+      this.fps = (this.frameCount / ((now - this.lastFpsUpdate) / 1000)).toFixed(1);
       this.frameCount = 0;
-      this.lastFpsUpdate = currentTime;
+      this.lastFpsUpdate = now;
+      this.updateFpsCounter();
     }
 
     // Handle camera movement if free camera is enabled
@@ -480,6 +499,9 @@ export class Renderer {
 
     // Update fighter movement with delta time
     this.updateFighterMovement();
+
+    // Update referee movement with delta time
+    this.updateRefereeMovement();
 
     // Log first frame render
     if (!this._hasLoggedFirstFrame) {
@@ -871,30 +893,33 @@ export class Renderer {
 
   // Add a new method to handle player role changes
   handlePlayerRoleChanged(data) {
-    const { id, role } = data;
-
-    // Get the current game state
-    const gameState = socketClient.gameState;
-
-    // Find the player in the game state
-    let player = null;
-    if (role === "fighter") {
-      player = gameState.fighters.find((f) => f.id === id);
-    } else if (role === "referee") {
-      player = gameState.referee;
-    } else {
-      player = gameState.viewers.find((v) => v.id === id);
+    console.log("Player role changed:", data);
+    
+    if (data.id === socketClient.gameState.myId) {
+      // If I was a fighter and now I'm not, reset movement controls
+      if (socketClient.gameState.myRole === "fighter") {
+        this.resetFighterMovement();
+      }
+      
+      // If I was a referee and now I'm not, reset referee movement controls
+      if (socketClient.gameState.myRole === "referee") {
+        this.resetRefereeMovement();
+      }
     }
 
-    // If we found the player, update or recreate their model
-    if (player) {
-      // If the player already has a model, remove it first
-      if (this.playerModels.has(id)) {
-        this.removePlayer(id);
+    const playerModel = this.playerModels.get(data.id);
+    if (playerModel) {
+      // Update appearance based on new role
+      if (data.role === "fighter") {
+        // Apply fighter appearance
+        this.modelFactory.updateModelForRole(playerModel, "fighter");
+      } else if (data.role === "referee") {
+        // Apply referee appearance
+        this.modelFactory.updateModelForRole(playerModel, "referee");
+      } else {
+        // Apply viewer appearance
+        this.modelFactory.updateModelForRole(playerModel, "viewer");
       }
-
-      // Create a new model with the correct role
-      this.updateOrCreatePlayer(player);
     }
   }
 
@@ -1275,6 +1300,8 @@ export class Renderer {
     window.removeEventListener("keyup", this.handleKeyUp);
     window.removeEventListener("keydown", this.handleFighterKeyDown);
     window.removeEventListener("keyup", this.handleFighterKeyUp);
+    window.removeEventListener("keydown", this.handleRefereeKeyDown);
+    window.removeEventListener("keyup", this.handleRefereeKeyUp);
 
     // Other cleanup as needed
     console.log("Renderer cleanup completed");
@@ -1455,8 +1482,131 @@ export class Renderer {
     }
   }
 
+  // Add new methods for referee movement
+  handleRefereeKeyDown(event) {
+    // Check if this is coming from a custom event (our mobile controls)
+    const isMobileEvent = event.isTrusted === false;
+    
+    // Only handle referee movement if I am a referee
+    // For mobile, we'll be more lenient about the stage check
+    if (socketClient.gameState.myRole !== 'referee') {
+      return;
+    }
+    
+    // For keyboard input, enforce match in progress stage check
+    if (!isMobileEvent && socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
+      return;
+    }
+
+    // Track if any movement key is pressed
+    if (!this.hasMoved) {
+      this.hasMoved = true;
+      this.hideMovementInstructions();
+    }
+
+    console.log(`Referee control: ${event.key} down, mobile: ${isMobileEvent}`);
+    
+    switch (event.key.toLowerCase()) {
+      case "w":
+      case "arrowup":
+        this.refereeMovement.forward = true;
+        break;
+      case "s":
+      case "arrowdown":
+        this.refereeMovement.backward = true;
+        break;
+      case "a":
+        this.refereeMovement.left = true;
+        break;
+      case "d":
+        this.refereeMovement.right = true;
+        break;
+      case "arrowleft": // Swap: Arrow left now controls right movement
+        this.refereeMovement.right = true;
+        break;
+      case "arrowright": // Swap: Arrow right now controls left movement
+        this.refereeMovement.left = true;
+        break;
+    }
+  }
+
+  handleRefereeKeyUp(event) {
+    // Check if this is coming from a custom event (our mobile controls)
+    const isMobileEvent = event.isTrusted === false;
+    
+    // Only handle referee movement if I am a referee
+    // For mobile, we'll be more lenient about the stage check
+    if (socketClient.gameState.myRole !== 'referee') {
+      return;
+    }
+    
+    // For keyboard input, enforce match in progress stage check
+    if (!isMobileEvent && socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
+      return;
+    }
+
+    console.log(`Referee control: ${event.key} up, mobile: ${isMobileEvent}`);
+    
+    switch (event.key.toLowerCase()) {
+      case "w":
+      case "arrowup":
+        this.refereeMovement.forward = false;
+        break;
+      case "s":
+      case "arrowdown":
+        this.refereeMovement.backward = false;
+        break;
+      case "a":
+        this.refereeMovement.left = false;
+        break;
+      case "d":
+        this.refereeMovement.right = false;
+        break;
+      case "arrowleft": // Swap: Arrow left now controls right movement
+        this.refereeMovement.right = false;
+        break;
+      case "arrowright": // Swap: Arrow right now controls left movement
+        this.refereeMovement.left = false;
+        break;
+    }
+  }
+
+  updateRefereeMovement() {
+    // Only send movement if we're a referee
+    if (socketClient.gameState.myRole !== 'referee') {
+      return;
+    }
+    
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+
+    // On mobile, we're more lenient about the stage check
+    if (!isMobile && socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
+      return;
+    }
+
+    // Check if any movement keys are pressed
+    let movement = false;
+    
+    if (this.refereeMovement.forward) {
+      socketClient.sendMovement('forward', this.deltaTime);
+      movement = true;
+    }
+    if (this.refereeMovement.backward) {
+      socketClient.sendMovement('backward', this.deltaTime);
+      movement = true;
+    }
+    if (this.refereeMovement.left) {
+      socketClient.sendMovement('left', this.deltaTime);
+      movement = true;
+    }
+    if (this.refereeMovement.right) {
+      socketClient.sendMovement('right', this.deltaTime);
+      movement = true;
+    }
+  }
+
   // Add new methods for text bubble management
-  createTextBubble(playerId, text, isEmote = false) {
+  createTextBubble(playerId, text, isEmote = false, isAnnouncement = false) {
     // Remove any existing bubble
     this.removeTextBubble(playerId);
 
@@ -1465,7 +1615,18 @@ export class Renderer {
 
     // Create container div
     const bubbleDiv = document.createElement('div');
-    bubbleDiv.className = isEmote ? 'text-bubble emote-bubble' : 'text-bubble';
+    
+    // Add appropriate class based on the type of message
+    if (isAnnouncement) {
+      bubbleDiv.className = 'text-bubble referee-announcement';
+      bubbleDiv.style.fontWeight = 'bold';
+      bubbleDiv.style.fontSize = '1.2em';
+      bubbleDiv.style.color = '#FFD700'; // Gold color for announcements
+    } else if (isEmote) {
+      bubbleDiv.className = 'text-bubble emote-bubble';
+    } else {
+      bubbleDiv.className = 'text-bubble';
+    }
     
     // Set text content
     bubbleDiv.textContent = text;
@@ -1481,13 +1642,66 @@ export class Renderer {
     player.add(textObject);
     this.textBubbles.set(playerId, textObject);
 
+    // For referee announcements, add animation
+    if (isAnnouncement && player.role === 'referee') {
+      this.animateRefereeAnnouncement(player);
+    }
+
     // Auto-remove after delay
     setTimeout(() => {
       if (this.textBubbles.has(playerId)) {
         bubbleDiv.style.opacity = '0';
         setTimeout(() => this.removeTextBubble(playerId), 300);
       }
-    }, isEmote ? 2000 : 5000);
+    }, isAnnouncement ? 5000 : (isEmote ? 2000 : 5000)); // Announcements stay visible longer
+  }
+
+  // Add a new method to animate the referee jumping up and down
+  animateRefereeAnnouncement(refereeModel) {
+    if (!refereeModel) return;
+    
+    const originalY = refereeModel.position.y;
+    const jumpHeight = 0.3; // How high to jump (in units)
+    const jumpDuration = 200; // Duration of each jump (in ms)
+    const jumpCount = 3; // Number of jumps
+    
+    let jumpIndex = 0;
+    let isGoingUp = true;
+    
+    // Store the interval ID so we can clear it later
+    const jumpInterval = setInterval(() => {
+      // Calculate jump progress
+      const jumpProgress = (Date.now() % jumpDuration) / jumpDuration;
+      
+      // Calculate new Y position based on jump phase
+      if (isGoingUp) {
+        // Going up - easeOutQuad for a natural jump
+        const t = this.easeOutQuad(jumpProgress);
+        refereeModel.position.y = originalY + jumpHeight * t;
+        
+        // Check if we've reached the top
+        if (jumpProgress >= 0.9) {
+          isGoingUp = false;
+        }
+      } else {
+        // Coming down - easeInQuad for a natural landing
+        const t = this.easeInQuad(jumpProgress);
+        refereeModel.position.y = originalY + jumpHeight * (1 - t);
+        
+        // Check if we've completed the jump
+        if (jumpProgress >= 0.9) {
+          isGoingUp = true;
+          jumpIndex++;
+          
+          // If we've done all jumps, stop the animation
+          if (jumpIndex >= jumpCount) {
+            clearInterval(jumpInterval);
+            // Make sure we land exactly at the original position
+            refereeModel.position.y = originalY;
+          }
+        }
+      }
+    }, 16); // ~60fps
   }
 
   removeTextBubble(playerId) {
@@ -1805,6 +2019,14 @@ export class Renderer {
     this.fighterMovement.right = false;
   }
 
+  // Add a helper method to reset referee movement
+  resetRefereeMovement() {
+    this.refereeMovement.forward = false;
+    this.refereeMovement.backward = false;
+    this.refereeMovement.left = false;
+    this.refereeMovement.right = false;
+  }
+
   // Add method to show movement instructions
   showMovementInstructions() {
     if (this.movementInstructionsShown) return;
@@ -2034,6 +2256,149 @@ export class Renderer {
         this.showMovementInstructions();
       }
     }, 3000);
+  }
+
+  handlePlayerMoved(data) {
+    // console.log("Player moved:", data.id, data.position);
+    
+    const playerModel = this.playerModels.get(data.id);
+    if (!playerModel) return;
+
+    // Get previous position for interpolation
+    const prevPosition = {
+      x: playerModel.position.x,
+      y: playerModel.position.y,
+      z: playerModel.position.z
+    };
+    
+    // Get previous rotation
+    const prevRotation = playerModel.rotation.y;
+    
+    // Calculate distance to see if this is a teleport
+    const moveDelta = Math.sqrt(
+      Math.pow(data.position.x - prevPosition.x, 2) + 
+      Math.pow(data.position.z - prevPosition.z, 2)
+    );
+    
+    // For small movements, update directly
+    if (moveDelta < 0.5) {
+      playerModel.position.set(data.position.x, data.position.y, data.position.z);
+      playerModel.rotation.y = data.rotation || 0;
+    }
+    // For larger movements, interpolate over time
+    else {
+      // If we're in the match, interpolate the movement
+      if (socketClient.gameState.stage === 'MATCH_IN_PROGRESS') {
+        // Store target position
+        playerModel.targetPosition = data.position;
+        playerModel.targetRotation = data.rotation || 0;
+        playerModel.interpolationStart = this.lastFrameTime;
+        playerModel.interpolationDuration = 100; // 100ms interpolation
+        
+        // If we don't already have a previous position, set it
+        if (!playerModel.previousPosition) {
+          playerModel.previousPosition = { ...prevPosition };
+        }
+        
+        // Store previous rotation
+        playerModel.previousRotation = prevRotation;
+      } 
+      // Outside of match, just set position directly
+      else {
+        playerModel.position.set(data.position.x, data.position.y, data.position.z);
+        playerModel.rotation.y = data.rotation || 0;
+        // Clear any interpolation
+        playerModel.targetPosition = null;
+        playerModel.targetRotation = null;
+      }
+    }
+  }
+
+  // Add this method to handle position interpolation
+  updatePositionInterpolations() {
+    const now = this.lastFrameTime;
+    
+    this.playerModels.forEach((model, id) => {
+      // Skip if no target position
+      if (!model.targetPosition) return;
+      
+      // Calculate interpolation progress
+      const elapsed = now - model.interpolationStart;
+      const progress = Math.min(1.0, elapsed / model.interpolationDuration);
+      
+      // Use smooth ease-out interpolation
+      const t = 1.0 - Math.pow(1.0 - progress, 3); // Cubic ease out
+      
+      // Interpolate position
+      model.position.x = model.previousPosition.x + (model.targetPosition.x - model.previousPosition.x) * t;
+      model.position.y = model.previousPosition.y + (model.targetPosition.y - model.previousPosition.y) * t;
+      model.position.z = model.previousPosition.z + (model.targetPosition.z - model.previousPosition.z) * t;
+      
+      // Interpolate rotation (simple lerp for rotation)
+      model.rotation.y = model.previousRotation + (model.targetRotation - model.previousRotation) * t;
+      
+      // If interpolation complete, clean up
+      if (progress >= 1.0) {
+        model.previousPosition = { 
+          x: model.position.x,
+          y: model.position.y,
+          z: model.position.z
+        };
+        model.previousRotation = model.rotation.y;
+        model.targetPosition = null;
+        model.targetRotation = null;
+      }
+    });
+  }
+
+  updateFpsCounter() {
+    const fpsCounter = document.getElementById("fps-counter");
+    if (fpsCounter) {
+      fpsCounter.textContent = `${this.fps} FPS`;
+    }
+  }
+
+  handlePlayerMessage(data) {
+    console.log("Player message:", data);
+    
+    // Create text bubble for the player
+    this.createTextBubble(data.id, data.message, false, data.isAnnouncement);
+    
+    // Add to chat message log if visible
+    const chatLog = document.getElementById('chat-log');
+    if (chatLog) {
+      const playerName = this.getPlayerNameById(data.id) || 'Unknown Player';
+      
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'chat-message';
+      
+      // If this is an announcement, style it accordingly
+      if (data.isAnnouncement) {
+        messageDiv.className += ' announcement';
+      }
+      
+      const playerSpan = document.createElement('span');
+      playerSpan.className = 'player-name';
+      playerSpan.textContent = playerName + ': ';
+      
+      const messageSpan = document.createElement('span');
+      messageSpan.className = 'message-text';
+      messageSpan.textContent = data.message;
+      
+      messageDiv.appendChild(playerSpan);
+      messageDiv.appendChild(messageSpan);
+      
+      chatLog.appendChild(messageDiv);
+      
+      // Scroll to bottom
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+  }
+  
+  // Helper to get player name by ID
+  getPlayerNameById(id) {
+    const player = socketClient.findPlayerInGameState(id);
+    return player ? player.name : null;
   }
 }
 

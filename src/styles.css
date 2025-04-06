@@ -1177,3 +1177,32 @@ body {
 .title-pulse {
     animation: pulse 2s infinite ease-in-out;
 }
+
+/* Add styles for referee announcements */
+.referee-announcement {
+  background-color: rgba(0, 0, 0, 0.8) !important;
+  border: 2px solid #FFD700 !important;
+  color: #FFD700 !important;
+  font-weight: bold !important;
+  padding: 8px 12px !important;
+  font-size: 1.2em !important;
+  animation: announcementPulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes announcementPulse {
+  from {
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  }
+  to {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+  }
+}
+
+/* Style for announcement messages in chat */
+.chat-message.announcement {
+  background-color: rgba(255, 215, 0, 0.1);
+  border-left: 3px solid #FFD700;
+  font-weight: bold;
+}

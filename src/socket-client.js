@@ -149,6 +149,42 @@ class SocketClient {
     this.socketStats.playerMoved++;
     this.updateSocketStats();
     // console.log("Player moved:", data);
+    
+    // Find the player in our game state
+    const player = this.findPlayerInGameState(data.id);
+    
+    if (player) {
+      // Update the player's position in our game state
+      player.position = data.position;
+      player.rotation = data.rotation;
+      
+      // Check for unreasonable position changes (potential teleport)
+      const lastPos = player._lastPos;
+      if (lastPos) {
+        const moveDelta = Math.sqrt(
+          Math.pow(data.position.x - lastPos.x, 2) + 
+          Math.pow(data.position.z - lastPos.z, 2)
+        );
+        
+        // If the move is extremely large and not during stage transitions, smooth it out
+        if (moveDelta > 5 && this.gameState.stage === 'MATCH_IN_PROGRESS') {
+          // Create a slightly smoothed position (80% of the way to the target)
+          const smoothPos = {
+            x: lastPos.x + (data.position.x - lastPos.x) * 0.8,
+            y: data.position.y,
+            z: lastPos.z + (data.position.z - lastPos.z) * 0.8
+          };
+          
+          // Use the smoothed position instead
+          player.position = smoothPos;
+          data.position = smoothPos;
+        }
+      }
+      
+      // Store this position for next comparison
+      player._lastPos = { ...data.position };
+    }
+    
     this.emit("playerMoved", data);
   }
 
@@ -163,7 +199,13 @@ class SocketClient {
     this.socketStats.playerMessage++;
     this.updateSocketStats();
     // console.log("Player message:", data);
-    this.emit("playerMessage", data);
+    
+    // Pass the isAnnouncement flag to the event listeners
+    this.emit("playerMessage", {
+      id: data.id,
+      message: data.message,
+      isAnnouncement: data.isAnnouncement || false
+    });
   }
 
   handleMessageHistory(messages) {
@@ -322,7 +364,7 @@ class SocketClient {
   }
 
   sendMovement(direction, deltaTime) {
-    if (this.gameState.myRole === "fighter" && this.gameState.stage === "MATCH_IN_PROGRESS") {
+    if ((this.gameState.myRole === "fighter" || this.gameState.myRole === "referee") && this.gameState.stage === "MATCH_IN_PROGRESS") {
       this.socket.emit("move", { direction, deltaTime });
     }
   }

@@ -347,8 +347,14 @@ function selectFighters() {
     fighter2.position = { x: 3, y: 3, z: 0 };
     fighter2.rotation = -Math.PI / 2;
     
-    referee.position = { x: 0, y: 3, z: -2 };
-    referee.rotation = Math.atan2(0 - referee.position.x, 0 - referee.position.z);
+    referee.position = { x: 0, y: 3, z: -4 }; // Position on opposite side (-z)
+    
+    // Calculate midpoint and set rotation
+    const midpoint = {
+      x: (fighter1.position.x + fighter2.position.x) / 2,
+      z: (fighter1.position.z + fighter2.position.z) / 2
+    };
+    referee.rotation = Math.atan2(midpoint.x - referee.position.x, midpoint.z - referee.position.z);
 
     gameState.fighters.push(fighter1);
     gameState.fighters.push(fighter2);
@@ -376,8 +382,15 @@ function selectFighters() {
 
       // Add bot referee
       const botReferee = createBot(BOT_TYPES.REFEREE, 'referee');
-      botReferee.position = { x: 0, y: 3, z: -2 };
-      botReferee.rotation = Math.atan2(0 - botReferee.position.x, 0 - botReferee.position.z);
+      botReferee.position = { x: 0, y: 3, z: -4 }; // Position on opposite side (-z)
+      
+      // Calculate midpoint and set rotation
+      const midpoint = {
+        x: (realViewer.position.x + botFighter.position.x) / 2,
+        z: (realViewer.position.z + botFighter.position.z) / 2
+      };
+      botReferee.rotation = Math.atan2(midpoint.x - botReferee.position.x, midpoint.z - botReferee.position.z);
+      
       gameState.referee = botReferee;
     }
   }
@@ -404,8 +417,15 @@ function selectFighters() {
 
       // Add bot referee
       const botReferee = createBot(BOT_TYPES.REFEREE, 'referee');
-      botReferee.position = { x: 0, y: 3, z: -2 };
-      botReferee.rotation = Math.atan2(0 - botReferee.position.x, 0 - botReferee.position.z);
+      botReferee.position = { x: 0, y: 3, z: -4 }; // Position on opposite side (-z)
+      
+      // Calculate midpoint and set rotation
+      const midpoint = {
+        x: (fighter1.position.x + fighter2.position.x) / 2,
+        z: (fighter1.position.z + fighter2.position.z) / 2
+      };
+      botReferee.rotation = Math.atan2(midpoint.x - botReferee.position.x, midpoint.z - botReferee.position.z);
+      
       gameState.referee = botReferee;
     }
   }
@@ -453,8 +473,15 @@ function selectFighters() {
       
       // Set referee role and position
       referee.role = 'referee';
-      referee.position = { x: 0, y: 3, z: -2 };
-      referee.rotation = Math.atan2(0 - referee.position.x, 0 - referee.position.z);
+      referee.position = { x: 0, y: 3, z: -4 }; // Position on opposite side (-z)
+      
+      // Calculate midpoint and set rotation
+      const midpoint = {
+        x: (fighter1.position.x + fighter2.position.x) / 2,
+        z: (fighter1.position.z + fighter2.position.z) / 2
+      };
+      referee.rotation = Math.atan2(midpoint.x - referee.position.x, midpoint.z - referee.position.z);
+      
       gameState.referee = referee;
     } else {
       // Not enough eligible real users, need to use some bots
@@ -504,14 +531,28 @@ function selectFighters() {
         const referee = availableRealUsers.shift();
         gameState.viewers = gameState.viewers.filter(v => v.id !== referee.id);
         referee.role = 'referee';
-        referee.position = { x: 0, y: 3, z: -2 };
-        referee.rotation = Math.atan2(0 - referee.position.x, 0 - referee.position.z);
+        referee.position = { x: 0, y: 3, z: -4 }; // Position on opposite side (-z)
+        
+        // Calculate midpoint and set rotation
+        const midpoint = {
+          x: (fighter1.position.x + fighter2.position.x) / 2,
+          z: (fighter1.position.z + fighter2.position.z) / 2
+        };
+        referee.rotation = Math.atan2(midpoint.x - referee.position.x, midpoint.z - referee.position.z);
+        
         gameState.referee = referee;
       } else {
         // Use bot referee
         const botReferee = createBot(BOT_TYPES.REFEREE, 'referee');
-        botReferee.position = { x: 0, y: 3, z: -2 };
-        botReferee.rotation = Math.atan2(0 - botReferee.position.x, 0 - botReferee.position.z);
+        botReferee.position = { x: 0, y: 3, z: -4 }; // Position on opposite side (-z)
+        
+        // Calculate midpoint and set rotation
+        const midpoint = {
+          x: (fighter1.position.x + fighter2.position.x) / 2,
+          z: (fighter1.position.z + fighter2.position.z) / 2
+        };
+        botReferee.rotation = Math.atan2(midpoint.x - botReferee.position.x, midpoint.z - botReferee.position.z);
+        
         gameState.referee = botReferee;
       }
     }
@@ -613,12 +654,42 @@ function startMatch() {
     return;
   }
 
+  // Store original positions for validation
+  gameState.fighters.forEach(fighter => {
+    fighter.originalPosition = {
+      x: fighter.position.x,
+      y: fighter.position.y,
+      z: fighter.position.z
+    };
+  });
+
   // Reset fighter positions - place them on opposite sides of the ring
   gameState.fighters[0].position = { x: -3, y: 3, z: 0 };
   gameState.fighters[0].rotation = Math.PI / 2; // Face right/east
   
   gameState.fighters[1].position = { x: 3, y: 3, z: 0 };
   gameState.fighters[1].rotation = -Math.PI / 2; // Face left/west
+
+  // Position referee at a good starting position, looking at the center
+  if (gameState.referee) {
+    gameState.referee.position = { x: 0, y: 3, z: -4 }; // Position referee on the -z side (opposite side of ring)
+    
+    // Calculate midpoint between fighters
+    const midpoint = {
+      x: (gameState.fighters[0].position.x + gameState.fighters[1].position.x) / 2,
+      z: (gameState.fighters[0].position.z + gameState.fighters[1].position.z) / 2
+    };
+    
+    // Set rotation to face the midpoint
+    gameState.referee.rotation = Math.atan2(midpoint.x - gameState.referee.position.x, midpoint.z - gameState.referee.position.z);
+    
+    // Broadcast referee position
+    io.emit('playerMoved', {
+      id: gameState.referee.id,
+      position: gameState.referee.position,
+      rotation: gameState.referee.rotation
+    });
+  }
 
   // Broadcast match start
   io.emit('matchStart', {
@@ -638,14 +709,6 @@ function startMatch() {
   startBotMovement();
 }
 
-// Declare a draw (if time runs out)
-function declareDraw() {
-  io.emit('matchDraw', {
-    fighters: gameState.fighters
-  });
-  changeGameStage(GAME_STAGES.VICTORY_CEREMONY);
-}
-
 // End a round with a winner and loser
 function endRound(loserId) {
   // Find the loser
@@ -654,6 +717,19 @@ function endRound(loserId) {
 
   // Find the winner (the other fighter)
   const winner = gameState.fighters.find(f => f.id !== loserId);
+
+  // Make referee announce the winner
+  if (gameState.referee) {
+    const winnerName = winner ? winner.name : "Unknown";
+    const announcement = `${winnerName} wins!`;
+    
+    // Send referee message
+    io.emit('playerMessage', {
+      id: gameState.referee.id,
+      message: announcement,
+      isAnnouncement: true
+    });
+  }
 
   // Announce the winner
   io.emit('matchEnd', {
@@ -666,6 +742,26 @@ function endRound(loserId) {
   
   // Update player count
   broadcastPlayerCount();
+}
+
+// Declare a draw (if time runs out)
+function declareDraw() {
+  // Make referee announce the draw
+  if (gameState.referee) {
+    const announcement = "It's a draw!";
+    
+    // Send referee message
+    io.emit('playerMessage', {
+      id: gameState.referee.id,
+      message: announcement,
+      isAnnouncement: true
+    });
+  }
+
+  io.emit('matchDraw', {
+    fighters: gameState.fighters
+  });
+  changeGameStage(GAME_STAGES.VICTORY_CEREMONY);
 }
 
 // Create a bot player
@@ -754,6 +850,13 @@ function startBotMovement() {
       // Get the opponent of this bot
       const opponent = gameState.fighters.find(f => f.id !== bot.id);
       if (!opponent) return;
+      
+      // Store current position before updating
+      const prevPosition = {
+        x: bot.position.x,
+        y: bot.position.y,
+        z: bot.position.z
+      };
       
       // Get current direction from stored bot directions
       const direction = BOT_CONFIG.botDirections.get(bot.id);
@@ -923,6 +1026,21 @@ function startBotMovement() {
         bot.position.z * bot.position.z
       );
       
+      // Detect unreasonable movement (potential teleport)
+      const moveDelta = Math.sqrt(
+        Math.pow(bot.position.x - prevPosition.x, 2) + 
+        Math.pow(bot.position.z - prevPosition.z, 2)
+      );
+      
+      // If movement is too large (exceeding what's possible in a single frame), reject it
+      const maxReasonableMovement = baseSpeed * (BOT_CONFIG.moveInterval / 1000) * 1.5; // Add a 50% buffer
+      if (moveDelta > maxReasonableMovement) {
+        console.log(`Rejected suspicious bot movement from ${bot.id}: ${moveDelta.toFixed(2)} units`);
+        // Revert to previous valid position
+        bot.position.x = prevPosition.x;
+        bot.position.z = prevPosition.z;
+      }
+      
       if (newDistanceFromCenter > gameState.ringRadius) {
         // Push back toward ring center
         const pushVector = {
@@ -994,6 +1112,9 @@ function startBotMovement() {
         position: bot.position,
         rotation: bot.rotation
       });
+      
+      // Update referee rotation to face the new midpoint between fighters
+      updateRefereeRotation();
     }, BOT_CONFIG.moveInterval);
 
     // Store interval references for cleanup
@@ -1052,6 +1173,36 @@ function sanitizeForSocketIO(obj) {
   return obj;
 }
 
+// Add this new function after sanitizeForSocketIO
+function updateRefereeRotation() {
+  // Only proceed if we have a referee and 2 fighters during match
+  if (!gameState.referee || gameState.fighters.length < 2 || gameState.stage !== GAME_STAGES.MATCH_IN_PROGRESS) {
+    return;
+  }
+  
+  // Calculate midpoint between fighters
+  const fighter1 = gameState.fighters[0];
+  const fighter2 = gameState.fighters[1];
+  
+  const midpoint = {
+    x: (fighter1.position.x + fighter2.position.x) / 2,
+    z: (fighter1.position.z + fighter2.position.z) / 2
+  };
+  
+  // Update referee rotation to face midpoint
+  const oldRotation = gameState.referee.rotation;
+  gameState.referee.rotation = Math.atan2(midpoint.x - gameState.referee.position.x, midpoint.z - gameState.referee.position.z);
+  
+  // Only broadcast if rotation changed
+  if (oldRotation !== gameState.referee.rotation) {
+    io.emit('playerMoved', {
+      id: gameState.referee.id,
+      position: gameState.referee.position,
+      rotation: gameState.referee.rotation
+    });
+  }
+}
+
 // When a client connects
 io.on('connect', (socket) => {
   console.log('User connected:', socket.id);
@@ -1106,133 +1257,292 @@ io.on('connect', (socket) => {
 
   // Handle player movement
   socket.on('move', (data) => {
-    // Only fighters can move during the match
-    if (player.role !== 'fighter' || gameState.stage !== GAME_STAGES.MATCH_IN_PROGRESS) return;
+    // Only fighters and referees can move during the match
+    if ((player.role !== 'fighter' && player.role !== 'referee') || gameState.stage !== GAME_STAGES.MATCH_IN_PROGRESS) return;
 
-    const fighter = gameState.fighters.find(f => f.id === socket.id);
-    if (!fighter) return;
+    // Handle fighter movement
+    if (player.role === 'fighter') {
+      const fighter = gameState.fighters.find(f => f.id === socket.id);
+      if (!fighter) return;
 
-    // Get the other fighter for reference
-    const otherFighter = gameState.fighters.find(f => f.id !== socket.id);
-    if (!otherFighter) return;
-    
-    // Calculate direction vector to opponent
-    const dirToOpponent = {
-      x: otherFighter.position.x - fighter.position.x,
-      z: otherFighter.position.z - fighter.position.z
-    };
-    
-    // Normalize the direction vector
-    const length = Math.sqrt(dirToOpponent.x * dirToOpponent.x + dirToOpponent.z * dirToOpponent.z);
-    if (length > 0) {
-      dirToOpponent.x /= length;
-      dirToOpponent.z /= length;
-    }
-    
-    // Base movement speed (units per second)
-    const baseSpeed = 4.5;
-    
-    // Calculate actual movement for this frame using delta time
-    const moveSpeed = baseSpeed * data.deltaTime;
-    
-    // Calculate movement based on direction relative to opponent
-    switch(data.direction) {
-      case 'forward': // Move toward opponent
-        fighter.position.x += dirToOpponent.x * moveSpeed;
-        fighter.position.z += dirToOpponent.z * moveSpeed;
-        // Set rotation to face opponent
-        fighter.rotation = Math.atan2(dirToOpponent.x, dirToOpponent.z);
-        break;
-        
-      case 'backward': // Move away from opponent
-        fighter.position.x -= dirToOpponent.x * moveSpeed;
-        fighter.position.z -= dirToOpponent.z * moveSpeed;
-        // Still face the opponent
-        fighter.rotation = Math.atan2(dirToOpponent.x, dirToOpponent.z);
-        break;
-        
-      case 'left': // Move left relative to opponent
-        // Calculate perpendicular vector (left of direction to opponent)
-        fighter.position.x += -dirToOpponent.z * moveSpeed;
-        fighter.position.z += dirToOpponent.x * moveSpeed;
-        // Update rotation
-        fighter.rotation = Math.atan2(dirToOpponent.x, dirToOpponent.z);
-        break;
-        
-      case 'right': // Move right relative to opponent
-        // Calculate perpendicular vector (right of direction to opponent)
-        fighter.position.x += dirToOpponent.z * moveSpeed;
-        fighter.position.z += -dirToOpponent.x * moveSpeed;
-        // Update rotation
-        fighter.rotation = Math.atan2(dirToOpponent.x, dirToOpponent.z);
-        break;
-    }
+      // Store current position before updating
+      const prevPosition = {
+        x: fighter.position.x,
+        y: fighter.position.y,
+        z: fighter.position.z
+      };
 
-    // Boundary check - full 2D circle boundary now
-    const distanceFromCenter = Math.sqrt(
-      fighter.position.x * fighter.position.x + 
-      fighter.position.z * fighter.position.z
-    );
-    
-    if (distanceFromCenter > gameState.ringRadius) {
-      // Player fell out of the ring
-      endRound(fighter.id);
-      return;
-    }
+      // Get the other fighter for reference
+      const otherFighter = gameState.fighters.find(f => f.id !== socket.id);
+      if (!otherFighter) return;
+      
+      // Calculate direction vector to opponent
+      const dirToOpponent = {
+        x: otherFighter.position.x - fighter.position.x,
+        z: otherFighter.position.z - fighter.position.z
+      };
+      
+      // Normalize the direction vector
+      const length = Math.sqrt(dirToOpponent.x * dirToOpponent.x + dirToOpponent.z * dirToOpponent.z);
+      if (length > 0) {
+        dirToOpponent.x /= length;
+        dirToOpponent.z /= length;
+      }
+      
+      // Base movement speed (units per second)
+      const baseSpeed = 4.5;
+      
+      // Calculate actual movement for this frame using delta time
+      const moveSpeed = baseSpeed * data.deltaTime;
+      
+      // Calculate movement based on direction relative to opponent
+      switch(data.direction) {
+        case 'forward': // Move toward opponent
+          fighter.position.x += dirToOpponent.x * moveSpeed;
+          fighter.position.z += dirToOpponent.z * moveSpeed;
+          // Set rotation to face opponent
+          fighter.rotation = Math.atan2(dirToOpponent.x, dirToOpponent.z);
+          break;
+          
+        case 'backward': // Move away from opponent
+          fighter.position.x -= dirToOpponent.x * moveSpeed;
+          fighter.position.z -= dirToOpponent.z * moveSpeed;
+          // Still face the opponent
+          fighter.rotation = Math.atan2(dirToOpponent.x, dirToOpponent.z);
+          break;
+          
+        case 'left': // Move left relative to opponent
+          // Calculate perpendicular vector (left of direction to opponent)
+          fighter.position.x += -dirToOpponent.z * moveSpeed;
+          fighter.position.z += dirToOpponent.x * moveSpeed;
+          // Update rotation
+          fighter.rotation = Math.atan2(dirToOpponent.x, dirToOpponent.z);
+          break;
+          
+        case 'right': // Move right relative to opponent
+          // Calculate perpendicular vector (right of direction to opponent)
+          fighter.position.x += dirToOpponent.z * moveSpeed;
+          fighter.position.z += -dirToOpponent.x * moveSpeed;
+          // Update rotation
+          fighter.rotation = Math.atan2(dirToOpponent.x, dirToOpponent.z);
+          break;
+      }
 
-    // Check for collision with other fighter
-    if (otherFighter) {
-      const distance = Math.sqrt(
-        Math.pow(fighter.position.x - otherFighter.position.x, 2) + 
-        Math.pow(fighter.position.z - otherFighter.position.z, 2)
+      // Detect unreasonable movement (potential teleport)
+      const moveDelta = Math.sqrt(
+        Math.pow(fighter.position.x - prevPosition.x, 2) + 
+        Math.pow(fighter.position.z - prevPosition.z, 2)
       );
       
-      if (distance < 1.5) {
-        // Simple pushing mechanic - push in direction of impact
-        const pushDir = {
-          x: otherFighter.position.x - fighter.position.x,
-          z: otherFighter.position.z - fighter.position.z
-        };
-        
-        // Normalize push direction
-        const pushLength = Math.sqrt(pushDir.x * pushDir.x + pushDir.z * pushDir.z);
-        if (pushLength > 0) {
-          pushDir.x /= pushLength;
-          pushDir.z /= pushLength;
-        }
-        
-        // Push strength is higher when moving toward opponent
-        const pushStrength = data.direction === 'forward' ? 0.25 : 0.15;
-        
-        otherFighter.position.x += pushDir.x * pushStrength;
-        otherFighter.position.z += pushDir.z * pushStrength;
+      // If movement is too large (exceeding what's possible in a single frame), reject it
+      const maxReasonableMovement = baseSpeed * data.deltaTime * 1.5; // Add a 50% buffer
+      if (moveDelta > maxReasonableMovement && data.deltaTime < 0.5) { // Only check for reasonable deltaTime
+        console.log(`Rejected suspicious movement from ${fighter.id}: ${moveDelta.toFixed(2)} units`);
+        // Revert to previous valid position
+        fighter.position.x = prevPosition.x;
+        fighter.position.z = prevPosition.z;
+      }
 
-        // Check if pushed fighter is out of the ring
-        const otherDistanceFromCenter = Math.sqrt(
-          otherFighter.position.x * otherFighter.position.x + 
-          otherFighter.position.z * otherFighter.position.z
+      // Boundary check - full 2D circle boundary now
+      const distanceFromCenter = Math.sqrt(
+        fighter.position.x * fighter.position.x + 
+        fighter.position.z * fighter.position.z
+      );
+      
+      if (distanceFromCenter > gameState.ringRadius) {
+        // Player fell out of the ring
+        endRound(fighter.id);
+        return;
+      }
+
+      // Check for collision with other fighter
+      if (otherFighter) {
+        const distance = Math.sqrt(
+          Math.pow(fighter.position.x - otherFighter.position.x, 2) + 
+          Math.pow(fighter.position.z - otherFighter.position.z, 2)
         );
         
-        if (otherDistanceFromCenter > gameState.ringRadius) {
-          endRound(otherFighter.id);
-          return;
+        if (distance < 1.5) {
+          // Simple pushing mechanic - push in direction of impact
+          const pushDir = {
+            x: otherFighter.position.x - fighter.position.x,
+            z: otherFighter.position.z - fighter.position.z
+          };
+          
+          // Normalize push direction
+          const pushLength = Math.sqrt(pushDir.x * pushDir.x + pushDir.z * pushDir.z);
+          if (pushLength > 0) {
+            pushDir.x /= pushLength;
+            pushDir.z /= pushLength;
+          }
+          
+          // Push strength is higher when moving toward opponent
+          const pushStrength = data.direction === 'forward' ? 0.25 : 0.15;
+          
+          otherFighter.position.x += pushDir.x * pushStrength;
+          otherFighter.position.z += pushDir.z * pushStrength;
+
+          // Check if pushed fighter is out of the ring
+          const otherDistanceFromCenter = Math.sqrt(
+            otherFighter.position.x * otherFighter.position.x + 
+            otherFighter.position.z * otherFighter.position.z
+          );
+          
+          if (otherDistanceFromCenter > gameState.ringRadius) {
+            endRound(otherFighter.id);
+            return;
+          }
+
+          // Broadcast other fighter's position update
+          io.emit('playerMoved', {
+            id: otherFighter.id,
+            position: otherFighter.position,
+            rotation: otherFighter.rotation
+          });
         }
-
-        // Broadcast other fighter's position update
-        io.emit('playerMoved', {
-          id: otherFighter.id,
-          position: otherFighter.position,
-          rotation: otherFighter.rotation
-        });
       }
-    }
 
-    // Broadcast updated position
-    io.emit('playerMoved', {
-      id: fighter.id,
-      position: fighter.position,
-      rotation: fighter.rotation
-    });
+      // Broadcast updated position
+      io.emit('playerMoved', {
+        id: fighter.id,
+        position: fighter.position,
+        rotation: fighter.rotation
+      });
+      
+      // Update referee rotation to face the new midpoint between fighters
+      updateRefereeRotation();
+    }
+    // Handle referee movement
+    else if (player.role === 'referee') {
+      const referee = gameState.referee;
+      if (!referee || referee.id !== socket.id) return;
+
+      // We need both fighters
+      if (gameState.fighters.length < 2) return;
+      
+      // Calculate midpoint between fighters
+      const fighter1 = gameState.fighters[0];
+      const fighter2 = gameState.fighters[1];
+      
+      const midpoint = {
+        x: (fighter1.position.x + fighter2.position.x) / 2,
+        z: (fighter1.position.z + fighter2.position.z) / 2
+      };
+
+      // Calculate direction vector to midpoint
+      const dirToMidpoint = {
+        x: midpoint.x - referee.position.x,
+        z: midpoint.z - referee.position.z
+      };
+      
+      // Normalize the direction vector
+      const length = Math.sqrt(dirToMidpoint.x * dirToMidpoint.x + dirToMidpoint.z * dirToMidpoint.z);
+      if (length > 0) {
+        dirToMidpoint.x /= length;
+        dirToMidpoint.z /= length;
+      }
+      
+      // Base movement speed (units per second)
+      const baseSpeed = 4.0;
+      
+      // Calculate actual movement for this frame using delta time
+      const moveSpeed = baseSpeed * data.deltaTime;
+      
+      // Store original position for validation
+      const originalX = referee.position.x;
+      const originalZ = referee.position.z;
+      
+      // Calculate movement based on direction relative to midpoint
+      switch(data.direction) {
+        case 'forward': // Move toward midpoint
+          referee.position.x += dirToMidpoint.x * moveSpeed;
+          referee.position.z += dirToMidpoint.z * moveSpeed;
+          break;
+          
+        case 'backward': // Move away from midpoint
+          referee.position.x -= dirToMidpoint.x * moveSpeed;
+          referee.position.z -= dirToMidpoint.z * moveSpeed;
+          break;
+          
+        case 'left': // Move left relative to midpoint
+          // Calculate perpendicular vector (left of direction to midpoint)
+          referee.position.x += -dirToMidpoint.z * moveSpeed;
+          referee.position.z += dirToMidpoint.x * moveSpeed;
+          break;
+          
+        case 'right': // Move right relative to midpoint
+          // Calculate perpendicular vector (right of direction to midpoint)
+          referee.position.x += dirToMidpoint.z * moveSpeed;
+          referee.position.z += -dirToMidpoint.x * moveSpeed;
+          break;
+      }
+
+      // Constraint 1: Cannot leave the ring
+      const distanceFromCenter = Math.sqrt(
+        referee.position.x * referee.position.x + 
+        referee.position.z * referee.position.z
+      );
+      
+      const ringRadiusBuffer = 0.5; // Keep referee 0.5 units inside the ring edge
+      if (distanceFromCenter > gameState.ringRadius - ringRadiusBuffer) {
+        // Instead of resetting to the original position, project the movement along the ring edge
+        const ringEdgeRadius = gameState.ringRadius - ringRadiusBuffer;
+        
+        // Calculate direction to center
+        const dirToCenter = {
+          x: -referee.position.x,
+          z: -referee.position.z
+        };
+        
+        // Normalize
+        const length = Math.sqrt(dirToCenter.x * dirToCenter.x + dirToCenter.z * dirToCenter.z);
+        if (length > 0) {
+          dirToCenter.x /= length;
+          dirToCenter.z /= length;
+        }
+        
+        // Project position to ring edge
+        referee.position.x = -dirToCenter.x * ringEdgeRadius;
+        referee.position.z = -dirToCenter.z * ringEdgeRadius;
+      }
+
+      // Constraint 2: Cannot get too close to the middle point between fighters
+      const distanceToMidpoint = Math.sqrt(
+        Math.pow(referee.position.x - midpoint.x, 2) + 
+        Math.pow(referee.position.z - midpoint.z, 2)
+      );
+      
+      const minDistanceToMidpoint = 2.0; // Minimum distance allowed to midpoint
+      if (distanceToMidpoint < minDistanceToMidpoint) {
+        // Instead of resetting to original position, project the movement to the minimum distance
+        // Calculate direction from midpoint to referee
+        const dirFromMidpoint = {
+          x: referee.position.x - midpoint.x,
+          z: referee.position.z - midpoint.z
+        };
+        
+        // Normalize
+        const length = Math.sqrt(dirFromMidpoint.x * dirFromMidpoint.x + dirFromMidpoint.z * dirFromMidpoint.z);
+        if (length > 0) {
+          dirFromMidpoint.x /= length;
+          dirFromMidpoint.z /= length;
+        }
+        
+        // Project position to minimum allowed distance from midpoint
+        referee.position.x = midpoint.x + dirFromMidpoint.x * minDistanceToMidpoint;
+        referee.position.z = midpoint.z + dirFromMidpoint.z * minDistanceToMidpoint;
+      }
+
+      // Always rotate to face the midpoint
+      referee.rotation = Math.atan2(midpoint.x - referee.position.x, midpoint.z - referee.position.z);
+
+      // Broadcast updated position
+      io.emit('playerMoved', {
+        id: referee.id,
+        position: referee.position,
+        rotation: referee.rotation
+      });
+    }
   });
 
   // Handle player emote
