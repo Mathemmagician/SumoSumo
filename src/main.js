@@ -20,14 +20,13 @@ window.addEventListener("load", async () => {
   console.log("Window loaded, initializing...");
 
   try {
-    // Initialize the intro animation
-    await sumiEAnimation.play();
-    
-    // First, connect socket client
-    socketClient.connect();
-
-    // Wait for renderer to initialize (which involves model loading)
-    await renderer.initialize();
+    await Promise.all([
+      sumiEAnimation.play(),
+      renderer.initialize(),
+      setTimeout(() => {
+        socketClient.connect();
+      }, 4000)
+    ]);
 
     // Explicitly make sure the stripe manager is initialized
     if (stripeManager) {
