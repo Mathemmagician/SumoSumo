@@ -859,9 +859,17 @@ export class Renderer {
         this.hideMovementInstructions();
       }
 
+      // Keep cinematic bars visible during VICTORY_CEREMONY
+      if (data.stage === "VICTORY_CEREMONY" && this.cameraSystem && this.cameraSystem.ceremonyCineBars) {
+        // Make sure cinematic bars stay visible during victory ceremony
+        this.cameraSystem.ceremonyCineBars.show();
+      }
+      
       // Ensure cinematic bars are hidden when transitioning to stages that don't need them
-      if (data.stage !== "PRE_MATCH_CEREMONY" && data.stage !== "VICTORY_CEREMONY" && this.cameraSystem) {
-        // Force hide cinematic bars to fix the bug where they sometimes remain visible
+      if (data.stage !== "PRE_MATCH_CEREMONY" && 
+          data.stage !== "VICTORY_CEREMONY" && 
+          this.cameraSystem) {
+        // Force hide cinematic bars when leaving victory ceremony 
         if (this.cameraSystem.ceremonyCineBars) {
           this.cameraSystem.ceremonyCineBars.hide();
         }

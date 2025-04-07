@@ -137,7 +137,9 @@ const FAKE_USERS = {
   intervals: new Map(), // Store intervals for each fake user
   targetCount: 20, // Set the target count for fake users
   disconnectInterval: null,
-  reconnectInterval: null
+  reconnectInterval: null,
+  messageTimeouts: new Map(),
+  emoteTimeouts: new Map()
 };
 
 // Add near the top with other state variables (after FAKE_USERS declaration)
@@ -1926,13 +1928,22 @@ function addFakeUser() {
       });
 
       // Clear emote after 2-4 seconds
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         io.emit('playerEmote', {
           id: fakeId,
           name: fakeUser.name,
           emote: null
         });
       }, 2000 + Math.random() * 2000);
+      
+      // Store timeout ID to ensure it gets cleared if user disconnects
+      if (!FAKE_USERS.emoteTimeouts) {
+        FAKE_USERS.emoteTimeouts = new Map();
+      }
+      if (!FAKE_USERS.emoteTimeouts.has(fakeId)) {
+        FAKE_USERS.emoteTimeouts.set(fakeId, []);
+      }
+      FAKE_USERS.emoteTimeouts.get(fakeId).push(timeoutId);
     }
   }, 5000));
 
@@ -1967,13 +1978,22 @@ function addFakeUser() {
       });
 
       // Clear message after 3-5 seconds
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         io.emit('playerMessage', {
           id: fakeId,
           name: fakeUser.name,
           message: null
         });
       }, 3000 + Math.random() * 2000);
+      
+      // Store timeout ID to ensure it gets cleared if user disconnects
+      if (!FAKE_USERS.messageTimeouts) {
+        FAKE_USERS.messageTimeouts = new Map();
+      }
+      if (!FAKE_USERS.messageTimeouts.has(fakeId)) {
+        FAKE_USERS.messageTimeouts.set(fakeId, []);
+      }
+      FAKE_USERS.messageTimeouts.get(fakeId).push(timeoutId);
     }
   }, 8000));
 
@@ -1992,6 +2012,20 @@ function disconnectFakeUser(fakeId) {
   if (intervals) {
     intervals.forEach(interval => clearInterval(interval));
     FAKE_USERS.intervals.delete(fakeId);
+  }
+  
+  // Clear any pending message timeouts
+  if (FAKE_USERS.messageTimeouts && FAKE_USERS.messageTimeouts.has(fakeId)) {
+    const timeouts = FAKE_USERS.messageTimeouts.get(fakeId);
+    timeouts.forEach(timeout => clearTimeout(timeout));
+    FAKE_USERS.messageTimeouts.delete(fakeId);
+  }
+  
+  // Clear any pending emote timeouts
+  if (FAKE_USERS.emoteTimeouts && FAKE_USERS.emoteTimeouts.has(fakeId)) {
+    const timeouts = FAKE_USERS.emoteTimeouts.get(fakeId);
+    timeouts.forEach(timeout => clearTimeout(timeout));
+    FAKE_USERS.emoteTimeouts.delete(fakeId);
   }
 
   // Remove from game state
@@ -2025,6 +2059,22 @@ function stopFakeUserSystem() {
   if (FAKE_USERS.reconnectInterval) {
     clearInterval(FAKE_USERS.reconnectInterval);
     FAKE_USERS.reconnectInterval = null;
+  }
+
+  // Clear all message timeouts
+  if (FAKE_USERS.messageTimeouts) {
+    for (const timeouts of FAKE_USERS.messageTimeouts.values()) {
+      timeouts.forEach(timeout => clearTimeout(timeout));
+    }
+    FAKE_USERS.messageTimeouts.clear();
+  }
+  
+  // Clear all emote timeouts
+  if (FAKE_USERS.emoteTimeouts) {
+    for (const timeouts of FAKE_USERS.emoteTimeouts.values()) {
+      timeouts.forEach(timeout => clearTimeout(timeout));
+    }
+    FAKE_USERS.emoteTimeouts.clear();
   }
 
   // Disconnect all fake users
