@@ -2340,11 +2340,7 @@ export class Renderer {
         <div style="
           margin-bottom: 15px;
         ">
-          <div style="
-            font-size: 16px;
-            margin-bottom: 10px;
-            color: #fff;
-          ">Use WASD to move around the ring</div>
+
           
           <div style="
             display: flex;
