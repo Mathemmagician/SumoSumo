@@ -2270,7 +2270,7 @@ export class Renderer {
   // Add method to show referee instructions
   showRefereeInstructions() {
     if (this.movementInstructionsShown) return;
-    
+     
     // Only show for referees
     if (socketClient.gameState.myRole !== 'referee') {
       return;
@@ -2281,45 +2281,46 @@ export class Renderer {
       return;
     }
     
+    // Create an attractive container for the instructions
     const instructionsDiv = document.createElement('div');
     instructionsDiv.id = 'referee-instructions';
+    instructionsDiv.className = 'movement-instructions';
+    
+    // Add a pulsing animation
+    instructionsDiv.style.animation = 'pulse 2s infinite';
+    
+    // Set up CSS for the instructions with a traditional Japanese aesthetic
     instructionsDiv.style.cssText = `
-      position: fixed;
+      position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background-color: rgba(60, 20, 0, 0.45);
-      border-radius: 8px;
-      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
-      padding: 8px 12px;
-      min-width: 160px;
-      backdrop-filter: blur(3px);
-      transition: all 0.3s ease;
-      border: 1px solid rgba(156, 102, 68, 0.5);
-      color: white;
-      text-align: center;
-      font-size: 16px;
+      background-color: rgba(0, 0, 0, 0.7);
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
       z-index: 1000;
-      font-family: 'Arial', sans-serif;
-      animation: fadeIn 0.3s ease-out;
+      color: white;
+      font-family: 'Roboto', sans-serif;
+      text-align: center;
+      max-width: 80%;
+      border: 2px solid #bc712a;
+      animation: pulse 2s infinite;
     `;
     
-    // Add keyframes for fade in animation
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes fadeIn {
-        0% { 
-          opacity: 0; 
-          transform: translate(-50%, -60%) scale(0.95);
-        }
-        100% { 
-          opacity: 1; 
-          transform: translate(-50%, -50%) scale(1);
-        }
+    // Add keyframe animation for pulsing effect
+    const styleSheet = document.createElement('style');
+    styleSheet.type = 'text/css';
+    styleSheet.innerHTML = `
+      @keyframes pulse {
+        0% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.5); }
+        50% { box-shadow: 0 0 30px rgba(255, 215, 0, 0.8); }
+        100% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.5); }
       }
     `;
-    document.head.appendChild(style);
+    document.head.appendChild(styleSheet);
     
+    // Add HTML content with Japanese-style design elements
     instructionsDiv.innerHTML = `
       <div style="
         margin-bottom: 15px;
@@ -2362,20 +2363,11 @@ export class Renderer {
               height: 60px;
               justify-content: center;
             ">
-              <div style="
-                font-size: 20px;
-                font-weight: bold;
-                color: #ffd700;
-                margin-bottom: 3px;
-              ">W</div>
-              <div style="
-                color: #ffffff;
-                font-size: 14px;
-                opacity: 0.9;
-              ">Forward</div>
+              <div style="font-weight: bold; font-size: 20px;">W</div>
+              <div style="font-size: 12px;">Forward</div>
             </div>
             
-            <!-- Bottom row with A S D -->
+            <!-- Middle row with A, S, D -->
             <div style="
               display: flex;
               gap: 8px;
@@ -2389,21 +2381,12 @@ export class Renderer {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                width: 100px;
+                width: 60px;
                 height: 60px;
                 justify-content: center;
               ">
-                <div style="
-                  font-size: 20px;
-                  font-weight: bold;
-                  color: #ffd700;
-                  margin-bottom: 3px;
-                ">A</div>
-                <div style="
-                  color: #ffffff;
-                  font-size: 14px;
-                  opacity: 0.9;
-                ">Left</div>
+                <div style="font-weight: bold; font-size: 20px;">A</div>
+                <div style="font-size: 12px;">Right</div>
               </div>
               
               <div style="
@@ -2415,21 +2398,12 @@ export class Renderer {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                width: 100px;
+                width: 60px;
                 height: 60px;
                 justify-content: center;
               ">
-                <div style="
-                  font-size: 20px;
-                  font-weight: bold;
-                  color: #ffd700;
-                  margin-bottom: 3px;
-                ">S</div>
-                <div style="
-                  color: #ffffff;
-                  font-size: 14px;
-                  opacity: 0.9;
-                ">Back</div>
+                <div style="font-weight: bold; font-size: 20px;">S</div>
+                <div style="font-size: 12px;">Back</div>
               </div>
               
               <div style="
@@ -2441,90 +2415,53 @@ export class Renderer {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                width: 100px;
+                width: 60px;
                 height: 60px;
                 justify-content: center;
               ">
-                <div style="
-                  font-size: 20px;
-                  font-weight: bold;
-                  color: #ffd700;
-                  margin-bottom: 3px;
-                ">D</div>
-                <div style="
-                  color: #ffffff;
-                  font-size: 14px;
-                  opacity: 0.9;
-                ">Right</div>
+                <div style="font-weight: bold; font-size: 20px;">D</div>
+                <div style="font-size: 12px;">Left</div>
               </div>
             </div>
           </div>
-        </div>
-        
-        <!-- Taunt Commands -->
-        <div style="
-          margin-top: 10px;
-        ">
-          <div style="
-            font-size: 16px;
-            margin-bottom: 10px;
-            color: #fff;
-          ">Press these keys to call sumo commands</div>
           
           <div style="
+            margin-top: 20px;
             display: flex;
-            gap: 20px;
+            justify-content: center;
+            gap: 15px;
           ">
+            <!-- Taunt Controls -->
             <div style="
-              background: rgba(156, 102, 68, 0.3);
-              padding: 8px 15px;
+              background: rgba(218, 165, 32, 0.3);
+              padding: 10px 15px;
               border-radius: 4px;
-              border: 1px solid rgba(156, 102, 68, 0.5);
-              transition: all 0.3s ease;
+              border: 1px solid rgba(218, 165, 32, 0.5);
               display: flex;
               flex-direction: column;
               align-items: center;
-              width: 150px;
-              height: 60px;
               justify-content: center;
+              width: 100px;
+              height: 70px;
             ">
-              <div style="
-                font-size: 20px;
-                font-weight: bold;
-                color: #ffd700;
-                margin-bottom: 3px;
-              ">Q</div>
-              <div style="
-                color: #ffffff;
-                font-size: 14px;
-                opacity: 0.9;
-              ">English Commands</div>
+              <div style="font-weight: bold; font-size: 20px;">Q</div>
+              <div style="font-size: 12px;">English Taunt</div>
             </div>
             
             <div style="
-              background: rgba(156, 102, 68, 0.3);
-              padding: 8px 15px;
+              background: rgba(218, 165, 32, 0.3);
+              padding: 10px 15px;
               border-radius: 4px;
-              border: 1px solid rgba(156, 102, 68, 0.5);
-              transition: all 0.3s ease;
+              border: 1px solid rgba(218, 165, 32, 0.5);
               display: flex;
               flex-direction: column;
               align-items: center;
-              width: 150px;
-              height: 60px;
               justify-content: center;
+              width: 100px;
+              height: 70px;
             ">
-              <div style="
-                font-size: 20px;
-                font-weight: bold;
-                color: #ffd700;
-                margin-bottom: 3px;
-              ">E</div>
-              <div style="
-                color: #ffffff;
-                font-size: 14px;
-                opacity: 0.9;
-              ">Japanese Commands</div>
+              <div style="font-weight: bold; font-size: 20px;">E</div>
+              <div style="font-size: 12px;">Japanese Taunt</div>
             </div>
           </div>
         </div>
@@ -2538,21 +2475,7 @@ export class Renderer {
       ">Press any key to dismiss</div>
     `;
     
-    // Add hover effects to the key boxes
-    const keyBoxes = instructionsDiv.querySelectorAll('div[style*="background: rgba(156, 102, 68, 0.3)"]');
-    keyBoxes.forEach(box => {
-      box.addEventListener('mouseenter', () => {
-        box.style.background = 'rgba(156, 102, 68, 0.4)';
-        box.style.border = '1px solid rgba(156, 102, 68, 0.7)';
-        box.style.transform = 'scale(1.05)';
-      });
-      box.addEventListener('mouseleave', () => {
-        box.style.background = 'rgba(156, 102, 68, 0.3)';
-        box.style.border = '1px solid rgba(156, 102, 68, 0.5)';
-        box.style.transform = 'scale(1)';
-      });
-    });
-    
+    // Add to the document
     document.body.appendChild(instructionsDiv);
     this.movementInstructionsShown = true;
   }

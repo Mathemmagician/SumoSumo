@@ -583,14 +583,45 @@ class UIManager {
         arrowsContainer.className = 'arrows-container';
         arrowsContainer.id = 'fighter-controls';
         
+        // Add custom styling to position controls better
+        arrowsContainer.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            z-index: 1000;
+        `;
+        
+        // Create the row that will contain up button and possibly taunt buttons
+        const topRowContainer = document.createElement('div');
+        topRowContainer.style.cssText = `
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        `;
+        
+        // Create the row that will contain left, down, right buttons
+        const bottomRowContainer = document.createElement('div');
+        bottomRowContainer.style.cssText = `
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        `;
+        
         // Define arrow directions and their positions
         const arrows = [
             { direction: 'up', text: '▲', key: 'ArrowUp' },
-            { direction: 'left', text: '◄', key: 'ArrowRight' },
-            { direction: 'right', text: '►', key: 'ArrowLeft' },
+            { direction: 'left', text: '◄', key: 'ArrowLeft' }, // Now consistently using the actual direction
+            { direction: 'right', text: '►', key: 'ArrowRight' }, // Now consistently using the actual direction
             { direction: 'down', text: '▼', key: 'ArrowDown' }
         ];
         
+        // Create buttons
+        const buttonMap = {};
         arrows.forEach(arrow => {
             const btn = document.createElement('button');
             btn.className = `mobile-control-btn ${arrow.direction}`;
@@ -617,22 +648,21 @@ class UIManager {
                 this.sendMobileControlEvent(arrow.key, false);
             });
             
-            arrowsContainer.appendChild(btn);
+            // Store button reference
+            buttonMap[arrow.direction] = btn;
         });
         
-        // Create simple referee taunt buttons for mobile
-        const refereeTauntContainer = document.createElement('div');
-        refereeTauntContainer.id = 'referee-taunt-controls';
-        refereeTauntContainer.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            display: flex;
-            gap: 10px;
-            z-index: 1001;
-            display: none;
-        `;
+        // Add buttons to the appropriate rows
+        topRowContainer.appendChild(buttonMap['up']);
+        bottomRowContainer.appendChild(buttonMap['left']);
+        bottomRowContainer.appendChild(buttonMap['down']);
+        bottomRowContainer.appendChild(buttonMap['right']);
         
+        // Add rows to container
+        arrowsContainer.appendChild(topRowContainer);
+        arrowsContainer.appendChild(bottomRowContainer);
+        
+        // Create simple referee taunt buttons for mobile
         // Create simple English taunt button
         const englishTauntBtn = document.createElement('button');
         englishTauntBtn.className = 'referee-taunt-btn';
@@ -647,6 +677,7 @@ class UIManager {
             font-weight: bold;
             font-size: 16px;
             cursor: pointer;
+            margin: 0 20px;
         `;
         
         // Create simple Japanese taunt button
@@ -663,6 +694,7 @@ class UIManager {
             font-weight: bold;
             font-size: 16px;
             cursor: pointer;
+            margin: 0 20px;
         `;
         
         // Add event listeners to taunt buttons
@@ -688,11 +720,10 @@ class UIManager {
             }, 300);
         });
         
-        // Add buttons to container
-        refereeTauntContainer.appendChild(englishTauntBtn);
-        refereeTauntContainer.appendChild(japaneseTauntBtn);
+        // Create a container for referee-specific controls and store it for later showing/hiding
+        this.refereeTauntButtons = { englishTauntBtn, japaneseTauntBtn };
         
-        // Create joystick controls for fly-around mode
+        // Add joystick controls for fly-around mode
         const joystickContainer = document.createElement('div');
         joystickContainer.id = 'joystick-controls';
         joystickContainer.style.display = 'none'; // Hidden by default
@@ -721,9 +752,6 @@ class UIManager {
         this.mobileControls.appendChild(arrowsContainer);
         this.mobileControls.appendChild(joystickContainer);
         document.body.appendChild(this.mobileControls);
-        
-        // Add referee taunt controls directly to body
-        document.body.appendChild(refereeTauntContainer);
         
         // Initialize joystick controls
         this.initializeJoystickControls(leftJoystickOuter, leftJoystickInner, 'movement');
@@ -853,7 +881,7 @@ class UIManager {
         // Get container elements
         const fighterControls = document.getElementById('fighter-controls');
         const joystickControls = document.getElementById('joystick-controls');
-        const refereeTauntControls = document.getElementById('referee-taunt-controls');
+        const topRowContainer = fighterControls ? fighterControls.querySelector('div:first-child') : null;
         
         // Always show the main container if on mobile and in landscape
         if (this.isMobile && this.isLandscape) {
@@ -862,22 +890,35 @@ class UIManager {
             this.mobileControls.style.display = 'none';
         }
         
-        // Handle fighter controls - show only if user is a fighter
-        if (this.isMobile && this.isLandscape && role === 'fighter') {
-            console.log("Showing fighter mobile controls");
-            if (fighterControls) fighterControls.style.display = 'block';
-            if (refereeTauntControls) refereeTauntControls.style.display = 'none';
+        // Handle fighter controls - show only if user is a fighter or referee
+        if (this.isMobile && this.isLandscape && (role === 'fighter' || role === 'referee')) {
+            console.log(`Showing mobile controls for ${role}`);
+            if (fighterControls) fighterControls.style.display = 'flex';
+            
+            // Special handling for referee - add taunt buttons to the top row
+            if (role === 'referee' && topRowContainer && this.refereeTauntButtons) {
+                // First, clear any existing taunt buttons to avoid duplicates
+                Array.from(topRowContainer.children).forEach(child => {
+                    if (child.classList.contains('referee-taunt-btn')) {
+                        topRowContainer.removeChild(child);
+                    }
+                });
+                
+                // Add the taunt buttons to the top row
+                topRowContainer.insertBefore(this.refereeTauntButtons.englishTauntBtn, topRowContainer.firstChild);
+                topRowContainer.appendChild(this.refereeTauntButtons.japaneseTauntBtn);
+                
+                console.log("Added referee taunt buttons to control layout");
+            } else if (role === 'fighter' && topRowContainer) {
+                // Remove taunt buttons if present when switching to fighter
+                Array.from(topRowContainer.children).forEach(child => {
+                    if (child.classList.contains('referee-taunt-btn')) {
+                        topRowContainer.removeChild(child);
+                    }
+                });
+            }
         } else {
             if (fighterControls) fighterControls.style.display = 'none';
-        }
-        
-        // Handle referee controls - show for referees
-        if (this.isMobile && this.isLandscape && role === 'referee') {
-            console.log("Showing referee mobile controls");
-            if (fighterControls) fighterControls.style.display = 'block'; // Use same movement controls for referee
-            if (refereeTauntControls) refereeTauntControls.style.display = 'flex';
-        } else {
-            if (refereeTauntControls) refereeTauntControls.style.display = 'none';
         }
         
         // Handle fly around controls - show only if free camera is enabled
