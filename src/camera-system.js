@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { socketClient } from './socket-client';
 import { RING_HEIGHT } from './constants';
-import { STAGE_DURATIONS } from './constants';
+import { STAGE_DURATIONS } from './constants.js';
 
 // Rank lists - 30 primary ranks and 30 modifiers
 const RANKS = [
@@ -838,6 +838,15 @@ export class CameraSystem {
     // Reset animation start time
     this.animationStartTime = Date.now();
     
+    // Check if we're in VICTORY_CEREMONY stage and adjust duration
+    const currentGameStage = socketClient?.gameState?.stage || '';
+    if (currentGameStage === 'VICTORY_CEREMONY') {
+      // Use the VICTORY_CEREMONY duration from constants to ensure cinematic bars remain visible
+      // throughout the entire victory ceremony
+      const victoryCeremonyDuration = STAGE_DURATIONS.VICTORY_CEREMONY || 8000;
+      settings.duration = victoryCeremonyDuration;
+    }
+    
     console.log("Starting knockout camera sequence");
   }
   
@@ -890,11 +899,13 @@ export class CameraSystem {
   /**
    * Clean up knockout sequence resources and reset state
    */
-  cleanupKnockoutSequence() {
-    // Hide cinematic bars if they exist
+  cleanupKnockoutSequence(keepBars = false) {
+    // Hide cinematic bars if they exist, unless keepBars is true
     if (this.ceremonyCineBars) {
       this.ceremonyCineBars.hidePlayerStats();
-      this.ceremonyCineBars.hide();
+      if (!keepBars) {
+        this.ceremonyCineBars.hide();
+      }
     }
     
     // Reset knockout settings
@@ -923,11 +934,15 @@ export class CameraSystem {
     
     // If the sequence is complete, return to overview
     if (elapsedTime >= settings.duration) {
-      this.cleanupKnockoutSequence();
-      // Force hide cinematic bars to fix the bug where they sometimes remain visible
-      if (this.ceremonyCineBars) {
+      this.cleanupKnockoutSequence(true); // Added true to indicate we're keeping bars for victory ceremony
+      
+      // Don't force hide cinematic bars if we're still in VICTORY_CEREMONY stage
+      // This allows the bars to remain visible throughout the entire victory ceremony
+      const currentGameStage = socketClient?.gameState?.stage || '';
+      if (currentGameStage !== 'VICTORY_CEREMONY' && this.ceremonyCineBars) {
         this.ceremonyCineBars.hide();
       }
+      
       this.setMode(this.MODES.WAITING_OVERVIEW);
       return;
     }
