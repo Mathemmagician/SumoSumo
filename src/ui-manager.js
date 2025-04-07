@@ -136,6 +136,11 @@ class UIManager {
                         return;
                     }
                     
+                    // Skip referee announcements
+                    if (messageObj.isAnnouncement) {
+                        return;
+                    }
+                    
                     // Create a unique key for this message
                     const messageKey = `${messageObj.id}:${messageObj.message}:${messageObj.timestamp}`;
                     
@@ -195,6 +200,11 @@ class UIManager {
             if (data.id) {
                 // If it's your own message coming back from the server, don't display it again
                 if (data.id === socketClient.gameState.myId) {
+                    return;
+                }
+                
+                // Skip adding referee announcements to chat
+                if (data.isAnnouncement) {
                     return;
                 }
                 
@@ -573,14 +583,45 @@ class UIManager {
         arrowsContainer.className = 'arrows-container';
         arrowsContainer.id = 'fighter-controls';
         
+        // Add custom styling to position controls better
+        arrowsContainer.style.cssText = `
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            right: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            z-index: 1000;
+        `;
+        
+        // Create the row that will contain up button and possibly taunt buttons
+        const topRowContainer = document.createElement('div');
+        topRowContainer.style.cssText = `
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        `;
+        
+        // Create the row that will contain left, down, right buttons
+        const bottomRowContainer = document.createElement('div');
+        bottomRowContainer.style.cssText = `
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        `;
+        
         // Define arrow directions and their positions
         const arrows = [
             { direction: 'up', text: '▲', key: 'ArrowUp' },
-            { direction: 'left', text: '◄', key: 'ArrowRight' },
-            { direction: 'right', text: '►', key: 'ArrowLeft' },
+            { direction: 'left', text: '◄', key: 'ArrowLeft' }, // Now consistently using the actual direction
+            { direction: 'right', text: '►', key: 'ArrowRight' }, // Now consistently using the actual direction
             { direction: 'down', text: '▼', key: 'ArrowDown' }
         ];
         
+        // Create buttons
+        const buttonMap = {};
         arrows.forEach(arrow => {
             const btn = document.createElement('button');
             btn.className = `mobile-control-btn ${arrow.direction}`;
@@ -607,10 +648,82 @@ class UIManager {
                 this.sendMobileControlEvent(arrow.key, false);
             });
             
-            arrowsContainer.appendChild(btn);
+            // Store button reference
+            buttonMap[arrow.direction] = btn;
         });
         
-        // Create joystick controls for fly-around mode
+        // Add buttons to the appropriate rows
+        topRowContainer.appendChild(buttonMap['up']);
+        bottomRowContainer.appendChild(buttonMap['left']);
+        bottomRowContainer.appendChild(buttonMap['down']);
+        bottomRowContainer.appendChild(buttonMap['right']);
+        
+        // Add rows to container
+        arrowsContainer.appendChild(topRowContainer);
+        arrowsContainer.appendChild(bottomRowContainer);
+        
+        // Create simple referee taunt buttons for mobile
+        // Create simple English taunt button
+        const englishTauntBtn = document.createElement('button');
+        englishTauntBtn.className = 'referee-taunt-btn';
+        englishTauntBtn.textContent = 'EN';
+        englishTauntBtn.style.cssText = `
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: rgba(60, 20, 0, 0.75);
+            color: white;
+            border: 2px solid #FFD700;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 0 20px;
+        `;
+        
+        // Create simple Japanese taunt button
+        const japaneseTauntBtn = document.createElement('button');
+        japaneseTauntBtn.className = 'referee-taunt-btn';
+        japaneseTauntBtn.textContent = 'JP';
+        japaneseTauntBtn.style.cssText = `
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: rgba(60, 20, 0, 0.75);
+            color: white;
+            border: 2px solid #FFD700;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 0 20px;
+        `;
+        
+        // Add event listeners to taunt buttons
+        englishTauntBtn.addEventListener('click', () => {
+            this.sendMobileControlEvent('q', true);
+            setTimeout(() => this.sendMobileControlEvent('q', false), 100);
+            
+            // Add visual feedback
+            englishTauntBtn.style.backgroundColor = 'rgba(100, 50, 20, 0.9)';
+            setTimeout(() => {
+                englishTauntBtn.style.backgroundColor = 'rgba(60, 20, 0, 0.75)';
+            }, 300);
+        });
+        
+        japaneseTauntBtn.addEventListener('click', () => {
+            this.sendMobileControlEvent('e', true);
+            setTimeout(() => this.sendMobileControlEvent('e', false), 100);
+            
+            // Add visual feedback
+            japaneseTauntBtn.style.backgroundColor = 'rgba(100, 50, 20, 0.9)';
+            setTimeout(() => {
+                japaneseTauntBtn.style.backgroundColor = 'rgba(60, 20, 0, 0.75)';
+            }, 300);
+        });
+        
+        // Create a container for referee-specific controls and store it for later showing/hiding
+        this.refereeTauntButtons = { englishTauntBtn, japaneseTauntBtn };
+        
+        // Add joystick controls for fly-around mode
         const joystickContainer = document.createElement('div');
         joystickContainer.id = 'joystick-controls';
         joystickContainer.style.display = 'none'; // Hidden by default
@@ -643,9 +756,6 @@ class UIManager {
         // Initialize joystick controls
         this.initializeJoystickControls(leftJoystickOuter, leftJoystickInner, 'movement');
         this.initializeJoystickControls(rightJoystickOuter, rightJoystickInner, 'rotation');
-        
-        // For testing: uncomment to force show controls
-        // this.mobileControls.style.display = 'block';
     }
     
     // Create fullscreen button
@@ -771,6 +881,7 @@ class UIManager {
         // Get container elements
         const fighterControls = document.getElementById('fighter-controls');
         const joystickControls = document.getElementById('joystick-controls');
+        const topRowContainer = fighterControls ? fighterControls.querySelector('div:first-child') : null;
         
         // Always show the main container if on mobile and in landscape
         if (this.isMobile && this.isLandscape) {
@@ -779,10 +890,33 @@ class UIManager {
             this.mobileControls.style.display = 'none';
         }
         
-        // Handle fighter controls - show only if user is a fighter
-        if (this.isMobile && this.isLandscape && role === 'fighter') {
-            console.log("Showing fighter mobile controls");
-            if (fighterControls) fighterControls.style.display = 'block';
+        // Handle fighter controls - show only if user is a fighter or referee
+        if (this.isMobile && this.isLandscape && (role === 'fighter' || role === 'referee')) {
+            console.log(`Showing mobile controls for ${role}`);
+            if (fighterControls) fighterControls.style.display = 'flex';
+            
+            // Special handling for referee - add taunt buttons to the top row
+            if (role === 'referee' && topRowContainer && this.refereeTauntButtons) {
+                // First, clear any existing taunt buttons to avoid duplicates
+                Array.from(topRowContainer.children).forEach(child => {
+                    if (child.classList.contains('referee-taunt-btn')) {
+                        topRowContainer.removeChild(child);
+                    }
+                });
+                
+                // Add the taunt buttons to the top row
+                topRowContainer.insertBefore(this.refereeTauntButtons.englishTauntBtn, topRowContainer.firstChild);
+                topRowContainer.appendChild(this.refereeTauntButtons.japaneseTauntBtn);
+                
+                console.log("Added referee taunt buttons to control layout");
+            } else if (role === 'fighter' && topRowContainer) {
+                // Remove taunt buttons if present when switching to fighter
+                Array.from(topRowContainer.children).forEach(child => {
+                    if (child.classList.contains('referee-taunt-btn')) {
+                        topRowContainer.removeChild(child);
+                    }
+                });
+            }
         } else {
             if (fighterControls) fighterControls.style.display = 'none';
         }

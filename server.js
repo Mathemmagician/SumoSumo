@@ -1592,7 +1592,17 @@ io.on('connect', (socket) => {
   });
 
   // Handle player message
-  socket.on('message', (message) => {
+  socket.on('message', (messageData) => {
+    // Handle both string messages and object format
+    let message, isAnnouncement = false;
+    
+    if (typeof messageData === 'object') {
+      message = messageData.text || messageData.message || '';
+      isAnnouncement = messageData.isAnnouncement || false;
+    } else {
+      message = messageData;
+    }
+    
     // Simple validation
     if (message.length > 100) {
       message = message.substring(0, 100);
@@ -1605,15 +1615,18 @@ io.on('connect', (socket) => {
       id: player.id,
       name: player.name,
       message,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      isAnnouncement
     };
     
-    // Add to message history
-    messageHistory.push(messageObj);
-    
-    // Keep only the last MAX_MESSAGE_HISTORY messages
-    if (messageHistory.length > MAX_MESSAGE_HISTORY) {
-      messageHistory.shift(); // Remove the oldest message
+    // Add to message history (skip announcements)
+    if (!isAnnouncement) {
+      messageHistory.push(messageObj);
+      
+      // Keep only the last MAX_MESSAGE_HISTORY messages
+      if (messageHistory.length > MAX_MESSAGE_HISTORY) {
+        messageHistory.shift(); // Remove the oldest message
+      }
     }
     
     // Broadcast the message to all clients

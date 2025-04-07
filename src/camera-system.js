@@ -445,7 +445,7 @@ export class CameraSystem {
    */
   handleFighterCloseup(fighter, settings, progress) {
     // Change FOV for cinematic effect
-    this.camera.fov = 35;
+    this.camera.fov = 45;
     this.camera.updateProjectionMatrix();
     
     // Get fighter position

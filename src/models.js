@@ -116,7 +116,7 @@ export class ModelLoader {
     }
     
     // If models are already loaded, return immediately
-    if (this.loadedModels.fighters.length >= 2 && this.loadedModels.referee && this.loadedModels.viewers.length === 4 && this.loadedModels.roof) {
+    if (this.loadedModels.fighters.length >= 4 && this.loadedModels.referee && this.loadedModels.viewers.length === 7 && this.loadedModels.roof) {
       console.log('Models already loaded, returning immediately');
       return this.loadedModels;
     }
@@ -128,15 +128,21 @@ export class ModelLoader {
     this.loadPromise = new Promise(async (resolve, reject) => {
       try {
         // Load all models in parallel
-        const [sumo0Gltf, sumo1Gltf, sumo2Gltf, refereeGltf, viewer0Gltf, viewer1Gltf, viewer2Gltf, viewer3Gltf, roofGltf] = await Promise.all([
+        const [sumo0Gltf, sumo1Gltf, sumo2Gltf, sumo4Gltf, refereeGltf, 
+               viewer0Gltf, viewer1Gltf, viewer2Gltf, viewer3Gltf, 
+               viewer4Gltf, viewer5Gltf, viewer6Gltf, roofGltf] = await Promise.all([
           this.loadModel('/models3d/sumo.glb'),
           this.loadModel('/models3d/sumo_1.glb'),
           this.loadModel('/models3d/sumo_2.glb'),
+          this.loadModel('/models3d/sumo_4.glb'),
           this.loadModel('/models3d/referee.glb'),
           this.loadModel('/models3d/viewer_0.glb'),
           this.loadModel('/models3d/viewer_1.glb'),
           this.loadModel('/models3d/viewer_2.glb'),
           this.loadModel('/models3d/viewer_3.glb'),
+          this.loadModel('/models3d/viewer_4.glb'),
+          this.loadModel('/models3d/viewer_5.glb'),
+          this.loadModel('/models3d/viewer_6.glb'),
           this.loadModel('/models3d/roof.glb')
         ]);
 
@@ -144,14 +150,18 @@ export class ModelLoader {
         this.loadedModels.fighters = [
           this.processModel(sumo0Gltf.scene),
           this.processModel(sumo1Gltf.scene),
-          this.processModel(sumo2Gltf.scene)
+          this.processModel(sumo2Gltf.scene),
+          this.processModel(sumo4Gltf.scene)
         ];
         this.loadedModels.referee = this.processModel(refereeGltf.scene);
         this.loadedModels.viewers = [
           this.processModel(viewer0Gltf.scene),
           this.processModel(viewer1Gltf.scene),
           this.processModel(viewer2Gltf.scene),
-          this.processModel(viewer3Gltf.scene)
+          this.processModel(viewer3Gltf.scene),
+          this.processModel(viewer4Gltf.scene),
+          this.processModel(viewer5Gltf.scene),
+          this.processModel(viewer6Gltf.scene)
         ];
         this.loadedModels.roof = this.processModel(roofGltf.scene);
 
@@ -310,6 +320,92 @@ export class ModelFactory {
     }
     
     return model;
+  }
+
+  updateModelForRole(model, newRole) {
+    // Validate inputs
+    if (!model || !newRole) {
+      console.error('Invalid model or role for updateModelForRole:', model, newRole);
+      return;
+    }
+
+    if (!this.initialized) {
+      console.error('ModelFactory not initialized. Call initialize() first');
+      return;
+    }
+
+    console.log(`Updating model to new role: ${newRole}`);
+
+    // Save the current position and rotation
+    const position = model.position.clone();
+    const rotation = model.rotation.clone();
+    
+    // Get the appropriate base model based on the new role
+    let baseModel = null;
+    let modelIndex = 0;
+    
+    // Use player's seed from userData if available to keep consistent appearance
+    const seed = model.userData.seed || 0;
+    
+    if (newRole === 'fighter') {
+      modelIndex = Math.abs(seed) % this.modelLoader.loadedModels.fighters.length;
+      baseModel = this.modelLoader.loadedModels.fighters[modelIndex];
+    } else if (newRole === 'referee') {
+      baseModel = this.modelLoader.loadedModels.referee;
+    } else {
+      // For viewers, select a model based on seed
+      modelIndex = Math.abs(seed) % this.modelLoader.loadedModels.viewers.length;
+      baseModel = this.modelLoader.loadedModels.viewers[modelIndex];
+    }
+    
+    if (!baseModel) {
+      console.error(`No model loaded for role: ${newRole}`);
+      return;
+    }
+
+    // Clone the base model
+    const newModelGeometry = baseModel.clone();
+    
+    // Replace the model's geometry and materials
+    model.traverse((child) => {
+      if (child.isMesh) {
+        // Find corresponding mesh in new model
+        let newMesh = null;
+        newModelGeometry.traverse((newChild) => {
+          if (newChild.isMesh) {
+            newMesh = newChild;
+          }
+        });
+        
+        if (newMesh) {
+          // Replace geometry and material
+          child.geometry.dispose();
+          child.geometry = newMesh.geometry.clone();
+          child.material.dispose();
+          child.material = newMesh.material.clone();
+        }
+      }
+    });
+    
+    // Update scale based on role
+    if (newRole === 'fighter') {
+      model.scale.set(4, 4, 4);
+    } else if (newRole === 'referee') {
+      model.scale.set(4, 4, 4);
+    } else {
+      // Default to viewer
+      model.scale.set(3, 3, 3);
+    }
+    
+    // Restore position and rotation
+    model.position.copy(position);
+    model.rotation.copy(rotation);
+    
+    // Update userData
+    model.userData.role = newRole;
+    model.userData.modelIndex = modelIndex;
+    
+    console.log(`Model updated to ${newRole} role successfully`);
   }
 }
 

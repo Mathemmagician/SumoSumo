@@ -373,8 +373,11 @@ class SocketClient {
     this.socket.emit("emote", emoteType);
   }
 
-  sendMessage(message) {
-    if (message?.trim()) {
+  sendMessage(message, options = {}) {
+    if (typeof message === 'string' && message?.trim()) {
+      this.socket.emit("message", message);
+    } else if (typeof message === 'object') {
+      // Send object directly (for announcements and other special messages)
       this.socket.emit("message", message);
     }
   }
