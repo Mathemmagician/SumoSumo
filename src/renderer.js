@@ -1516,16 +1516,23 @@ export class Renderer {
         this.refereeMovement.backward = true;
         break;
       case "a":
-        this.refereeMovement.left = true;
+        this.refereeMovement.right = true; // REVERSED: 'a' now maps to right
         break;
       case "d":
-        this.refereeMovement.right = true;
+        this.refereeMovement.left = true; // REVERSED: 'd' now maps to left
         break;
       case "arrowleft": // Swap: Arrow left now controls right movement
         this.refereeMovement.right = true;
         break;
       case "arrowright": // Swap: Arrow right now controls left movement
         this.refereeMovement.left = true;
+        break;
+      // Add referee taunt handlers
+      case "q":
+        this.handleRefereeTaunt('english');
+        break;
+      case "e":
+        this.handleRefereeTaunt('japanese');
         break;
     }
   }
@@ -1557,10 +1564,10 @@ export class Renderer {
         this.refereeMovement.backward = false;
         break;
       case "a":
-        this.refereeMovement.left = false;
+        this.refereeMovement.right = false; // REVERSED: 'a' now maps to right
         break;
       case "d":
-        this.refereeMovement.right = false;
+        this.refereeMovement.left = false; // REVERSED: 'd' now maps to left
         break;
       case "arrowleft": // Swap: Arrow left now controls right movement
         this.refereeMovement.right = false;
@@ -1617,12 +1624,7 @@ export class Renderer {
     const bubbleDiv = document.createElement('div');
     
     // Add appropriate class based on the type of message
-    if (isAnnouncement) {
-      bubbleDiv.className = 'text-bubble referee-announcement';
-      bubbleDiv.style.fontWeight = 'bold';
-      bubbleDiv.style.fontSize = '1.2em';
-      bubbleDiv.style.color = '#FFD700'; // Gold color for announcements
-    } else if (isEmote) {
+    if (isEmote) {
       bubbleDiv.className = 'text-bubble emote-bubble';
     } else {
       bubbleDiv.className = 'text-bubble';
@@ -1642,18 +1644,18 @@ export class Renderer {
     player.add(textObject);
     this.textBubbles.set(playerId, textObject);
 
-    // For referee announcements, add animation
-    if (isAnnouncement && player.role === 'referee') {
-      this.animateRefereeAnnouncement(player);
-    }
-
-    // Auto-remove after delay
+    // Check if this is a referee taunt (referee role and using emote)
+    const isRefereeTaunt = player.userData.role === 'referee' && isEmote;
+    
+    // Auto-remove after delay - longer duration for referee taunts
+    const displayDuration = isRefereeTaunt ? 5000 : (isEmote ? 4000 : 5000);
+    
     setTimeout(() => {
       if (this.textBubbles.has(playerId)) {
         bubbleDiv.style.opacity = '0';
-        setTimeout(() => this.removeTextBubble(playerId), 300);
+        setTimeout(() => this.removeTextBubble(playerId), 500); // Longer fade out
       }
-    }, isAnnouncement ? 5000 : (isEmote ? 2000 : 5000)); // Announcements stay visible longer
+    }, displayDuration);
   }
 
   // Add a new method to animate the referee jumping up and down
@@ -2252,10 +2254,326 @@ export class Renderer {
     
     // Show instructions after 3 seconds if no movement
     setTimeout(() => {
-      if (!this.hasMoved && socketClient.gameState.stage === 'MATCH_IN_PROGRESS') {
-        this.showMovementInstructions();
+      if (!this.hasMoved) {
+        // For fighters, show movement instructions
+        if (socketClient.gameState.myRole === 'fighter' && socketClient.gameState.stage === 'MATCH_IN_PROGRESS') {
+          this.showMovementInstructions();
+        }
+        // For referees, also show movement instructions
+        else if (socketClient.gameState.myRole === 'referee' && socketClient.gameState.stage === 'MATCH_IN_PROGRESS') {
+          this.showRefereeInstructions();
+        }
       }
     }, 3000);
+  }
+
+  // Add method to show referee instructions
+  showRefereeInstructions() {
+    if (this.movementInstructionsShown) return;
+    
+    // Only show for referees
+    if (socketClient.gameState.myRole !== 'referee') {
+      return;
+    }
+
+    // Don't show on mobile devices
+    if (this.isMobile) {
+      return;
+    }
+    
+    const instructionsDiv = document.createElement('div');
+    instructionsDiv.id = 'referee-instructions';
+    instructionsDiv.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(60, 20, 0, 0.45);
+      border-radius: 8px;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+      padding: 8px 12px;
+      min-width: 160px;
+      backdrop-filter: blur(3px);
+      transition: all 0.3s ease;
+      border: 1px solid rgba(156, 102, 68, 0.5);
+      color: white;
+      text-align: center;
+      font-size: 16px;
+      z-index: 1000;
+      font-family: 'Arial', sans-serif;
+      animation: fadeIn 0.3s ease-out;
+    `;
+    
+    // Add keyframes for fade in animation
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes fadeIn {
+        0% { 
+          opacity: 0; 
+          transform: translate(-50%, -60%) scale(0.95);
+        }
+        100% { 
+          opacity: 1; 
+          transform: translate(-50%, -50%) scale(1);
+        }
+      }
+    `;
+    document.head.appendChild(style);
+    
+    instructionsDiv.innerHTML = `
+      <div style="
+        margin-bottom: 15px;
+        font-size: 18px;
+        font-weight: bold;
+        color: #ffd700;
+        text-shadow: 0 0 5px rgba(255, 215, 0, 0.3);
+      ">Referee Commands</div>
+      
+      <div style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 15px;
+      ">
+        <!-- Movement Controls -->
+        <div style="
+          margin-bottom: 15px;
+        ">
+          <div style="
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #fff;
+          ">Use WASD to move around the ring</div>
+          
+          <div style="
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+          ">
+            <!-- Top row with W -->
+            <div style="
+              background: rgba(156, 102, 68, 0.3);
+              padding: 8px 15px;
+              border-radius: 4px;
+              border: 1px solid rgba(156, 102, 68, 0.5);
+              transition: all 0.3s ease;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              width: 100px;
+              height: 60px;
+              justify-content: center;
+            ">
+              <div style="
+                font-size: 20px;
+                font-weight: bold;
+                color: #ffd700;
+                margin-bottom: 3px;
+              ">W</div>
+              <div style="
+                color: #ffffff;
+                font-size: 14px;
+                opacity: 0.9;
+              ">Forward</div>
+            </div>
+            
+            <!-- Bottom row with A S D -->
+            <div style="
+              display: flex;
+              gap: 8px;
+            ">
+              <div style="
+                background: rgba(156, 102, 68, 0.3);
+                padding: 8px 15px;
+                border-radius: 4px;
+                border: 1px solid rgba(156, 102, 68, 0.5);
+                transition: all 0.3s ease;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                width: 100px;
+                height: 60px;
+                justify-content: center;
+              ">
+                <div style="
+                  font-size: 20px;
+                  font-weight: bold;
+                  color: #ffd700;
+                  margin-bottom: 3px;
+                ">A</div>
+                <div style="
+                  color: #ffffff;
+                  font-size: 14px;
+                  opacity: 0.9;
+                ">Left</div>
+              </div>
+              
+              <div style="
+                background: rgba(156, 102, 68, 0.3);
+                padding: 8px 15px;
+                border-radius: 4px;
+                border: 1px solid rgba(156, 102, 68, 0.5);
+                transition: all 0.3s ease;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                width: 100px;
+                height: 60px;
+                justify-content: center;
+              ">
+                <div style="
+                  font-size: 20px;
+                  font-weight: bold;
+                  color: #ffd700;
+                  margin-bottom: 3px;
+                ">S</div>
+                <div style="
+                  color: #ffffff;
+                  font-size: 14px;
+                  opacity: 0.9;
+                ">Back</div>
+              </div>
+              
+              <div style="
+                background: rgba(156, 102, 68, 0.3);
+                padding: 8px 15px;
+                border-radius: 4px;
+                border: 1px solid rgba(156, 102, 68, 0.5);
+                transition: all 0.3s ease;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                width: 100px;
+                height: 60px;
+                justify-content: center;
+              ">
+                <div style="
+                  font-size: 20px;
+                  font-weight: bold;
+                  color: #ffd700;
+                  margin-bottom: 3px;
+                ">D</div>
+                <div style="
+                  color: #ffffff;
+                  font-size: 14px;
+                  opacity: 0.9;
+                ">Right</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Taunt Commands -->
+        <div style="
+          margin-top: 10px;
+        ">
+          <div style="
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #fff;
+          ">Press these keys to call sumo commands</div>
+          
+          <div style="
+            display: flex;
+            gap: 20px;
+          ">
+            <div style="
+              background: rgba(156, 102, 68, 0.3);
+              padding: 8px 15px;
+              border-radius: 4px;
+              border: 1px solid rgba(156, 102, 68, 0.5);
+              transition: all 0.3s ease;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              width: 150px;
+              height: 60px;
+              justify-content: center;
+            ">
+              <div style="
+                font-size: 20px;
+                font-weight: bold;
+                color: #ffd700;
+                margin-bottom: 3px;
+              ">Q</div>
+              <div style="
+                color: #ffffff;
+                font-size: 14px;
+                opacity: 0.9;
+              ">English Commands</div>
+            </div>
+            
+            <div style="
+              background: rgba(156, 102, 68, 0.3);
+              padding: 8px 15px;
+              border-radius: 4px;
+              border: 1px solid rgba(156, 102, 68, 0.5);
+              transition: all 0.3s ease;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              width: 150px;
+              height: 60px;
+              justify-content: center;
+            ">
+              <div style="
+                font-size: 20px;
+                font-weight: bold;
+                color: #ffd700;
+                margin-bottom: 3px;
+              ">E</div>
+              <div style="
+                color: #ffffff;
+                font-size: 14px;
+                opacity: 0.9;
+              ">Japanese Commands</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="
+        margin-top: 12px;
+        font-size: 14px;
+        color: rgba(255, 255, 255, 0.6);
+        font-style: italic;
+      ">Press any key to dismiss</div>
+    `;
+    
+    // Add hover effects to the key boxes
+    const keyBoxes = instructionsDiv.querySelectorAll('div[style*="background: rgba(156, 102, 68, 0.3)"]');
+    keyBoxes.forEach(box => {
+      box.addEventListener('mouseenter', () => {
+        box.style.background = 'rgba(156, 102, 68, 0.4)';
+        box.style.border = '1px solid rgba(156, 102, 68, 0.7)';
+        box.style.transform = 'scale(1.05)';
+      });
+      box.addEventListener('mouseleave', () => {
+        box.style.background = 'rgba(156, 102, 68, 0.3)';
+        box.style.border = '1px solid rgba(156, 102, 68, 0.5)';
+        box.style.transform = 'scale(1)';
+      });
+    });
+    
+    document.body.appendChild(instructionsDiv);
+    this.movementInstructionsShown = true;
+  }
+  
+  // Update hide method to hide both sets of instructions
+  hideMovementInstructions() {
+    const instructionsDiv = document.getElementById('movement-instructions');
+    if (instructionsDiv) {
+      instructionsDiv.remove();
+    }
+    
+    const refereeInstructionsDiv = document.getElementById('referee-instructions');
+    if (refereeInstructionsDiv) {
+      refereeInstructionsDiv.remove();
+    }
+    
+    this.movementInstructionsShown = false;
   }
 
   handlePlayerMoved(data) {
@@ -2364,9 +2682,9 @@ export class Renderer {
     // Create text bubble for the player
     this.createTextBubble(data.id, data.message, false, data.isAnnouncement);
     
-    // Add to chat message log if visible
+    // Add to chat message log if visible AND it's not a referee announcement
     const chatLog = document.getElementById('chat-log');
-    if (chatLog) {
+    if (chatLog && !data.isAnnouncement) {
       const playerName = this.getPlayerNameById(data.id) || 'Unknown Player';
       
       const messageDiv = document.createElement('div');
@@ -2399,6 +2717,61 @@ export class Renderer {
   getPlayerNameById(id) {
     const player = socketClient.findPlayerInGameState(id);
     return player ? player.name : null;
+  }
+
+  // Handle referee taunts/commands
+  handleRefereeTaunt(language) {
+    // Only allow if the user is a referee
+    if (socketClient.gameState.myRole !== 'referee') {
+      return;
+    }
+
+    // Add rate limiting - check if last taunt was less than 1 second ago
+    const now = Date.now();
+    if (this.lastTauntTime && (now - this.lastTauntTime) < 1000) {
+      console.log("Taunt rate limited: can only taunt once per second");
+      return;
+    }
+    
+    // Update last taunt time
+    this.lastTauntTime = now;
+    
+    // Referee sumo phrases
+    const refereeTaunts = {
+      english: [
+        "Hakkeyoi!",
+        "Nokotta!",
+        "Shoubu atta!",
+        "Te wo tsuite",
+        "Mada, mada!"
+      ],
+      japanese: [
+        "はっけよい!",
+        "残った!",
+        "勝負あった!",
+        "手をつけ",
+        "まだ、まだ！",
+      ]
+    };
+    
+    // Get random taunt from the appropriate language
+    const taunts = refereeTaunts[language] || refereeTaunts.english;
+    const randomIndex = Math.floor(Math.random() * taunts.length);
+    const taunt = taunts[randomIndex];
+    
+    // Send the taunt as an announcement
+    socketClient.sendMessage({
+      text: taunt,
+      isAnnouncement: true
+    });
+    
+    // Create a text bubble for the referee (as an announcement)
+    if (socketClient.gameState.referee && socketClient.gameState.referee.id === socketClient.gameState.myId) {
+      const myId = socketClient.gameState.myId;
+      this.createTextBubble(myId, taunt, true);
+    }
+    
+    // Remove the animation for referee when announcing
   }
 }
 

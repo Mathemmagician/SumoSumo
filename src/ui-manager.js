@@ -136,6 +136,11 @@ class UIManager {
                         return;
                     }
                     
+                    // Skip referee announcements
+                    if (messageObj.isAnnouncement) {
+                        return;
+                    }
+                    
                     // Create a unique key for this message
                     const messageKey = `${messageObj.id}:${messageObj.message}:${messageObj.timestamp}`;
                     
@@ -195,6 +200,11 @@ class UIManager {
             if (data.id) {
                 // If it's your own message coming back from the server, don't display it again
                 if (data.id === socketClient.gameState.myId) {
+                    return;
+                }
+                
+                // Skip adding referee announcements to chat
+                if (data.isAnnouncement) {
                     return;
                 }
                 
@@ -610,6 +620,78 @@ class UIManager {
             arrowsContainer.appendChild(btn);
         });
         
+        // Create simple referee taunt buttons for mobile
+        const refereeTauntContainer = document.createElement('div');
+        refereeTauntContainer.id = 'referee-taunt-controls';
+        refereeTauntContainer.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 1001;
+            display: none;
+        `;
+        
+        // Create simple English taunt button
+        const englishTauntBtn = document.createElement('button');
+        englishTauntBtn.className = 'referee-taunt-btn';
+        englishTauntBtn.textContent = 'EN';
+        englishTauntBtn.style.cssText = `
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: rgba(60, 20, 0, 0.75);
+            color: white;
+            border: 2px solid #FFD700;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+        `;
+        
+        // Create simple Japanese taunt button
+        const japaneseTauntBtn = document.createElement('button');
+        japaneseTauntBtn.className = 'referee-taunt-btn';
+        japaneseTauntBtn.textContent = 'JP';
+        japaneseTauntBtn.style.cssText = `
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: rgba(60, 20, 0, 0.75);
+            color: white;
+            border: 2px solid #FFD700;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+        `;
+        
+        // Add event listeners to taunt buttons
+        englishTauntBtn.addEventListener('click', () => {
+            this.sendMobileControlEvent('q', true);
+            setTimeout(() => this.sendMobileControlEvent('q', false), 100);
+            
+            // Add visual feedback
+            englishTauntBtn.style.backgroundColor = 'rgba(100, 50, 20, 0.9)';
+            setTimeout(() => {
+                englishTauntBtn.style.backgroundColor = 'rgba(60, 20, 0, 0.75)';
+            }, 300);
+        });
+        
+        japaneseTauntBtn.addEventListener('click', () => {
+            this.sendMobileControlEvent('e', true);
+            setTimeout(() => this.sendMobileControlEvent('e', false), 100);
+            
+            // Add visual feedback
+            japaneseTauntBtn.style.backgroundColor = 'rgba(100, 50, 20, 0.9)';
+            setTimeout(() => {
+                japaneseTauntBtn.style.backgroundColor = 'rgba(60, 20, 0, 0.75)';
+            }, 300);
+        });
+        
+        // Add buttons to container
+        refereeTauntContainer.appendChild(englishTauntBtn);
+        refereeTauntContainer.appendChild(japaneseTauntBtn);
+        
         // Create joystick controls for fly-around mode
         const joystickContainer = document.createElement('div');
         joystickContainer.id = 'joystick-controls';
@@ -640,12 +722,12 @@ class UIManager {
         this.mobileControls.appendChild(joystickContainer);
         document.body.appendChild(this.mobileControls);
         
+        // Add referee taunt controls directly to body
+        document.body.appendChild(refereeTauntContainer);
+        
         // Initialize joystick controls
         this.initializeJoystickControls(leftJoystickOuter, leftJoystickInner, 'movement');
         this.initializeJoystickControls(rightJoystickOuter, rightJoystickInner, 'rotation');
-        
-        // For testing: uncomment to force show controls
-        // this.mobileControls.style.display = 'block';
     }
     
     // Create fullscreen button
@@ -771,6 +853,7 @@ class UIManager {
         // Get container elements
         const fighterControls = document.getElementById('fighter-controls');
         const joystickControls = document.getElementById('joystick-controls');
+        const refereeTauntControls = document.getElementById('referee-taunt-controls');
         
         // Always show the main container if on mobile and in landscape
         if (this.isMobile && this.isLandscape) {
@@ -783,8 +866,18 @@ class UIManager {
         if (this.isMobile && this.isLandscape && role === 'fighter') {
             console.log("Showing fighter mobile controls");
             if (fighterControls) fighterControls.style.display = 'block';
+            if (refereeTauntControls) refereeTauntControls.style.display = 'none';
         } else {
             if (fighterControls) fighterControls.style.display = 'none';
+        }
+        
+        // Handle referee controls - show for referees
+        if (this.isMobile && this.isLandscape && role === 'referee') {
+            console.log("Showing referee mobile controls");
+            if (fighterControls) fighterControls.style.display = 'block'; // Use same movement controls for referee
+            if (refereeTauntControls) refereeTauntControls.style.display = 'flex';
+        } else {
+            if (refereeTauntControls) refereeTauntControls.style.display = 'none';
         }
         
         // Handle fly around controls - show only if free camera is enabled
