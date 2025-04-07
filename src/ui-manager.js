@@ -586,8 +586,8 @@ class UIManager {
         // Add custom styling to position controls better
         arrowsContainer.style.cssText = `
             position: fixed;
-            bottom: 20px;
-            left: 0;
+            bottom: 10px;
+            left: 10px;
             right: 0;
             display: flex;
             flex-direction: column;
@@ -668,8 +668,8 @@ class UIManager {
         englishTauntBtn.className = 'referee-taunt-btn';
         englishTauntBtn.textContent = 'EN';
         englishTauntBtn.style.cssText = `
-            width: 60px;
-            height: 60px;
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
             background-color: rgba(60, 20, 0, 0.75);
             color: white;
@@ -685,8 +685,8 @@ class UIManager {
         japaneseTauntBtn.className = 'referee-taunt-btn';
         japaneseTauntBtn.textContent = 'JP';
         japaneseTauntBtn.style.cssText = `
-            width: 60px;
-            height: 60px;
+            width: 50px;
+            height: 50px;
             border-radius: 50%;
             background-color: rgba(60, 20, 0, 0.75);
             color: white;
