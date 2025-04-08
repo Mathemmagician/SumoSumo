@@ -499,62 +499,85 @@ class UIManager {
         console.log(`Toggled viewer-only mode: ${viewerOnlyMode}`);
     }
 
-    toggleFreeCamera(button) {
-        // Toggle active state
-        button.classList.toggle('active');
-        const freeCameraMode = button.classList.contains('active');
+    // Set default camera (deactivate other camera options)
+    setDefaultCamera(button) {
+        // Skip if already active
+        if (button.classList.contains('active')) return;
         
-        // If free camera is enabled, disable third-person view if it's active
-        if (freeCameraMode) {
-            const thirdPersonToggle = document.getElementById('third-person-toggle');
-            if (thirdPersonToggle && thirdPersonToggle.classList.contains('active')) {
-                thirdPersonToggle.classList.remove('active');
-                // Emit an event to disable third-person view
-                const event = new CustomEvent('thirdPersonToggled', { 
-                    detail: { enabled: false } 
-                });
-                document.dispatchEvent(event);
-            }
-        }
+        // Deactivate other camera buttons
+        const cameraButtons = document.querySelectorAll('.camera-btn');
+        cameraButtons.forEach(btn => btn.classList.remove('active'));
         
-        // Emit an event that the renderer can listen to
-        const event = new CustomEvent('freeCameraToggled', { 
-            detail: { enabled: freeCameraMode } 
+        // Activate this button
+        button.classList.add('active');
+        
+        // Disable free camera if it's active
+        const freeCameraEvent = new CustomEvent('freeCameraToggled', { 
+            detail: { enabled: false } 
         });
-        document.dispatchEvent(event);
+        document.dispatchEvent(freeCameraEvent);
+        
+        // Disable third-person view if it's active
+        const thirdPersonEvent = new CustomEvent('thirdPersonToggled', { 
+            detail: { enabled: false } 
+        });
+        document.dispatchEvent(thirdPersonEvent);
+    }
+
+    toggleFreeCamera(button) {
+        // Skip if already active
+        if (button.classList.contains('active')) return;
+        
+        // Deactivate other camera buttons
+        const cameraButtons = document.querySelectorAll('.camera-btn');
+        cameraButtons.forEach(btn => btn.classList.remove('active'));
+        
+        // Activate this button
+        button.classList.add('active');
+        
+        // If third-person view is active, disable it
+        const thirdPersonEvent = new CustomEvent('thirdPersonToggled', { 
+            detail: { enabled: false } 
+        });
+        document.dispatchEvent(thirdPersonEvent);
+        
+        // Enable free camera
+        const freeCameraEvent = new CustomEvent('freeCameraToggled', { 
+            detail: { enabled: true } 
+        });
+        document.dispatchEvent(freeCameraEvent);
         
         // Update joystick controls visibility for free camera mode
         if (this.isMobile) {
             const joystickControls = document.getElementById('joystick-controls');
             if (joystickControls) {
-                joystickControls.style.display = freeCameraMode ? 'flex' : 'none';
+                joystickControls.style.display = 'flex';
             }
         }
     }
 
     toggleThirdPersonView(button) {
-        // Toggle active state
-        button.classList.toggle('active');
-        const thirdPersonMode = button.classList.contains('active');
+        // Skip if already active
+        if (button.classList.contains('active')) return;
         
-        // If third person is enabled, disable free camera if it's active
-        if (thirdPersonMode) {
-            const freeCameraToggle = document.getElementById('free-camera-toggle');
-            if (freeCameraToggle && freeCameraToggle.classList.contains('active')) {
-                freeCameraToggle.classList.remove('active');
-                // Emit an event to disable free camera
-                const event = new CustomEvent('freeCameraToggled', { 
-                    detail: { enabled: false } 
-                });
-                document.dispatchEvent(event);
-            }
-        }
+        // Deactivate other camera buttons
+        const cameraButtons = document.querySelectorAll('.camera-btn');
+        cameraButtons.forEach(btn => btn.classList.remove('active'));
         
-        // Emit an event that the renderer can listen to
-        const event = new CustomEvent('thirdPersonToggled', { 
-            detail: { enabled: thirdPersonMode } 
+        // Activate this button
+        button.classList.add('active');
+        
+        // If free camera is active, disable it
+        const freeCameraEvent = new CustomEvent('freeCameraToggled', { 
+            detail: { enabled: false } 
         });
-        document.dispatchEvent(event);
+        document.dispatchEvent(freeCameraEvent);
+        
+        // Enable third-person view
+        const thirdPersonEvent = new CustomEvent('thirdPersonToggled', { 
+            detail: { enabled: true } 
+        });
+        document.dispatchEvent(thirdPersonEvent);
     }
 
     toggleDeveloperMode(checkbox) {

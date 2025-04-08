@@ -361,9 +361,84 @@ body {
 
 /* Viewer Only Toggle Styles */
 .viewer-only-container {
-  margin-top: 6px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding-top: 8px;
+  padding-top: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+/* Option button (Viewer Only) */
+.option-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 20px;
+  background-color: rgba(60, 20, 0, 0.6);
+  border: 1px solid rgba(156, 102, 68, 0.7);
+  color: #f9d9aa;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.option-btn.active {
+  background-color: rgba(156, 102, 68, 0.8);
+  box-shadow: 0 0 10px rgba(156, 102, 68, 0.5);
+}
+
+.option-btn:hover {
+  background-color: rgba(90, 30, 0, 0.8);
+}
+
+.option-icon {
+  font-size: 16px;
+}
+
+.option-text {
+  font-size: 14px;
+}
+
+/* Camera view options */
+.camera-view-label {
+  font-size: 14px;
+  color: #f9d9aa;
+}
+
+.camera-view-options {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.camera-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: rgba(60, 20, 0, 0.6);
+  border: 1px solid rgba(156, 102, 68, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #f9d9aa;
+}
+
+.camera-btn:hover {
+  background-color: rgba(90, 30, 0, 0.8);
+  transform: translateY(-2px);
+}
+
+.camera-btn.active {
+  background-color: rgba(156, 102, 68, 0.8);
+  box-shadow: 0 0 10px rgba(156, 102, 68, 0.5);
+}
+
+.camera-icon {
+  font-size: 16px;
 }
 
 /* Control buttons container */

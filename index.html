@@ -112,15 +112,23 @@
         </p>
 
         <div class="viewer-only-container">
-          <div class="control-buttons">
-            <button id="viewer-only-toggle" class="control-btn" onclick="uiManager.toggleViewerOnly(this)" title="Viewer Only">
-              <span class="control-icon">👁️</span>
+          <!-- First row: Viewer button with text -->
+          <button id="viewer-only-toggle" class="option-btn" onclick="uiManager.toggleViewerOnly(this)" title="Viewer Only">
+            <span class="option-icon">👁️</span>
+            <span class="option-text">Viewer Only</span>
+          </button>
+          
+          <!-- Second row: Camera view options -->
+          <div class="camera-view-label">Camera View:</div>
+          <div class="camera-view-options">
+            <button id="default-camera" class="camera-btn active" onclick="uiManager.setDefaultCamera(this)" title="Default Camera">
+              <span class="camera-icon">🎥</span>
             </button>
-            <button id="free-camera-toggle" class="control-btn" onclick="uiManager.toggleFreeCamera(this)" title="Fly Around">
-              <span class="control-icon">🐦</span>
+            <button id="free-camera-toggle" class="camera-btn" onclick="uiManager.toggleFreeCamera(this)" title="Fly Around">
+              <span class="camera-icon">🐦</span>
             </button>
-            <button id="third-person-toggle" class="control-btn" onclick="uiManager.toggleThirdPersonView(this)" title="Third-Person View">
-              <span class="control-icon">👤</span>
+            <button id="third-person-toggle" class="camera-btn" onclick="uiManager.toggleThirdPersonView(this)" title="Third-Person View">
+              <span class="camera-icon">👤</span>
             </button>
           </div>
         </div>
