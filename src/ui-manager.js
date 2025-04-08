@@ -491,6 +491,20 @@ class UIManager {
 
     toggleFreeCamera(checkbox) {
         const freeCameraMode = checkbox.checked;
+        
+        // If free camera is enabled, disable third-person view if it's active
+        if (freeCameraMode) {
+            const thirdPersonToggle = document.getElementById('third-person-toggle');
+            if (thirdPersonToggle && thirdPersonToggle.checked) {
+                thirdPersonToggle.checked = false;
+                // Emit an event to disable third-person view
+                const event = new CustomEvent('thirdPersonToggled', { 
+                    detail: { enabled: false } 
+                });
+                document.dispatchEvent(event);
+            }
+        }
+        
         // Emit an event that the renderer can listen to
         const event = new CustomEvent('freeCameraToggled', { 
             detail: { enabled: freeCameraMode } 
@@ -504,6 +518,25 @@ class UIManager {
                 joystickControls.style.display = freeCameraMode ? 'flex' : 'none';
             }
         }
+    }
+
+    toggleThirdPersonView(checkbox) {
+        const thirdPersonMode = checkbox.checked;
+        
+        // If third person is enabled, disable free camera if it's active
+        if (thirdPersonMode) {
+            const freeCameraToggle = document.getElementById('free-camera-toggle');
+            if (freeCameraToggle && freeCameraToggle.checked) {
+                freeCameraToggle.checked = false;
+                this.toggleFreeCamera(freeCameraToggle);
+            }
+        }
+        
+        // Emit an event that the renderer can listen to
+        const event = new CustomEvent('thirdPersonToggled', { 
+            detail: { enabled: thirdPersonMode } 
+        });
+        document.dispatchEvent(event);
     }
 
     toggleDeveloperMode(checkbox) {

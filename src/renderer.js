@@ -48,6 +48,9 @@ export class Renderer {
 
     // Add these new properties for camera control
     this.isFreeCamera = false;
+    this.isThirdPersonView = false;
+    this.originalCameraPosition = null;
+    this.originalCameraRotation = null;
     this.cameraMovement = {
       forward: false,
       backward: false,
@@ -221,6 +224,14 @@ export class Renderer {
     document.addEventListener("freeCameraToggled", (event) => {
       this.toggleFreeCamera(event.detail.enabled);
     });
+
+    // Add third-person view event listener
+    document.addEventListener('thirdPersonToggled', (event) => {
+      this.toggleThirdPersonView(event.detail.enabled);
+    });
+
+    // Automatically update camera position for game state changes
+    this.updateCameraForGameState(socketClient.gameState);
 
     // Set up more comprehensive socket event listeners for player updates
     this.setupSocketEventListeners();
@@ -493,6 +504,8 @@ export class Renderer {
     // Handle camera movement if free camera is enabled
     if (this.isFreeCamera) {
       this.updateCameraPosition();
+    } else if (this.isThirdPersonView) {
+      this.updateThirdPersonCamera();
     } else if (this.cameraSystem) {
       this.cameraSystem.update();
     }
@@ -515,7 +528,7 @@ export class Renderer {
         const playerPosition = new THREE.Vector3();
         bubble.playerModel.getWorldPosition(playerPosition);
         bubble.sprite.position.copy(playerPosition);
-        bubble.sprite.position.y += 2.0; // Match the new modelHeight
+        bubble.sprite.position.y += 1.6; // Lower from 2.0 to 1.6
 
         // Make sprite face camera
         bubble.sprite.quaternion.copy(this.camera.quaternion);
@@ -570,6 +583,60 @@ export class Renderer {
       
       // Let the camera system take control again
       this.updateCameraForGameState(socketClient.gameState);
+    }
+  }
+
+  // Add third-person view toggle
+  toggleThirdPersonView(enabled) {
+    console.log("Toggling third-person view:", enabled);
+    this.isThirdPersonView = enabled;
+    
+    if (enabled) {
+      // Store original camera parameters if not already stored
+      if (!this.originalCameraPosition) {
+        this.originalCameraPosition = this.camera.position.clone();
+        this.originalCameraRotation = this.camera.rotation.clone();
+      }
+
+      // The actual positioning will happen in animate()
+    } else {
+      // Return to normal camera control
+      if (this.originalCameraPosition) {
+        // Instead of immediately resetting, smoothly transition back
+        const duration = 1000; // 1 second
+        const startTime = performance.now();
+        const startPosition = this.camera.position.clone();
+        const startRotation = this.camera.quaternion.clone();
+        
+        const endPosition = this.originalCameraPosition.clone();
+        
+        const animateBackToOriginal = (currentTime) => {
+          const elapsed = currentTime - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          
+          // Use an easing function for smoother motion
+          const easeProgress = 1 - Math.pow(1 - progress, 3); // Cubic ease out
+          
+          // Interpolate position
+          this.camera.position.lerpVectors(startPosition, endPosition, easeProgress);
+          
+          // Look at center
+          this.camera.lookAt(0, 0, 0);
+          
+          // Continue animation if not complete
+          if (progress < 1) {
+            requestAnimationFrame(animateBackToOriginal);
+          } else {
+            // Let the camera system take control again
+            this.updateCameraForGameState(socketClient.gameState);
+          }
+        };
+        
+        requestAnimationFrame(animateBackToOriginal);
+      } else {
+        // Let the camera system take control again
+        this.updateCameraForGameState(socketClient.gameState);
+      }
     }
   }
 
@@ -937,6 +1004,14 @@ export class Renderer {
       } else {
         // Apply viewer appearance
         this.modelFactory.updateModelForRole(playerModel, "viewer");
+        
+        // If this was previously a fighter that fell and is now a viewer,
+        // reset any abnormal rotation to make sure the model is upright
+        if (Math.abs(playerModel.rotation.x) > 0.1 || Math.abs(playerModel.rotation.z) > 0.1) {
+          console.log("Resetting abnormal viewer rotation for player:", data.id);
+          playerModel.rotation.x = 0;
+          playerModel.rotation.z = 0;
+        }
       }
     }
   }
@@ -1439,16 +1514,16 @@ export class Renderer {
       case "arrowdown":
         this.fighterMovement.backward = true;
         break;
-      case "a":
+      case "a": // Swapped: A now controls right movement
+        this.fighterMovement.right = true;
+        break;
+      case "d": // Swapped: D now controls left movement
         this.fighterMovement.left = true;
         break;
-      case "d":
+      case "arrowleft": // Keep arrow key mappings as before
         this.fighterMovement.right = true;
         break;
-      case "arrowleft": // Swap: Arrow left now controls right movement
-        this.fighterMovement.right = true;
-        break;
-      case "arrowright": // Swap: Arrow right now controls left movement
+      case "arrowright": // Keep arrow key mappings as before
         this.fighterMovement.left = true;
         break;
     }
@@ -1468,7 +1543,7 @@ export class Renderer {
     if (!isMobileEvent && socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
       return;
     }
-
+    
     console.log(`Fighter control: ${event.key} up, mobile: ${isMobileEvent}`);
     
     switch (event.key.toLowerCase()) {
@@ -1480,16 +1555,16 @@ export class Renderer {
       case "arrowdown":
         this.fighterMovement.backward = false;
         break;
-      case "a":
+      case "a": // Swapped: A now controls right movement
+        this.fighterMovement.right = false;
+        break;
+      case "d": // Swapped: D now controls left movement
         this.fighterMovement.left = false;
         break;
-      case "d":
+      case "arrowleft": // Keep arrow key mappings as before
         this.fighterMovement.right = false;
         break;
-      case "arrowleft": // Swap: Arrow left now controls right movement
-        this.fighterMovement.right = false;
-        break;
-      case "arrowright": // Swap: Arrow right now controls left movement
+      case "arrowright": // Keep arrow key mappings as before
         this.fighterMovement.left = false;
         break;
     }
@@ -1685,7 +1760,7 @@ export class Renderer {
     
     // Position above player model - adjust height based on player scale
     const modelHeight = player.scale.y;
-    textObject.position.set(0, 1.0, 0);
+    textObject.position.set(0, 0.8, 0); // Lower the position from 1.0 to 0.8
     
     // Add to player mesh and store reference
     player.add(textObject);
@@ -2764,6 +2839,98 @@ export class Renderer {
     }
     
     // Remove the animation for referee when announcing
+  }
+
+  // Add method to update third-person camera position
+  updateThirdPersonCamera() {
+    // Get current user's ID from socket client
+    const myId = socketClient.getMyId();
+    if (!myId) {
+      console.warn('Cannot position third-person camera: no user ID found');
+      return;
+    }
+
+    // Get the player model for the current user
+    const playerModel = this.playerModels.get(myId);
+    if (!playerModel) {
+      console.warn(`Cannot position third-person camera: no player model found for user ${myId}`);
+      return;
+    }
+
+    // Get player position
+    const playerPosition = playerModel.position.clone();
+    
+    // Get player rotation (which determines the forward direction)
+    const playerRotation = playerModel.rotation.y;
+    
+    // Check if user is a viewer or fighter
+    const isViewer = socketClient.gameState.myRole === 'viewer';
+    
+    if (isViewer) {
+      // For viewers: Position camera next to player and look at the ring center
+      
+      // Check if the viewer model is incorrectly rotated (happens after falling as a fighter)
+      const needsRotationReset = Math.abs(playerModel.rotation.x) > 0.1 || Math.abs(playerModel.rotation.z) > 0.1;
+      
+      // If viewer model has incorrect rotation (from previous fighter fall animation),
+      // gradually reset it to proper upright position
+      if (needsRotationReset) {
+        // Gradually reset X and Z rotation back to 0 (upright)
+        playerModel.rotation.x *= 0.8;
+        playerModel.rotation.z *= 0.8;
+        
+        // If rotation is very small, just set it to 0
+        if (Math.abs(playerModel.rotation.x) < 0.01) playerModel.rotation.x = 0;
+        if (Math.abs(playerModel.rotation.z) < 0.01) playerModel.rotation.z = 0;
+      }
+      
+      // Calculate height - use standard height if viewer model was recently reset
+      const height = 1.8; // Height above ground
+      
+      // Calculate camera position (next to viewer)
+      const cameraPosition = new THREE.Vector3(
+        playerPosition.x,
+        playerPosition.y + height,
+        playerPosition.z
+      );
+      
+      // Smoothly move camera to this position
+      this.camera.position.lerp(cameraPosition, 0.1);
+      
+      // Look at ring center (0,0,0)
+      this.camera.lookAt(new THREE.Vector3(0, 0.5, 0));
+    } else {
+      // For fighters: Standard behind-player view
+      
+      // Calculate direction vector (where the player is facing)
+      const direction = new THREE.Vector3(
+        -Math.sin(playerRotation), 
+        0, 
+        -Math.cos(playerRotation)
+      );
+      
+      // Calculate camera position (behind player and slightly elevated)
+      const offset = 4; // Distance behind player
+      const height = 2.5; // Height above ground
+      
+      const cameraPosition = new THREE.Vector3(
+        playerPosition.x + direction.x * offset,
+        playerPosition.y + height,
+        playerPosition.z + direction.z * offset
+      );
+      
+      // Smoothly move camera to this position
+      this.camera.position.lerp(cameraPosition, 0.1);
+      
+      // Make camera look at a point in front of the player
+      const lookTarget = new THREE.Vector3(
+        playerPosition.x - direction.x * 2,
+        playerPosition.y + 1.0,
+        playerPosition.z - direction.z * 2
+      );
+      
+      this.camera.lookAt(lookTarget);
+    }
   }
 }
 

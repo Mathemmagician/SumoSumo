@@ -429,6 +429,10 @@ class SocketClient {
     );
   }
 
+  getMyId() {
+    return this.gameState.myId;
+  }
+
   on(eventName, handler) {
     if (!this.eventHandlers.has(eventName)) {
       this.eventHandlers.set(eventName, new Set());
