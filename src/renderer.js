@@ -712,7 +712,17 @@ export class Renderer {
     // Player removals
     socketClient.on("playerLeft", (playerId) => {
       console.log("Renderer received playerLeft:", playerId);
+      
+      // First remove any text bubbles to prevent orphaned elements
+      this.removeTextBubble(playerId);
+      
+      // Immediately remove the player model to prevent teleporting issues
       this.removePlayer(playerId);
+      
+      // Remove the player from any position interpolations that might be in progress
+      if (this.positionInterpolations) {
+        delete this.positionInterpolations[playerId];
+      }
     });
 
     // Role changes
@@ -1273,13 +1283,32 @@ export class Renderer {
 
   removePlayer(playerId) {
     console.log("Removing player model:", playerId);
+    
+    // First, remove any text bubbles associated with this player
+    this.removeTextBubble(playerId);
+    
     const model = this.playerModels.get(playerId);
     if (model) {
+      // Remove any animations or update references
+      if (model.userData && model.userData.animationDetails) {
+        delete model.userData.animationDetails;
+      }
+      
+      // Traverse and remove any child objects (like text bubbles)
+      model.traverse(child => {
+        // Check if this is a CSS2DObject with a bubble
+        if (child.element && child.element.classList && 
+            (child.element.classList.contains('text-bubble') || 
+             child.element.classList.contains('emote-bubble'))) {
+          model.remove(child);
+        }
+      });
+      
+      // Remove from scene and dispose of resources
       this.scene.remove(model);
       this.playerModels.delete(playerId);
-      // console.log(
-      //   `Removed player model. Total models: ${this.playerModels.size}`
-      // );
+      
+      console.log(`Removed player model ${playerId}. Total models: ${this.playerModels.size}`);
     }
   }
 
@@ -1315,10 +1344,20 @@ export class Renderer {
     console.log("Renderer cleanup completed");
 
     // Clean up any remaining text bubbles
-    for (const [playerId, bubble] of this.textBubbles) {
-      clearTimeout(bubble.timeout);
-      bubble.sprite.material.dispose();
-      bubble.sprite.material.map.dispose();
+    for (const [playerId, bubbleData] of this.textBubbles) {
+      // Clear any pending timeouts
+      if (bubbleData.fadeTimeout) {
+        clearTimeout(bubbleData.fadeTimeout);
+      }
+      if (bubbleData.removeTimeout) {
+        clearTimeout(bubbleData.removeTimeout);
+      }
+      
+      // Remove from parent if possible
+      const textObject = bubbleData.sprite;
+      if (textObject && textObject.parent) {
+        textObject.parent.remove(textObject);
+      }
     }
     this.textBubbles.clear();
 
@@ -1621,12 +1660,12 @@ export class Renderer {
   }
 
   // Add new methods for text bubble management
-  createTextBubble(playerId, text, isEmote = false, isAnnouncement = false) {
-    // Remove any existing bubble
-    this.removeTextBubble(playerId);
-
+  createTextBubble(playerId, text, isEmote) {
     const player = this.playerModels.get(playerId);
     if (!player) return;
+
+    // First check if this player already has a bubble and remove it
+    this.removeTextBubble(playerId);
 
     // Create container div
     const bubbleDiv = document.createElement('div');
@@ -1650,7 +1689,16 @@ export class Renderer {
     
     // Add to player mesh and store reference
     player.add(textObject);
-    this.textBubbles.set(playerId, textObject);
+    
+    // Create object to store both the text object and timeouts
+    const bubbleData = {
+      sprite: textObject,
+      fadeTimeout: null,
+      removeTimeout: null
+    };
+    
+    // Store in our map
+    this.textBubbles.set(playerId, bubbleData);
 
     // Check if this is a referee taunt (referee role and using emote)
     const isRefereeTaunt = player.userData.role === 'referee' && isEmote;
@@ -1658,10 +1706,13 @@ export class Renderer {
     // Auto-remove after delay - longer duration for referee taunts
     const displayDuration = isRefereeTaunt ? 5000 : (isEmote ? 4000 : 5000);
     
-    setTimeout(() => {
+    // Set fade timeout
+    bubbleData.fadeTimeout = setTimeout(() => {
       if (this.textBubbles.has(playerId)) {
         bubbleDiv.style.opacity = '0';
-        setTimeout(() => this.removeTextBubble(playerId), 500); // Longer fade out
+        
+        // Set remove timeout
+        bubbleData.removeTimeout = setTimeout(() => this.removeTextBubble(playerId), 500);
       }
     }, displayDuration);
   }
@@ -1715,12 +1766,26 @@ export class Renderer {
   }
 
   removeTextBubble(playerId) {
-    const textObject = this.textBubbles.get(playerId);
-    if (textObject) {
+    const bubbleData = this.textBubbles.get(playerId);
+    if (bubbleData) {
+      // Clear any pending timeouts
+      if (bubbleData.fadeTimeout) {
+        clearTimeout(bubbleData.fadeTimeout);
+      }
+      if (bubbleData.removeTimeout) {
+        clearTimeout(bubbleData.removeTimeout);
+      }
+      
+      // Get the sprite/text object
+      const textObject = bubbleData.sprite;
+      
+      // Remove from player if player still exists
       const player = this.playerModels.get(playerId);
-      if (player) {
+      if (player && textObject) {
         player.remove(textObject);
       }
+      
+      // Remove from map
       this.textBubbles.delete(playerId);
     }
   }

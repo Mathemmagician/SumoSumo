@@ -10,6 +10,7 @@ import { renderer } from "./renderer";
 import { sumiEAnimation } from "./intro-animation-sumi";
 // import { stripeManager } from './stripe-manager.js';  // Don't delete this
 import "./analytics";
+import { storylineManager } from "./storyline-manager";
 
 let stripeManager = null;
 
