@@ -112,38 +112,17 @@
         </p>
 
         <div class="viewer-only-container">
-          <label class="viewer-only-label">
-            <input
-              type="checkbox"
-              id="viewer-only-toggle"
-              onchange="uiManager.toggleViewerOnly(this)"
-            />
-            <span class="viewer-only-text">Viewer Only</span>
-          </label>
-          <label class="viewer-only-label">
-            <input
-              type="checkbox"
-              id="free-camera-toggle"
-              onchange="uiManager.toggleFreeCamera(this)"
-            />
-            <span class="viewer-only-text">Fly Around</span>
-          </label>
-          <label class="viewer-only-label">
-            <input
-              type="checkbox"
-              id="third-person-toggle"
-              onchange="uiManager.toggleThirdPersonView(this)"
-            />
-            <span class="viewer-only-text">3rd View</span>
-          </label>
-          <!-- <label class="viewer-only-label">
-            <input
-              type="checkbox"
-              id="developer-mode-toggle"
-              onchange="uiManager.toggleDeveloperMode(this)"
-            />
-            <span class="viewer-only-text">Developer Mode</span>
-          </label> -->
+          <div class="control-buttons">
+            <button id="viewer-only-toggle" class="control-btn" onclick="uiManager.toggleViewerOnly(this)" title="Viewer Only">
+              <span class="control-icon">👁️</span>
+            </button>
+            <button id="free-camera-toggle" class="control-btn" onclick="uiManager.toggleFreeCamera(this)" title="Fly Around">
+              <span class="control-icon">🐦</span>
+            </button>
+            <button id="third-person-toggle" class="control-btn" onclick="uiManager.toggleThirdPersonView(this)" title="Third-Person View">
+              <span class="control-icon">👤</span>
+            </button>
+          </div>
         </div>
       </div>
 

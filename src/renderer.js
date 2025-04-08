@@ -505,7 +505,15 @@ export class Renderer {
     if (this.isFreeCamera) {
       this.updateCameraPosition();
     } else if (this.isThirdPersonView) {
-      this.updateThirdPersonCamera();
+      // Check if we're in ceremony stages - if so, let the camera system handle it
+      const currentStage = socketClient.gameState.stage;
+      if (currentStage === 'PRE_CEREMONY' || currentStage === 'PRE_MATCH_CEREMONY') {
+        // During ceremony, let the camera system take control
+        this.cameraSystem.update();
+      } else {
+        // For normal gameplay, use third-person camera
+        this.updateThirdPersonCamera();
+      }
     } else if (this.cameraSystem) {
       this.cameraSystem.update();
     }
@@ -597,7 +605,12 @@ export class Renderer {
         this.originalCameraPosition = this.camera.position.clone();
         this.originalCameraRotation = this.camera.rotation.clone();
       }
-
+      
+      // Check if we're in a ceremony stage - if so, immediately update camera for current game state
+      const currentStage = socketClient.gameState.stage;
+      if (currentStage === 'PRE_CEREMONY' || currentStage === 'PRE_MATCH_CEREMONY') {
+        this.updateCameraForGameState(socketClient.gameState);
+      }
       // The actual positioning will happen in animate()
     } else {
       // Return to normal camera control
@@ -2867,7 +2880,7 @@ export class Renderer {
     const isViewer = socketClient.gameState.myRole === 'viewer';
     
     if (isViewer) {
-      // For viewers: Position camera next to player and look at the ring center
+      // For viewers: Position camera behind player and look at the ring center
       
       // Check if the viewer model is incorrectly rotated (happens after falling as a fighter)
       const needsRotationReset = Math.abs(playerModel.rotation.x) > 0.1 || Math.abs(playerModel.rotation.z) > 0.1;
@@ -2884,20 +2897,24 @@ export class Renderer {
         if (Math.abs(playerModel.rotation.z) < 0.01) playerModel.rotation.z = 0;
       }
       
-      // Calculate height - use standard height if viewer model was recently reset
-      const height = 1.8; // Height above ground
+      // Calculate vector from player to ring center (0,0,0)
+      const toRingCenter = new THREE.Vector3(0, 0, 0).sub(playerPosition).normalize();
       
-      // Calculate camera position (next to viewer)
+      // Calculate a position behind the viewer (opposite direction from ring)
+      const offset = 2.5; // Distance behind viewer
+      const height = 2.5; // Height above ground
+      
+      // Position the camera behind the viewer, opposite of where they're facing
       const cameraPosition = new THREE.Vector3(
-        playerPosition.x,
+        playerPosition.x - toRingCenter.x * offset,
         playerPosition.y + height,
-        playerPosition.z
+        playerPosition.z - toRingCenter.z * offset
       );
       
       // Smoothly move camera to this position
       this.camera.position.lerp(cameraPosition, 0.1);
       
-      // Look at ring center (0,0,0)
+      // Look at ring center (0,0,0) over the viewer's shoulder
       this.camera.lookAt(new THREE.Vector3(0, 0.5, 0));
     } else {
       // For fighters: Standard behind-player view

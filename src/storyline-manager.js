@@ -130,13 +130,7 @@ class StorylineManager {
       this.storyBtn = document.createElement('button');
       this.storyBtn.id = 'story-btn';
       this.storyBtn.className = 'ui-btn';
-      this.storyBtn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-          <path d="M6.5 7a.5.5 0 0 0 0 1h4a.5.5 0 0 0 0-1h-4z"/>
-          <path d="M0 4.5A1.5 1.5 0 0 1 1.5 3h13A1.5 1.5 0 0 1 16 4.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 12.5v-8ZM1.5 4a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h13a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5h-13Z"/>
-        </svg>
-        <span>Story Line</span>
-      `;
+      this.storyBtn.innerHTML = `📖`;
       
       // Insert button before the first element in the controls panel
       if (controlsPanel.firstChild) {
