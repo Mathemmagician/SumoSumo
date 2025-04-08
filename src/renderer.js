@@ -505,10 +505,14 @@ export class Renderer {
     if (this.isFreeCamera) {
       this.updateCameraPosition();
     } else if (this.isThirdPersonView) {
-      // Check if we're in ceremony stages - if so, let the camera system handle it
+      // Check if we're in ceremony or special stages - if so, let the camera system handle it
       const currentStage = socketClient.gameState.stage;
-      if (currentStage === 'PRE_CEREMONY' || currentStage === 'PRE_MATCH_CEREMONY') {
-        // During ceremony, let the camera system take control
+      if (currentStage === 'PRE_CEREMONY' || 
+          currentStage === 'PRE_MATCH_CEREMONY' || 
+          currentStage === 'FIGHTER_SELECTION' || 
+          currentStage === 'VICTORY_CEREMONY' || 
+          currentStage === 'KNOCKOUT_SEQUENCE') {
+        // During ceremony stages, let the camera system take control
         this.cameraSystem.update();
       } else {
         // For normal gameplay, use third-person camera
@@ -608,7 +612,11 @@ export class Renderer {
       
       // Check if we're in a ceremony stage - if so, immediately update camera for current game state
       const currentStage = socketClient.gameState.stage;
-      if (currentStage === 'PRE_CEREMONY' || currentStage === 'PRE_MATCH_CEREMONY') {
+      if (currentStage === 'PRE_CEREMONY' || 
+          currentStage === 'PRE_MATCH_CEREMONY' || 
+          currentStage === 'FIGHTER_SELECTION' || 
+          currentStage === 'VICTORY_CEREMONY' || 
+          currentStage === 'KNOCKOUT_SEQUENCE') {
         this.updateCameraForGameState(socketClient.gameState);
       }
       // The actual positioning will happen in animate()
