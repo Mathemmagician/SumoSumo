@@ -1,51 +1,27 @@
 // Storyline Manager for SumoSumo
 import { socketClient } from './socket-client';
 
-// Story content - epic tale of SumoSumo (shorter, more epic)
+// Story content - epic tale of SumoSumo tournament
 const STORYLINE = [
   {
-    image: "sumoArt (0).jpg",
-    text: "Ancient warriors speak of SumoSumo - where legends clash in brutal combat for eternal glory."
+    image: "sumo-receiving-a-scroll-in-mountain.jpg",
+    text: "From the sacred peaks, scrolls are sent. Only the strongest receive the call to the SumoSumo tournament."
   },
   {
-    image: "sumoArt (1).jpg",
-    text: "They come bearing ancestral might. The weak perish. The worthy ascend."
+    image: "sumo-is-traveling-throw-mountains.jpg",
+    text: "Warriors journey through mountains and rivers, leaving behind all for a chance at glory."
   },
   {
-    image: "sumoArt (2).jpg",
-    text: "Forged in ice and fire, these titans seek to dominate all who dare challenge them."
+    image: "sumo-on-arena.jpg",
+    text: "At the ancient arena, the stage is set. Here, legends will clash, and destiny will be decided."
   },
   {
-    image: "sumoArt (3).jpg",
-    text: "Under merciless suns, warriors hone deadly techniques. Steel bodies. Iron wills."
+    image: "sumo-fighting-in-tournament-.jpg",
+    text: "Titans clash with thunderous force. Only the strongest will survive the SumoSumo battle."
   },
   {
-    image: "sumoArt (4).jpg",
-    text: "Mind, spirit, body - the sacred trinity. Only the complete warrior survives the ring."
-  },
-  {
-    image: "sumoArt (5).jpg",
-    text: "Desperate souls seek glory through blood and sweat. One rises. All others fall."
-  },
-  {
-    image: "sumoArt (6).jpg",
-    text: "The call to battle echoes across lands. Warriors converge. The arena awaits."
-  },
-  {
-    image: "sumoArt (7).jpg",
-    text: "Mount Fuji's ancient arena - hallowed ground soaked with the blood of countless champions."
-  },
-  {
-    image: "sumoArt (8).jpg",
-    text: "\"Enter with courage. One leaves victorious. The rest taste defeat's bitter sting.\""
-  },
-  {
-    image: "sumoArt (9).jpg",
-    text: "Dawn breaks. Destiny awaits. Honor and brutality dance together in sacred violence."
-  },
-  {
-    image: "sumoArt (10).jpg",
-    text: "You stand at the threshold. Observer or warrior? Choose your path in SumoSumo's sacred circle."
+    image: "sumo-won-a-tournament.jpg",
+    text: "One stands victorious. The champion of SumoSumo ascends, immortalized in legend."
   }
 ];
 

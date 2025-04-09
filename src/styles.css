@@ -1369,7 +1369,7 @@ body {
 /* Caption Container at bottom */
 .story-caption-container {
   position: absolute;
-  bottom: 80px;
+  bottom: 50px;
   left: 0;
   width: 100%;
   padding: 0 20px;
@@ -1385,7 +1385,7 @@ body {
   margin: 0 auto;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9), 0 0 20px rgba(0, 0, 0, 0.7);
   opacity: 0;
-  max-width: 1000px;
+  max-width: 1200px;
   padding: 15px 25px;
   background-color: rgba(0, 0, 0, 0.5);
   border-radius: 12px;
@@ -1431,13 +1431,13 @@ body {
 /* Navigation Buttons Styles - repositioned */
 .story-nav-buttons {
   position: absolute;
-  bottom: 20px;
+  bottom: 10px;
   left: 0;
   width: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 40px;
+  gap: 20px;
   z-index: 10;
 }
 
@@ -1445,12 +1445,10 @@ body {
   background-color: rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(156, 102, 68, 0.7);
   color: #f9d9aa;
-  padding: 12px 20px;
   border-radius: 50%;
   cursor: pointer;
-  font-size: 1.5rem;
-  width: 50px;
-  height: 50px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1471,10 +1469,9 @@ body {
 /* Slide indicator */
 .slide-indicator {
   font-family: "Sawarabi Mincho", serif;
-  font-size: 1rem;
   color: #f9d9aa;
   background-color: rgba(0, 0, 0, 0.5);
-  padding: 8px 15px;
+  padding: 4px;
   border-radius: 20px;
   border: 1px solid rgba(156, 102, 68, 0.5);
   min-width: 60px;
@@ -1489,7 +1486,7 @@ body {
   }
   
   .story-caption-container {
-    bottom: 70px;
+    bottom: 50px;
   }
   
   .story-nav-btn {
@@ -1507,7 +1504,7 @@ body {
   }
   
   .story-caption-container {
-    bottom: 60px;
+    bottom: 50px;
   }
   
   .story-nav-btn {
