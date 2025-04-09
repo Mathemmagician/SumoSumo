@@ -87,6 +87,14 @@ class UIManager {
     setupSocketEvents() {
         // Listen for game state updates
         socketClient.on('gameStateUpdated', (gameState) => {
+            // Check if role has changed since last update
+            if (this._lastRole && this._lastRole !== gameState.myRole) {
+                this.showRoleChangeNotification(gameState.myRole);
+            }
+            
+            // Store current role for future comparison
+            this._lastRole = gameState.myRole;
+            
             this.updateRoleBadge(gameState.myRole);
             this.updatePlayerCount(this.countAllPlayers(gameState));
             this.updatePlayerName();
@@ -109,11 +117,18 @@ class UIManager {
         socketClient.on('playerRoleChanged', (data) => {
             if (data.id === socketClient.gameState.myId) {
                 this.updateRoleBadge(data.role);
+                this.showRoleChangeNotification(data.role);
             }
             this.updatePlayerCount(this.countAllPlayers(socketClient.gameState));
         });
         
         socketClient.on('fightersSelected', () => {
+            // Check if the player has been selected as a fighter
+            if (socketClient.gameState.myRole === 'fighter' && 
+                socketClient.gameState.fighters.some(f => f.id === socketClient.gameState.myId)) {
+                this.showCenterNotification("You have been selected as a FIGHTER!\nGet ready to battle!", 5000);
+            }
+            
             this.updateRoleBadge(socketClient.gameState.myRole);
             this.updatePlayerCount(this.countAllPlayers(socketClient.gameState));
         });
@@ -180,6 +195,9 @@ class UIManager {
             if (data.duration > 0) {
                 this.startStageTimer(data.duration);
             }
+            
+            // Show important game stage notifications
+            this.showGameStageNotification(data.name, data.displayName);
         });
         
         // Listen for emote/message events
@@ -510,11 +528,90 @@ class UIManager {
                     fighterModeBtn.classList.add('active');
                 }
             }
+            
+            // Show appropriate mode explanation
+            this.showModeExplanation(isViewerOnly);
         }
         
         // Send to server
         socketClient.socket.emit('toggleViewerOnly', isViewerOnly);
         console.log(`Toggled viewer-only mode: ${isViewerOnly}`);
+    }
+
+    // Show explanation toast for the selected mode
+    showModeExplanation(isViewerOnly) {
+        let message;
+        
+        if (isViewerOnly) {
+            message = "You are now in Viewer mode.\nYou can only observe the match.";
+        } else {
+            message = "You are now in Fighter mode.\nYou have a chance to be selected as a fighter in the next match!";
+        }
+        
+        // Show as center notification instead of toast
+        this.showCenterNotification(message);
+    }
+    
+    // Show notification in the center of the screen
+    showCenterNotification(message, duration = 3000) {
+        // Remove existing notification if any
+        const existingNotification = document.getElementById('center-notification');
+        if (existingNotification) {
+            existingNotification.remove();
+        }
+        
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.id = 'center-notification';
+        notification.className = 'center-notification';
+        notification.textContent = message;
+        
+        // Add to document
+        document.body.appendChild(notification);
+        
+        // Trigger animation
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 10);
+        
+        // Remove after duration
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                notification.remove();
+            }, 400);
+        }, duration);
+    }
+    
+    // Show toast message that fades out
+    showToast(message, duration = 3000) {
+        // Remove existing toast if any
+        const existingToast = document.getElementById('mode-toast');
+        if (existingToast) {
+            existingToast.remove();
+        }
+        
+        // Create toast element
+        const toast = document.createElement('div');
+        toast.id = 'mode-toast';
+        toast.className = 'toast-message';
+        toast.textContent = message;
+        
+        // Add to document
+        document.body.appendChild(toast);
+        
+        // Trigger animation
+        setTimeout(() => {
+            toast.classList.add('show');
+        }, 10);
+        
+        // Remove after duration
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => {
+                toast.remove();
+            }, 300);
+        }, duration);
     }
 
     // Set default camera (deactivate other camera options)
@@ -540,6 +637,12 @@ class UIManager {
             detail: { enabled: false } 
         });
         document.dispatchEvent(thirdPersonEvent);
+        
+        // Update camera explanation label
+        this.updateCameraExplanation("Default camera view selected");
+        
+        // Show camera explanation as center notification
+        this.showCenterNotification("Default camera view.\nWatch the match from the best angles.");
     }
 
     toggleFreeCamera(button) {
@@ -572,6 +675,12 @@ class UIManager {
                 joystickControls.style.display = 'flex';
             }
         }
+        
+        // Update camera explanation label
+        this.updateCameraExplanation("Free-fly mode - Use WASD/arrows to move");
+        
+        // Show free camera explanation as center notification
+        this.showCenterNotification("You are now in Free Camera mode.\nUse WASD/Arrow keys or joysticks to fly around.");
     }
 
     toggleThirdPersonView(button) {
@@ -596,6 +705,12 @@ class UIManager {
             detail: { enabled: true } 
         });
         document.dispatchEvent(thirdPersonEvent);
+        
+        // Update camera explanation label
+        this.updateCameraExplanation("Third-person view active");
+        
+        // Show third-person camera explanation as center notification
+        this.showCenterNotification("Third-person view activated.\nWatch from a player's perspective.");
     }
 
     toggleDeveloperMode(checkbox) {
@@ -1491,6 +1606,71 @@ class UIManager {
                 }
             }
         }
+    }
+
+    // Update the camera explanation text
+    updateCameraExplanation(text) {
+        const explanationElement = document.querySelector('.camera-explanation');
+        if (explanationElement) {
+            explanationElement.textContent = text;
+        }
+    }
+
+    // Show notification when role changes
+    showRoleChangeNotification(newRole) {
+        let message;
+        
+        switch(newRole.toLowerCase()) {
+            case 'fighter':
+                message = "You are now a FIGHTER!\nGet ready to battle in the ring!";
+                break;
+            case 'referee':
+                message = "You are now the REFEREE!\nMaintain order in the ring!";
+                break;
+            case 'viewer':
+                message = "You are now a VIEWER.\nEnjoy watching the match!";
+                break;
+            default:
+                message = `Your role has changed to: ${newRole}`;
+        }
+        
+        this.showCenterNotification(message, 4000);
+    }
+
+    // Show game stage notification
+    showGameStageNotification(stageName, displayName) {
+        let message;
+        let duration = 3000;
+        
+        switch(stageName) {
+            case 'MATCH_STARTING':
+                message = "Match is starting!\nFighters, prepare for battle!";
+                duration = 4000;
+                break;
+            case 'MATCH_IN_PROGRESS':
+                message = "FIGHT!\nMay the strongest sumo win!";
+                duration = 3000;
+                break;
+            case 'MATCH_ENDED':
+                // Find the winner if available
+                let winnerName = "";
+                if (socketClient.gameState && socketClient.gameState.winner) {
+                    winnerName = socketClient.gameState.winner.name || "A fighter";
+                }
+                
+                if (winnerName) {
+                    message = `${winnerName} is victorious!\nThe match has ended.`;
+                } else {
+                    message = "The match has ended!";
+                }
+                duration = 5000;
+                break;
+            default:
+                // Don't show notification for other stages
+                return;
+        }
+        
+        this.showCenterNotification(message, duration);
     }
 }
 
