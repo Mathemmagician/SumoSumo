@@ -137,11 +137,16 @@ class SocketClient {
     this.socketStats.playerLeft++;
     this.updateSocketStats();
     console.log("Player left:", playerId);
+    
+    // Make sure to remove the player from all collections immediately
+    // Order matters here: remove from all collections first, then emit event
     this.gameState.fighters = this.gameState.fighters.filter((f) => f.id !== playerId);
     if (this.gameState.referee?.id === playerId) {
       this.gameState.referee = null;
     }
     this.gameState.viewers = this.gameState.viewers.filter((v) => v.id !== playerId);
+    
+    // Now emit the event after the player is completely removed from state
     this.emit("playerLeft", playerId);
   }
 
@@ -360,6 +365,15 @@ class SocketClient {
 
   handleViewerOnlyUpdated(isViewerOnly) {
     console.log("Viewer-only updated:", isViewerOnly);
+    
+    // Update our local state if we have an ID
+    if (this.gameState.myId) {
+      const player = this.findPlayerInGameState(this.gameState.myId);
+      if (player) {
+        player.viewerOnly = isViewerOnly;
+      }
+    }
+    
     this.emit("viewerOnlyUpdated", isViewerOnly);
   }
 
@@ -384,6 +398,16 @@ class SocketClient {
 
   toggleViewerOnly(enabled) {
     this.socket.emit("toggleViewerOnly", enabled);
+    
+    // Also update local game state
+    if (this.gameState.myId) {
+      // Find the player in our state
+      const player = this.findPlayerInGameState(this.gameState.myId);
+      if (player) {
+        player.viewerOnly = enabled;
+        console.log(`Local viewerOnly state updated to: ${enabled}`);
+      }
+    }
   }
 
   determineMyRole() {
@@ -403,6 +427,10 @@ class SocketClient {
       (this.gameState.referee?.id === id ? this.gameState.referee : null) ||
       this.gameState.viewers.find((v) => v.id === id)
     );
+  }
+
+  getMyId() {
+    return this.gameState.myId;
   }
 
   on(eventName, handler) {

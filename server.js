@@ -234,8 +234,8 @@ function changeGameStage(newStage) {
       
       console.log(`POST_MATCH_COOLDOWN: Real user count = ${currentRealUserCount}`);
       
-      // Start a new round if we have at least 1 viewer to proceed
-      // The selectFighters function will handle bot allocation based on real user count
+      // Start a new round if we have at least 1 real viewer to proceed
+      // The selectFighters function will handle bot allocation based on active user count
       if (currentRealUserCount >= 1) {
         // We'll allocate bots as needed in selectFighters function
         changeGameStage(GAME_STAGES.FIGHTER_SELECTION);
@@ -263,8 +263,13 @@ function progressToNextStage(currentStage) {
       // Get count of real users (non-NPC players)
       const realUserCount = gameState.viewers.filter(viewer => !viewer.id.startsWith('npc-')).length;
       
-      // Need at least 1 viewer to proceed (we'll use bots to fill in the rest)
+      // Get count of active users (real users who are not viewer-only)
+      const activeUserCount = countActiveUsers();
+      
+      // Need at least 1 real user to proceed (we'll use bots to fill in the rest)
+      // Even viewer-only users count for starting the game
       if (realUserCount >= 1) {
+        console.log(`Progressing to FIGHTER_SELECTION with ${realUserCount} real users (${activeUserCount} active)`);
         changeGameStage(GAME_STAGES.FIGHTER_SELECTION);
       }
       break;
@@ -295,8 +300,8 @@ function progressToNextStage(currentStage) {
       
       console.log(`POST_MATCH_COOLDOWN: Real user count = ${currentRealUserCount}`);
       
-      // Start a new round if we have at least 1 viewer to proceed
-      // The selectFighters function will handle bot allocation based on real user count
+      // Start a new round if we have at least 1 real viewer to proceed
+      // The selectFighters function will handle bot allocation based on active user count
       if (currentRealUserCount >= 1) {
         // We'll allocate bots as needed in selectFighters function
         changeGameStage(GAME_STAGES.FIGHTER_SELECTION);
@@ -317,7 +322,11 @@ function selectFighters() {
 
   // Get count of real users (non-NPC players)
   const realUserCount = gameState.viewers.filter(viewer => !viewer.id.startsWith('npc-')).length;
-  console.log(`Real user count: ${realUserCount}`);
+  
+  // Get count of active users (real users who are not viewer-only)
+  const activeUserCount = countActiveUsers();
+  
+  console.log(`Real user count: ${realUserCount}, Active user count: ${activeUserCount}`);
 
   // Clean up any existing bot movement intervals
   if (BOT_CONFIG.botMovementIntervals.size > 0) {
@@ -336,9 +345,9 @@ function selectFighters() {
     gameState.referee = null;
   }
 
-  // Bot allocation based on real user count
-  if (realUserCount === 0) {
-    // If no real users, use 2 bot fighters and 1 bot referee
+  // Bot allocation based on active user count
+  if (activeUserCount === 0) {
+    // If no active users, use 2 bot fighters and 1 bot referee
     const fighter1 = createBot(BOT_TYPES.FIGHTER, 'fighter');
     const fighter2 = createBot(BOT_TYPES.FIGHTER, 'fighter');
     const referee = createBot(BOT_TYPES.REFEREE, 'referee');
@@ -362,19 +371,19 @@ function selectFighters() {
     gameState.fighters.push(fighter2);
     gameState.referee = referee;
   } 
-  else if (realUserCount === 1) {
-    // If 1 real user, make them a fighter + 1 bot fighter + 1 bot referee
-    const realViewer = gameState.viewers.find(viewer => !viewer.id.startsWith('npc-'));
+  else if (activeUserCount === 1) {
+    // If 1 active user, make them a fighter + 1 bot fighter + 1 bot referee
+    const activeViewer = gameState.viewers.find(viewer => !viewer.id.startsWith('npc-') && !viewer.viewerOnly);
     
-    if (realViewer) {
-      // Remove real user from viewers
-      gameState.viewers = gameState.viewers.filter(v => v.id !== realViewer.id);
+    if (activeViewer) {
+      // Remove active user from viewers
+      gameState.viewers = gameState.viewers.filter(v => v.id !== activeViewer.id);
 
-      // Make real user a fighter
-      realViewer.role = 'fighter';
-      realViewer.position = { x: -3, y: 3, z: 0 };
-      realViewer.rotation = Math.PI / 2;
-      gameState.fighters.push(realViewer);
+      // Make active user a fighter
+      activeViewer.role = 'fighter';
+      activeViewer.position = { x: -3, y: 3, z: 0 };
+      activeViewer.rotation = Math.PI / 2;
+      gameState.fighters.push(activeViewer);
 
       // Add bot fighter
       const botFighter = createBot(BOT_TYPES.FIGHTER, 'fighter');
@@ -388,29 +397,29 @@ function selectFighters() {
       
       // Calculate midpoint and set rotation
       const midpoint = {
-        x: (realViewer.position.x + botFighter.position.x) / 2,
-        z: (realViewer.position.z + botFighter.position.z) / 2
+        x: (activeViewer.position.x + botFighter.position.x) / 2,
+        z: (activeViewer.position.z + botFighter.position.z) / 2
       };
       botReferee.rotation = Math.atan2(midpoint.x - botReferee.position.x, midpoint.z - botReferee.position.z);
       
       gameState.referee = botReferee;
     }
   }
-  else if (realUserCount === 2) {
-    // If 2 real users, make both fighters + 1 bot referee
-    const realViewers = gameState.viewers.filter(viewer => !viewer.id.startsWith('npc-')).slice(0, 2);
+  else if (activeUserCount === 2) {
+    // If 2 active users, make both fighters + 1 bot referee
+    const activeViewers = gameState.viewers.filter(viewer => !viewer.id.startsWith('npc-') && !viewer.viewerOnly).slice(0, 2);
 
-    if (realViewers.length === 2) {
-      // Set up first real fighter
-      const fighter1 = realViewers[0];
+    if (activeViewers.length === 2) {
+      // Set up first active fighter
+      const fighter1 = activeViewers[0];
       gameState.viewers = gameState.viewers.filter(v => v.id !== fighter1.id);
       fighter1.role = 'fighter';
       fighter1.position = { x: -3, y: 3, z: 0 };
       fighter1.rotation = Math.PI / 2;
       gameState.fighters.push(fighter1);
 
-      // Set up second real fighter
-      const fighter2 = realViewers[1];
+      // Set up second active fighter
+      const fighter2 = activeViewers[1];
       gameState.viewers = gameState.viewers.filter(v => v.id !== fighter2.id);
       fighter2.role = 'fighter';
       fighter2.position = { x: 3, y: 3, z: 0 };
@@ -432,23 +441,23 @@ function selectFighters() {
     }
   }
   else {
-    // For 3+ real users, use only real users (no bots)
-    const eligibleRealViewers = gameState.viewers.filter(
+    // For 3+ active users, use only real users (no bots)
+    const eligibleActiveViewers = gameState.viewers.filter(
       viewer => !viewer.viewerOnly && !viewer.id.startsWith('npc-')
     );
     
-    if (eligibleRealViewers.length >= 3) {
-      // We have enough real users for fighters and referee
+    if (eligibleActiveViewers.length >= 3) {
+      // We have enough active users for fighters and referee
       
       // Select 2 random fighters
-      const fighter1Index = Math.floor(Math.random() * eligibleRealViewers.length);
-      const fighter1 = eligibleRealViewers.splice(fighter1Index, 1)[0];
+      const fighter1Index = Math.floor(Math.random() * eligibleActiveViewers.length);
+      const fighter1 = eligibleActiveViewers.splice(fighter1Index, 1)[0];
       
       // Remove fighter1 from viewers
       gameState.viewers = gameState.viewers.filter(v => v.id !== fighter1.id);
       
-      const fighter2Index = Math.floor(Math.random() * eligibleRealViewers.length);
-      const fighter2 = eligibleRealViewers.splice(fighter2Index, 1)[0];
+      const fighter2Index = Math.floor(Math.random() * eligibleActiveViewers.length);
+      const fighter2 = eligibleActiveViewers.splice(fighter2Index, 1)[0];
       
       // Remove fighter2 from viewers
       gameState.viewers = gameState.viewers.filter(v => v.id !== fighter2.id);
@@ -467,8 +476,8 @@ function selectFighters() {
       gameState.fighters.push(fighter2);
       
       // Select referee from remaining users
-      const refereeIndex = Math.floor(Math.random() * eligibleRealViewers.length);
-      const referee = eligibleRealViewers.splice(refereeIndex, 1)[0];
+      const refereeIndex = Math.floor(Math.random() * eligibleActiveViewers.length);
+      const referee = eligibleActiveViewers.splice(refereeIndex, 1)[0];
       
       // Remove referee from viewers
       gameState.viewers = gameState.viewers.filter(v => v.id !== referee.id);
@@ -486,22 +495,22 @@ function selectFighters() {
       
       gameState.referee = referee;
     } else {
-      // Not enough eligible real users, need to use some bots
-      const availableRealUsers = [...eligibleRealViewers];
+      // Not enough eligible active users, need to use some bots
+      const availableActiveUsers = [...eligibleActiveViewers];
       
       // Assign fighters first (up to 2)
-      if (availableRealUsers.length >= 1) {
-        // At least one real fighter
-        const fighter1 = availableRealUsers.shift();
+      if (availableActiveUsers.length >= 1) {
+        // At least one active fighter
+        const fighter1 = availableActiveUsers.shift();
         gameState.viewers = gameState.viewers.filter(v => v.id !== fighter1.id);
         fighter1.role = 'fighter';
         fighter1.position = { x: -3, y: 3, z: 0 };
         fighter1.rotation = Math.PI / 2;
         gameState.fighters.push(fighter1);
         
-        if (availableRealUsers.length >= 1) {
-          // Second real fighter
-          const fighter2 = availableRealUsers.shift();
+        if (availableActiveUsers.length >= 1) {
+          // Second active fighter
+          const fighter2 = availableActiveUsers.shift();
           gameState.viewers = gameState.viewers.filter(v => v.id !== fighter2.id);
           fighter2.role = 'fighter';
           fighter2.position = { x: 3, y: 3, z: 0 };
@@ -527,18 +536,18 @@ function selectFighters() {
         gameState.fighters.push(fighter2);
       }
       
-      // Assign referee from remaining real users or use bot
-      if (availableRealUsers.length >= 1) {
-        // Use real referee
-        const referee = availableRealUsers.shift();
+      // Assign referee from remaining active users or use bot
+      if (availableActiveUsers.length >= 1) {
+        // Use active referee
+        const referee = availableActiveUsers.shift();
         gameState.viewers = gameState.viewers.filter(v => v.id !== referee.id);
         referee.role = 'referee';
         referee.position = { x: 0, y: 3, z: -4 }; // Position on opposite side (-z)
         
         // Calculate midpoint and set rotation
         const midpoint = {
-          x: (fighter1.position.x + fighter2.position.x) / 2,
-          z: (fighter1.position.z + fighter2.position.z) / 2
+          x: (gameState.fighters[0].position.x + gameState.fighters[1].position.x) / 2,
+          z: (gameState.fighters[0].position.z + gameState.fighters[1].position.z) / 2
         };
         referee.rotation = Math.atan2(midpoint.x - referee.position.x, midpoint.z - referee.position.z);
         
@@ -550,8 +559,8 @@ function selectFighters() {
         
         // Calculate midpoint and set rotation
         const midpoint = {
-          x: (fighter1.position.x + fighter2.position.x) / 2,
-          z: (fighter1.position.z + fighter2.position.z) / 2
+          x: (gameState.fighters[0].position.x + gameState.fighters[1].position.x) / 2,
+          z: (gameState.fighters[0].position.z + gameState.fighters[1].position.z) / 2
         };
         botReferee.rotation = Math.atan2(midpoint.x - botReferee.position.x, midpoint.z - botReferee.position.z);
         
@@ -1254,7 +1263,14 @@ io.on('connect', (socket) => {
 
   // Check if we should start the game
   if (gameState.stage === GAME_STAGES.WAITING_FOR_PLAYERS && gameState.viewers.length >= 3) {
-    changeGameStage(GAME_STAGES.FIGHTER_SELECTION);
+    // Get count of real users
+    const realUserCount = gameState.viewers.filter(v => !v.id.startsWith('npc-')).length;
+    
+    // We need at least 1 real user to start
+    if (realUserCount >= 1) {
+      console.log(`Starting game with ${realUserCount} real users, ${gameState.viewers.length} total viewers`);
+      changeGameStage(GAME_STAGES.FIGHTER_SELECTION);
+    }
   }
 
   // Handle player movement
@@ -1650,14 +1666,24 @@ io.on('connect', (socket) => {
     console.log('User disconnected:', socket.id);
 
     let playerRole = null;
+    let disconnectingPlayer = null;
 
-    // Determine the player's role before removing them
+    // Determine the player's role and retrieve their data before removing them
     if (gameState.fighters.some(f => f.id === socket.id)) {
       playerRole = 'fighter';
+      disconnectingPlayer = gameState.fighters.find(f => f.id === socket.id);
     } else if (gameState.referee && gameState.referee.id === socket.id) {
       playerRole = 'referee';
+      disconnectingPlayer = gameState.referee;
     } else if (gameState.viewers.some(v => v.id === socket.id)) {
       playerRole = 'viewer';
+      disconnectingPlayer = gameState.viewers.find(v => v.id === socket.id);
+    }
+
+    // IMPORTANT: Broadcast player left immediately to prevent teleporting
+    // This must be done before any role changes or position updates
+    if (disconnectingPlayer) {
+      io.emit('playerLeft', socket.id);
     }
 
     // Remove player from appropriate array
@@ -1667,7 +1693,7 @@ io.on('connect', (socket) => {
       
       // Don't remove bot fighters from the match when disconnected (should never happen, but just in case)
       if (disconnectedFighter && !disconnectedFighter.isBot) {
-      gameState.fighters = gameState.fighters.filter(f => f.id !== socket.id);
+        gameState.fighters = gameState.fighters.filter(f => f.id !== socket.id);
       }
 
       // If a fighter leaves during the match, the other fighter wins automatically
@@ -1700,15 +1726,12 @@ io.on('connect', (socket) => {
     } else if (playerRole === 'referee') {
       // Only remove the referee if it's not a bot
       if (gameState.referee && !gameState.referee.isBot) {
-      gameState.referee = null;
+        gameState.referee = null;
       }
       // We do NOT reassign a referee immediately here—it's chosen at next FIGHTER_SELECTION
     } else if (playerRole === 'viewer') {
       gameState.viewers = gameState.viewers.filter(v => v.id !== socket.id);
     }
-
-    // Broadcast player left
-    io.emit('playerLeft', socket.id);
     
     // Update player count for all clients
     broadcastPlayerCount();
@@ -1791,15 +1814,17 @@ function resetGameState() {
 // Function to broadcast player count to all clients
 function broadcastPlayerCount() {
   const realUserCount = countRealUsers();
+  const activeUserCount = countActiveUsers();
   const botFighterCount = gameState.fighters.filter(f => f.isBot).length;
   const botRefereeCount = (gameState.referee && gameState.referee.isBot) ? 1 : 0;
+  const viewerOnlyCount = gameState.viewers.filter(v => !v.isBot && !v.id.startsWith('npc-') && v.viewerOnly).length;
   
   // Only log if counts have changed
   if (playerCountState.lastCounts.realUsers !== realUserCount || 
       playerCountState.lastCounts.botFighters !== botFighterCount ||
       playerCountState.lastCounts.botReferee !== botRefereeCount) {
     
-    console.log(`Real users: ${realUserCount} | Bot fighters: ${botFighterCount} | Bot referee: ${botRefereeCount}`);
+    console.log(`Real users: ${realUserCount} (${viewerOnlyCount} viewer-only) | Active users: ${activeUserCount} | Bot fighters: ${botFighterCount} | Bot referee: ${botRefereeCount}`);
     
     playerCountState.lastCounts = {
       realUsers: realUserCount,
@@ -1814,6 +1839,8 @@ function broadcastPlayerCount() {
     fighters: gameState.fighters.length,
     referee: gameState.referee ? 1 : 0,
     realUserCount: realUserCount,
+    activeUserCount: activeUserCount,
+    viewerOnlyCount: viewerOnlyCount,
     realViewers: gameState.viewers.filter(v => !v.isBot && !v.id.startsWith('npc-')).length,
     realFighters: gameState.fighters.filter(f => !f.isBot && !f.id.startsWith('npc-')).length,
     realReferee: (gameState.referee && !gameState.referee.isBot && !gameState.referee.id.startsWith('npc-')) ? 1 : 0,
@@ -1834,6 +1861,15 @@ function broadcastPlayerCount() {
 function countRealUsers() {
   return (
     gameState.viewers.filter(v => !v.isBot && !v.id.startsWith('npc-')).length + 
+    gameState.fighters.filter(f => !f.isBot && !f.id.startsWith('npc-')).length + 
+    (gameState.referee && !gameState.referee.isBot && !gameState.referee.id.startsWith('npc-') ? 1 : 0)
+  );
+}
+
+// Function to count active real users (non-viewer-only, non-bots, non-NPCs)
+function countActiveUsers() {
+  return (
+    gameState.viewers.filter(v => !v.isBot && !v.id.startsWith('npc-') && !v.viewerOnly).length + 
     gameState.fighters.filter(f => !f.isBot && !f.id.startsWith('npc-')).length + 
     (gameState.referee && !gameState.referee.isBot && !gameState.referee.id.startsWith('npc-') ? 1 : 0)
   );
@@ -2028,6 +2064,10 @@ function disconnectFakeUser(fakeId) {
     FAKE_USERS.emoteTimeouts.delete(fakeId);
   }
 
+  // IMPORTANT: Broadcast disconnect before removing from game state
+  // This prevents teleporting issues
+  io.emit('playerLeft', fakeId);
+
   // Remove from game state
   gameState.viewers = gameState.viewers.filter(v => v.id !== fakeId);
   gameState.fighters = gameState.fighters.filter(f => f.id !== fakeId);
@@ -2037,9 +2077,6 @@ function disconnectFakeUser(fakeId) {
 
   // Remove from fake users map
   FAKE_USERS.users.delete(fakeId);
-
-  // Broadcast disconnect
-  io.emit('playerLeft', fakeId);
   
   // Update player count
   broadcastPlayerCount();

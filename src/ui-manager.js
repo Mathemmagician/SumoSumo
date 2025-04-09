@@ -87,6 +87,14 @@ class UIManager {
     setupSocketEvents() {
         // Listen for game state updates
         socketClient.on('gameStateUpdated', (gameState) => {
+            // Check if role has changed since last update
+            if (this._lastRole && this._lastRole !== gameState.myRole) {
+                this.showRoleChangeNotification(gameState.myRole);
+            }
+            
+            // Store current role for future comparison
+            this._lastRole = gameState.myRole;
+            
             this.updateRoleBadge(gameState.myRole);
             this.updatePlayerCount(this.countAllPlayers(gameState));
             this.updatePlayerName();
@@ -109,11 +117,18 @@ class UIManager {
         socketClient.on('playerRoleChanged', (data) => {
             if (data.id === socketClient.gameState.myId) {
                 this.updateRoleBadge(data.role);
+                this.showRoleChangeNotification(data.role);
             }
             this.updatePlayerCount(this.countAllPlayers(socketClient.gameState));
         });
         
         socketClient.on('fightersSelected', () => {
+            // Check if the player has been selected as a fighter
+            if (socketClient.gameState.myRole === 'fighter' && 
+                socketClient.gameState.fighters.some(f => f.id === socketClient.gameState.myId)) {
+                this.showCenterNotification("You have been selected as a FIGHTER!\nGet ready to battle!", 5000);
+            }
+            
             this.updateRoleBadge(socketClient.gameState.myRole);
             this.updatePlayerCount(this.countAllPlayers(socketClient.gameState));
         });
@@ -180,6 +195,9 @@ class UIManager {
             if (data.duration > 0) {
                 this.startStageTimer(data.duration);
             }
+            
+            // Show important game stage notifications
+            this.showGameStageNotification(data.name, data.displayName);
         });
         
         // Listen for emote/message events
@@ -273,7 +291,7 @@ class UIManager {
         const viewerOnlyToggle = document.getElementById('viewer-only-toggle');
         if (viewerOnlyToggle) {
             viewerOnlyToggle.addEventListener('change', () => {
-                socketClient.toggleViewerOnly(viewerOnlyToggle.checked);
+                this.toggleViewerOnly(viewerOnlyToggle.checked, null);
             });
         }
         
@@ -489,21 +507,210 @@ class UIManager {
         }
     }
 
-    toggleFreeCamera(checkbox) {
-        const freeCameraMode = checkbox.checked;
-        // Emit an event that the renderer can listen to
-        const event = new CustomEvent('freeCameraToggled', { 
-            detail: { enabled: freeCameraMode } 
+    toggleViewerOnly(isViewerOnly, button) {
+        // Get both mode buttons
+        const viewerOnlyBtn = document.querySelector('.mode-btn[data-mode="viewer"]');
+        const fighterModeBtn = document.querySelector('.mode-btn[data-mode="fighter"]');
+        
+        if (viewerOnlyBtn && fighterModeBtn) {
+            // Remove active class from both buttons
+            viewerOnlyBtn.classList.remove('active');
+            fighterModeBtn.classList.remove('active');
+            
+            // Add active class to the clicked button
+            if (button) {
+                button.classList.add('active');
+            } else {
+                // If no button reference, set based on the mode
+                if (isViewerOnly) {
+                    viewerOnlyBtn.classList.add('active');
+                } else {
+                    fighterModeBtn.classList.add('active');
+                }
+            }
+            
+            // Show appropriate mode explanation
+            this.showModeExplanation(isViewerOnly);
+        }
+        
+        // Send to server
+        socketClient.socket.emit('toggleViewerOnly', isViewerOnly);
+        console.log(`Toggled viewer-only mode: ${isViewerOnly}`);
+    }
+
+    // Show explanation toast for the selected mode
+    showModeExplanation(isViewerOnly) {
+        let message;
+        
+        if (isViewerOnly) {
+            message = "You are now in Viewer mode.\nYou can only observe the match.";
+        } else {
+            message = "You are now in Fighter mode.\nYou have a chance to be selected as a fighter in the next match!";
+        }
+        
+        // Show as center notification instead of toast
+        this.showCenterNotification(message);
+    }
+    
+    // Show notification in the center of the screen
+    showCenterNotification(message, duration = 3000) {
+        // Remove existing notification if any
+        const existingNotification = document.getElementById('center-notification');
+        if (existingNotification) {
+            existingNotification.remove();
+        }
+        
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.id = 'center-notification';
+        notification.className = 'center-notification';
+        notification.textContent = message;
+        
+        // Add to document
+        document.body.appendChild(notification);
+        
+        // Trigger animation
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 10);
+        
+        // Remove after duration
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                notification.remove();
+            }, 400);
+        }, duration);
+    }
+    
+    // Show toast message that fades out
+    showToast(message, duration = 3000) {
+        // Remove existing toast if any
+        const existingToast = document.getElementById('mode-toast');
+        if (existingToast) {
+            existingToast.remove();
+        }
+        
+        // Create toast element
+        const toast = document.createElement('div');
+        toast.id = 'mode-toast';
+        toast.className = 'toast-message';
+        toast.textContent = message;
+        
+        // Add to document
+        document.body.appendChild(toast);
+        
+        // Trigger animation
+        setTimeout(() => {
+            toast.classList.add('show');
+        }, 10);
+        
+        // Remove after duration
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => {
+                toast.remove();
+            }, 300);
+        }, duration);
+    }
+
+    // Set default camera (deactivate other camera options)
+    setDefaultCamera(button) {
+        // Skip if already active
+        if (button.classList.contains('active')) return;
+        
+        // Deactivate other camera buttons
+        const cameraButtons = document.querySelectorAll('.camera-btn');
+        cameraButtons.forEach(btn => btn.classList.remove('active'));
+        
+        // Activate this button
+        button.classList.add('active');
+        
+        // Disable free camera if it's active
+        const freeCameraEvent = new CustomEvent('freeCameraToggled', { 
+            detail: { enabled: false } 
         });
-        document.dispatchEvent(event);
+        document.dispatchEvent(freeCameraEvent);
+        
+        // Disable third-person view if it's active
+        const thirdPersonEvent = new CustomEvent('thirdPersonToggled', { 
+            detail: { enabled: false } 
+        });
+        document.dispatchEvent(thirdPersonEvent);
+        
+        // Update camera explanation label
+        this.updateCameraExplanation("Default camera view selected");
+        
+        // Show camera explanation as center notification
+        this.showCenterNotification("Default camera view.\nWatch the match from the best angles.");
+    }
+
+    toggleFreeCamera(button) {
+        // Skip if already active
+        if (button.classList.contains('active')) return;
+        
+        // Deactivate other camera buttons
+        const cameraButtons = document.querySelectorAll('.camera-btn');
+        cameraButtons.forEach(btn => btn.classList.remove('active'));
+        
+        // Activate this button
+        button.classList.add('active');
+        
+        // If third-person view is active, disable it
+        const thirdPersonEvent = new CustomEvent('thirdPersonToggled', { 
+            detail: { enabled: false } 
+        });
+        document.dispatchEvent(thirdPersonEvent);
+        
+        // Enable free camera
+        const freeCameraEvent = new CustomEvent('freeCameraToggled', { 
+            detail: { enabled: true } 
+        });
+        document.dispatchEvent(freeCameraEvent);
         
         // Update joystick controls visibility for free camera mode
         if (this.isMobile) {
             const joystickControls = document.getElementById('joystick-controls');
             if (joystickControls) {
-                joystickControls.style.display = freeCameraMode ? 'flex' : 'none';
+                joystickControls.style.display = 'flex';
             }
         }
+        
+        // Update camera explanation label
+        this.updateCameraExplanation("Free-fly mode - Use WASD/arrows to move");
+        
+        // Show free camera explanation as center notification
+        this.showCenterNotification("You are now in Free Camera mode.\nUse WASD/Arrow keys or joysticks to fly around.");
+    }
+
+    toggleThirdPersonView(button) {
+        // Skip if already active
+        if (button.classList.contains('active')) return;
+        
+        // Deactivate other camera buttons
+        const cameraButtons = document.querySelectorAll('.camera-btn');
+        cameraButtons.forEach(btn => btn.classList.remove('active'));
+        
+        // Activate this button
+        button.classList.add('active');
+        
+        // If free camera is active, disable it
+        const freeCameraEvent = new CustomEvent('freeCameraToggled', { 
+            detail: { enabled: false } 
+        });
+        document.dispatchEvent(freeCameraEvent);
+        
+        // Enable third-person view
+        const thirdPersonEvent = new CustomEvent('thirdPersonToggled', { 
+            detail: { enabled: true } 
+        });
+        document.dispatchEvent(thirdPersonEvent);
+        
+        // Update camera explanation label
+        this.updateCameraExplanation("Third-person view active");
+        
+        // Show third-person camera explanation as center notification
+        this.showCenterNotification("Third-person view activated.\nWatch from a player's perspective.");
     }
 
     toggleDeveloperMode(checkbox) {
@@ -516,6 +723,177 @@ class UIManager {
                 detail: { enabled: checkbox.checked }
             });
             document.dispatchEvent(event);
+        }
+    }
+    
+    // Show story modal
+    showStory() {
+        // Check if story modal exists, if not create it
+        let storyModal = document.getElementById('story-modal');
+        if (!storyModal) {
+            storyModal = document.createElement('div');
+            storyModal.id = 'story-modal';
+            storyModal.className = 'fullscreen-modal';
+            
+            // Create image container
+            const imageContainer = document.createElement('div');
+            imageContainer.className = 'story-image-container fullscreen';
+            
+            // Create initial image
+            const storyImage = document.createElement('img');
+            storyImage.className = 'story-image';
+            storyImage.src = '/story/intro.jpg'; // You'll need to create this image
+            storyImage.alt = 'SumoSumo Story';
+            
+            // Add ink overlay effect
+            const inkOverlay = document.createElement('div');
+            inkOverlay.className = 'ink-overlay';
+            
+            // Create caption container
+            const captionContainer = document.createElement('div');
+            captionContainer.className = 'story-caption-container';
+            
+            // Create text element
+            const storyText = document.createElement('p');
+            storyText.className = 'story-text';
+            storyText.textContent = 'Long ago in ancient Japan, the sacred art of Sumo was born. Legends speak of warriors who gained power through honor, respect, and the occasional bowl of chankonabe...';
+            
+            // Create close button
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'story-close-btn';
+            closeBtn.innerHTML = '&times;';
+            closeBtn.onclick = () => {
+                storyModal.style.display = 'none';
+            };
+            
+            // Create navigation buttons
+            const navButtons = document.createElement('div');
+            navButtons.className = 'story-nav-buttons';
+            
+            const prevBtn = document.createElement('button');
+            prevBtn.className = 'story-nav-btn';
+            prevBtn.textContent = '←';
+            prevBtn.disabled = true; // Disabled on first slide
+            
+            const nextBtn = document.createElement('button');
+            nextBtn.className = 'story-nav-btn';
+            nextBtn.textContent = '→';
+            
+            // Add elements to DOM
+            navButtons.appendChild(prevBtn);
+            navButtons.appendChild(nextBtn);
+            
+            captionContainer.appendChild(storyText);
+            
+            imageContainer.appendChild(storyImage);
+            imageContainer.appendChild(inkOverlay);
+            
+            storyModal.appendChild(imageContainer);
+            storyModal.appendChild(captionContainer);
+            storyModal.appendChild(closeBtn);
+            storyModal.appendChild(navButtons);
+            
+            document.body.appendChild(storyModal);
+            
+            // Add animation classes after a small delay
+            setTimeout(() => {
+                storyImage.classList.add('fade-in');
+                storyText.classList.add('text-fade-in');
+            }, 100);
+        }
+        
+        // Show the modal
+        storyModal.style.display = 'block';
+    }
+    
+    // Two-step process for Twitter ad spot button
+    buySpotOnWall() {
+        const btn = document.getElementById('buy-spot-btn');
+
+        if (!btn) return;
+
+        // If button is already expanded, proceed to Twitter
+        if (btn.classList.contains('expanded')) {
+            // Visual feedback before redirecting
+            btn.style.backgroundColor = '#3a9';
+
+            setTimeout(() => {
+                const twitterId = '1009846161379864577';
+                const message = 'Hi, I would like to advertise in your game. My offer is $500 for 1 week of exclusive placement. <Include relevant details and reasonable requests>.';
+
+                // Encode the message for URL
+                const encodedMessage = encodeURIComponent(message);
+
+                // Create the Twitter URL with pre-filled message
+                const twitterUrl = `https://twitter.com/messages/compose?recipient_id=${twitterId}&text=${encodedMessage}`;
+
+                // Open in a new tab
+                window.open(twitterUrl, '_blank');
+
+                // Reset button style and state
+                this.resetBuyButton();
+            }, 400);
+        } else {
+            // First click - just expand the button
+            btn.classList.add('expanded');
+            btn.style.width = 'auto';
+            btn.style.paddingRight = '16px';
+            btn.style.borderRadius = '20px';
+
+            const btnText = btn.querySelector('.btn-text');
+            if (btnText) {
+                btnText.style.display = 'inline';
+                btnText.style.marginLeft = '5px';
+            }
+
+            // Add event listener for clicks outside the button
+            document.addEventListener('click', this.handleOutsideClick);
+        }
+    }
+
+    // Handle clicks outside the button
+    handleOutsideClick = (event) => {
+        const btn = document.getElementById('buy-spot-btn');
+
+        // If the click is outside the button, reset it
+        if (btn && !btn.contains(event.target) && btn.classList.contains('expanded')) {
+            this.resetBuyButton();
+        }
+    }
+
+    // Reset the buy button to initial state
+    resetBuyButton() {
+        const btn = document.getElementById('buy-spot-btn');
+        if (!btn) return;
+
+        btn.classList.remove('expanded');
+        btn.style.width = '';
+        btn.style.paddingRight = '';
+        btn.style.borderRadius = '';
+        btn.style.backgroundColor = '';
+
+        const btnText = btn.querySelector('.btn-text');
+        if (btnText) {
+            btnText.style.display = '';
+            btnText.style.marginLeft = '';
+        }
+
+        // Remove the outside click event listener
+        document.removeEventListener('click', this.handleOutsideClick);
+    }
+    
+    // Add this new method to update the player name
+    updatePlayerName() {
+        const playerNameElement = document.getElementById('player-name');
+        if (!playerNameElement) return;
+        
+        const myId = socketClient.gameState.myId;
+        if (!myId) return;
+        
+        // Find the player in the game state
+        const player = socketClient.findPlayerInGameState(myId);
+        if (player && player.name) {
+            playerNameElement.textContent = player.name;
         }
     }
     
@@ -950,97 +1328,6 @@ class UIManager {
         }
     }
 
-        // Two-step process for Twitter ad spot button
-        buySpotOnWall() {
-            const btn = document.getElementById('buy-spot-btn');
-    
-            if (!btn) return;
-    
-            // If button is already expanded, proceed to Twitter
-            if (btn.classList.contains('expanded')) {
-                // Visual feedback before redirecting
-                btn.style.backgroundColor = '#3a9';
-    
-                setTimeout(() => {
-                    const twitterId = '1009846161379864577';
-                    const message = 'Hi, I would like to advertise in your game. My offer is $500 for 1 week of exclusive placement. <Include relevant details and reasonable requests>.';
-    
-                    // Encode the message for URL
-                    const encodedMessage = encodeURIComponent(message);
-    
-                    // Create the Twitter URL with pre-filled message
-                    const twitterUrl = `https://twitter.com/messages/compose?recipient_id=${twitterId}&text=${encodedMessage}`;
-    
-                    // Open in a new tab
-                    window.open(twitterUrl, '_blank');
-    
-                    // Reset button style and state
-                    this.resetBuyButton();
-                }, 400);
-            } else {
-                // First click - just expand the button
-                btn.classList.add('expanded');
-                btn.style.width = 'auto';
-                btn.style.paddingRight = '16px';
-                btn.style.borderRadius = '20px';
-    
-                const btnText = btn.querySelector('.btn-text');
-                if (btnText) {
-                    btnText.style.display = 'inline';
-                    btnText.style.marginLeft = '5px';
-                }
-    
-                // Add event listener for clicks outside the button
-                document.addEventListener('click', this.handleOutsideClick);
-            }
-        }
-    
-        // Handle clicks outside the button
-        handleOutsideClick = (event) => {
-            const btn = document.getElementById('buy-spot-btn');
-    
-            // If the click is outside the button, reset it
-            if (btn && !btn.contains(event.target) && btn.classList.contains('expanded')) {
-                this.resetBuyButton();
-            }
-        }
-    
-        // Reset the buy button to initial state
-        resetBuyButton() {
-            const btn = document.getElementById('buy-spot-btn');
-            if (!btn) return;
-    
-            btn.classList.remove('expanded');
-            btn.style.width = '';
-            btn.style.paddingRight = '';
-            btn.style.borderRadius = '';
-            btn.style.backgroundColor = '';
-    
-            const btnText = btn.querySelector('.btn-text');
-            if (btnText) {
-                btnText.style.display = '';
-                btnText.style.marginLeft = '';
-            }
-    
-            // Remove the outside click event listener
-            document.removeEventListener('click', this.handleOutsideClick);
-        }
-        
-    // Add this new method to update the player name
-    updatePlayerName() {
-        const playerNameElement = document.getElementById('player-name');
-        if (!playerNameElement) return;
-        
-        const myId = socketClient.gameState.myId;
-        if (!myId) return;
-        
-        // Find the player in the game state
-        const player = socketClient.findPlayerInGameState(myId);
-        if (player && player.name) {
-            playerNameElement.textContent = player.name;
-        }
-    }
-
     // Initialize and play background music
     initializeBackgroundMusic() {
         if (this.backgroundMusic) {
@@ -1319,6 +1606,71 @@ class UIManager {
                 }
             }
         }
+    }
+
+    // Update the camera explanation text
+    updateCameraExplanation(text) {
+        const explanationElement = document.querySelector('.camera-explanation');
+        if (explanationElement) {
+            explanationElement.textContent = text;
+        }
+    }
+
+    // Show notification when role changes
+    showRoleChangeNotification(newRole) {
+        let message;
+        
+        switch(newRole.toLowerCase()) {
+            case 'fighter':
+                message = "You are now a FIGHTER!\nGet ready to battle in the ring!";
+                break;
+            case 'referee':
+                message = "You are now the REFEREE!\nMaintain order in the ring!";
+                break;
+            case 'viewer':
+                message = "You are now a VIEWER.\nEnjoy watching the match!";
+                break;
+            default:
+                message = `Your role has changed to: ${newRole}`;
+        }
+        
+        this.showCenterNotification(message, 4000);
+    }
+
+    // Show game stage notification
+    showGameStageNotification(stageName, displayName) {
+        let message;
+        let duration = 3000;
+        
+        switch(stageName) {
+            case 'MATCH_STARTING':
+                message = "Match is starting!\nFighters, prepare for battle!";
+                duration = 4000;
+                break;
+            case 'MATCH_IN_PROGRESS':
+                message = "FIGHT!\nMay the strongest sumo win!";
+                duration = 3000;
+                break;
+            case 'MATCH_ENDED':
+                // Find the winner if available
+                let winnerName = "";
+                if (socketClient.gameState && socketClient.gameState.winner) {
+                    winnerName = socketClient.gameState.winner.name || "A fighter";
+                }
+                
+                if (winnerName) {
+                    message = `${winnerName} is victorious!\nThe match has ended.`;
+                } else {
+                    message = "The match has ended!";
+                }
+                duration = 5000;
+                break;
+            default:
+                // Don't show notification for other stages
+                return;
+        }
+        
+        this.showCenterNotification(message, duration);
     }
 }
 

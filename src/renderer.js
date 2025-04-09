@@ -48,6 +48,9 @@ export class Renderer {
 
     // Add these new properties for camera control
     this.isFreeCamera = false;
+    this.isThirdPersonView = false;
+    this.originalCameraPosition = null;
+    this.originalCameraRotation = null;
     this.cameraMovement = {
       forward: false,
       backward: false,
@@ -221,6 +224,14 @@ export class Renderer {
     document.addEventListener("freeCameraToggled", (event) => {
       this.toggleFreeCamera(event.detail.enabled);
     });
+
+    // Add third-person view event listener
+    document.addEventListener('thirdPersonToggled', (event) => {
+      this.toggleThirdPersonView(event.detail.enabled);
+    });
+
+    // Automatically update camera position for game state changes
+    this.updateCameraForGameState(socketClient.gameState);
 
     // Set up more comprehensive socket event listeners for player updates
     this.setupSocketEventListeners();
@@ -493,6 +504,20 @@ export class Renderer {
     // Handle camera movement if free camera is enabled
     if (this.isFreeCamera) {
       this.updateCameraPosition();
+    } else if (this.isThirdPersonView) {
+      // Check if we're in ceremony or special stages - if so, let the camera system handle it
+      const currentStage = socketClient.gameState.stage;
+      if (currentStage === 'PRE_CEREMONY' || 
+          currentStage === 'PRE_MATCH_CEREMONY' || 
+          currentStage === 'FIGHTER_SELECTION' || 
+          currentStage === 'VICTORY_CEREMONY' || 
+          currentStage === 'KNOCKOUT_SEQUENCE') {
+        // During ceremony stages, let the camera system take control
+        this.cameraSystem.update();
+      } else {
+        // For normal gameplay, use third-person camera
+        this.updateThirdPersonCamera();
+      }
     } else if (this.cameraSystem) {
       this.cameraSystem.update();
     }
@@ -515,7 +540,7 @@ export class Renderer {
         const playerPosition = new THREE.Vector3();
         bubble.playerModel.getWorldPosition(playerPosition);
         bubble.sprite.position.copy(playerPosition);
-        bubble.sprite.position.y += 2.0; // Match the new modelHeight
+        bubble.sprite.position.y += 1.6; // Lower from 2.0 to 1.6
 
         // Make sprite face camera
         bubble.sprite.quaternion.copy(this.camera.quaternion);
@@ -570,6 +595,69 @@ export class Renderer {
       
       // Let the camera system take control again
       this.updateCameraForGameState(socketClient.gameState);
+    }
+  }
+
+  // Add third-person view toggle
+  toggleThirdPersonView(enabled) {
+    console.log("Toggling third-person view:", enabled);
+    this.isThirdPersonView = enabled;
+    
+    if (enabled) {
+      // Store original camera parameters if not already stored
+      if (!this.originalCameraPosition) {
+        this.originalCameraPosition = this.camera.position.clone();
+        this.originalCameraRotation = this.camera.rotation.clone();
+      }
+      
+      // Check if we're in a ceremony stage - if so, immediately update camera for current game state
+      const currentStage = socketClient.gameState.stage;
+      if (currentStage === 'PRE_CEREMONY' || 
+          currentStage === 'PRE_MATCH_CEREMONY' || 
+          currentStage === 'FIGHTER_SELECTION' || 
+          currentStage === 'VICTORY_CEREMONY' || 
+          currentStage === 'KNOCKOUT_SEQUENCE') {
+        this.updateCameraForGameState(socketClient.gameState);
+      }
+      // The actual positioning will happen in animate()
+    } else {
+      // Return to normal camera control
+      if (this.originalCameraPosition) {
+        // Instead of immediately resetting, smoothly transition back
+        const duration = 1000; // 1 second
+        const startTime = performance.now();
+        const startPosition = this.camera.position.clone();
+        const startRotation = this.camera.quaternion.clone();
+        
+        const endPosition = this.originalCameraPosition.clone();
+        
+        const animateBackToOriginal = (currentTime) => {
+          const elapsed = currentTime - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          
+          // Use an easing function for smoother motion
+          const easeProgress = 1 - Math.pow(1 - progress, 3); // Cubic ease out
+          
+          // Interpolate position
+          this.camera.position.lerpVectors(startPosition, endPosition, easeProgress);
+          
+          // Look at center
+          this.camera.lookAt(0, 0, 0);
+          
+          // Continue animation if not complete
+          if (progress < 1) {
+            requestAnimationFrame(animateBackToOriginal);
+          } else {
+            // Let the camera system take control again
+            this.updateCameraForGameState(socketClient.gameState);
+          }
+        };
+        
+        requestAnimationFrame(animateBackToOriginal);
+      } else {
+        // Let the camera system take control again
+        this.updateCameraForGameState(socketClient.gameState);
+      }
     }
   }
 
@@ -712,7 +800,17 @@ export class Renderer {
     // Player removals
     socketClient.on("playerLeft", (playerId) => {
       console.log("Renderer received playerLeft:", playerId);
+      
+      // First remove any text bubbles to prevent orphaned elements
+      this.removeTextBubble(playerId);
+      
+      // Immediately remove the player model to prevent teleporting issues
       this.removePlayer(playerId);
+      
+      // Remove the player from any position interpolations that might be in progress
+      if (this.positionInterpolations) {
+        delete this.positionInterpolations[playerId];
+      }
     });
 
     // Role changes
@@ -927,6 +1025,14 @@ export class Renderer {
       } else {
         // Apply viewer appearance
         this.modelFactory.updateModelForRole(playerModel, "viewer");
+        
+        // If this was previously a fighter that fell and is now a viewer,
+        // reset any abnormal rotation to make sure the model is upright
+        if (Math.abs(playerModel.rotation.x) > 0.1 || Math.abs(playerModel.rotation.z) > 0.1) {
+          console.log("Resetting abnormal viewer rotation for player:", data.id);
+          playerModel.rotation.x = 0;
+          playerModel.rotation.z = 0;
+        }
       }
     }
   }
@@ -1273,13 +1379,32 @@ export class Renderer {
 
   removePlayer(playerId) {
     console.log("Removing player model:", playerId);
+    
+    // First, remove any text bubbles associated with this player
+    this.removeTextBubble(playerId);
+    
     const model = this.playerModels.get(playerId);
     if (model) {
+      // Remove any animations or update references
+      if (model.userData && model.userData.animationDetails) {
+        delete model.userData.animationDetails;
+      }
+      
+      // Traverse and remove any child objects (like text bubbles)
+      model.traverse(child => {
+        // Check if this is a CSS2DObject with a bubble
+        if (child.element && child.element.classList && 
+            (child.element.classList.contains('text-bubble') || 
+             child.element.classList.contains('emote-bubble'))) {
+          model.remove(child);
+        }
+      });
+      
+      // Remove from scene and dispose of resources
       this.scene.remove(model);
       this.playerModels.delete(playerId);
-      // console.log(
-      //   `Removed player model. Total models: ${this.playerModels.size}`
-      // );
+      
+      console.log(`Removed player model ${playerId}. Total models: ${this.playerModels.size}`);
     }
   }
 
@@ -1315,10 +1440,20 @@ export class Renderer {
     console.log("Renderer cleanup completed");
 
     // Clean up any remaining text bubbles
-    for (const [playerId, bubble] of this.textBubbles) {
-      clearTimeout(bubble.timeout);
-      bubble.sprite.material.dispose();
-      bubble.sprite.material.map.dispose();
+    for (const [playerId, bubbleData] of this.textBubbles) {
+      // Clear any pending timeouts
+      if (bubbleData.fadeTimeout) {
+        clearTimeout(bubbleData.fadeTimeout);
+      }
+      if (bubbleData.removeTimeout) {
+        clearTimeout(bubbleData.removeTimeout);
+      }
+      
+      // Remove from parent if possible
+      const textObject = bubbleData.sprite;
+      if (textObject && textObject.parent) {
+        textObject.parent.remove(textObject);
+      }
     }
     this.textBubbles.clear();
 
@@ -1400,16 +1535,16 @@ export class Renderer {
       case "arrowdown":
         this.fighterMovement.backward = true;
         break;
-      case "a":
+      case "a": // Swapped: A now controls right movement
+        this.fighterMovement.right = true;
+        break;
+      case "d": // Swapped: D now controls left movement
         this.fighterMovement.left = true;
         break;
-      case "d":
+      case "arrowleft": // Keep arrow key mappings as before
         this.fighterMovement.right = true;
         break;
-      case "arrowleft": // Swap: Arrow left now controls right movement
-        this.fighterMovement.right = true;
-        break;
-      case "arrowright": // Swap: Arrow right now controls left movement
+      case "arrowright": // Keep arrow key mappings as before
         this.fighterMovement.left = true;
         break;
     }
@@ -1429,7 +1564,7 @@ export class Renderer {
     if (!isMobileEvent && socketClient.gameState.stage !== 'MATCH_IN_PROGRESS') {
       return;
     }
-
+    
     console.log(`Fighter control: ${event.key} up, mobile: ${isMobileEvent}`);
     
     switch (event.key.toLowerCase()) {
@@ -1441,16 +1576,16 @@ export class Renderer {
       case "arrowdown":
         this.fighterMovement.backward = false;
         break;
-      case "a":
+      case "a": // Swapped: A now controls right movement
+        this.fighterMovement.right = false;
+        break;
+      case "d": // Swapped: D now controls left movement
         this.fighterMovement.left = false;
         break;
-      case "d":
+      case "arrowleft": // Keep arrow key mappings as before
         this.fighterMovement.right = false;
         break;
-      case "arrowleft": // Swap: Arrow left now controls right movement
-        this.fighterMovement.right = false;
-        break;
-      case "arrowright": // Swap: Arrow right now controls left movement
+      case "arrowright": // Keep arrow key mappings as before
         this.fighterMovement.left = false;
         break;
     }
@@ -1621,12 +1756,12 @@ export class Renderer {
   }
 
   // Add new methods for text bubble management
-  createTextBubble(playerId, text, isEmote = false, isAnnouncement = false) {
-    // Remove any existing bubble
-    this.removeTextBubble(playerId);
-
+  createTextBubble(playerId, text, isEmote) {
     const player = this.playerModels.get(playerId);
     if (!player) return;
+
+    // First check if this player already has a bubble and remove it
+    this.removeTextBubble(playerId);
 
     // Create container div
     const bubbleDiv = document.createElement('div');
@@ -1646,11 +1781,20 @@ export class Renderer {
     
     // Position above player model - adjust height based on player scale
     const modelHeight = player.scale.y;
-    textObject.position.set(0, 1.0, 0);
+    textObject.position.set(0, 0.8, 0); // Lower the position from 1.0 to 0.8
     
     // Add to player mesh and store reference
     player.add(textObject);
-    this.textBubbles.set(playerId, textObject);
+    
+    // Create object to store both the text object and timeouts
+    const bubbleData = {
+      sprite: textObject,
+      fadeTimeout: null,
+      removeTimeout: null
+    };
+    
+    // Store in our map
+    this.textBubbles.set(playerId, bubbleData);
 
     // Check if this is a referee taunt (referee role and using emote)
     const isRefereeTaunt = player.userData.role === 'referee' && isEmote;
@@ -1658,10 +1802,13 @@ export class Renderer {
     // Auto-remove after delay - longer duration for referee taunts
     const displayDuration = isRefereeTaunt ? 5000 : (isEmote ? 4000 : 5000);
     
-    setTimeout(() => {
+    // Set fade timeout
+    bubbleData.fadeTimeout = setTimeout(() => {
       if (this.textBubbles.has(playerId)) {
         bubbleDiv.style.opacity = '0';
-        setTimeout(() => this.removeTextBubble(playerId), 500); // Longer fade out
+        
+        // Set remove timeout
+        bubbleData.removeTimeout = setTimeout(() => this.removeTextBubble(playerId), 500);
       }
     }, displayDuration);
   }
@@ -1715,12 +1862,26 @@ export class Renderer {
   }
 
   removeTextBubble(playerId) {
-    const textObject = this.textBubbles.get(playerId);
-    if (textObject) {
+    const bubbleData = this.textBubbles.get(playerId);
+    if (bubbleData) {
+      // Clear any pending timeouts
+      if (bubbleData.fadeTimeout) {
+        clearTimeout(bubbleData.fadeTimeout);
+      }
+      if (bubbleData.removeTimeout) {
+        clearTimeout(bubbleData.removeTimeout);
+      }
+      
+      // Get the sprite/text object
+      const textObject = bubbleData.sprite;
+      
+      // Remove from player if player still exists
       const player = this.playerModels.get(playerId);
-      if (player) {
+      if (player && textObject) {
         player.remove(textObject);
       }
+      
+      // Remove from map
       this.textBubbles.delete(playerId);
     }
   }
@@ -2699,6 +2860,102 @@ export class Renderer {
     }
     
     // Remove the animation for referee when announcing
+  }
+
+  // Add method to update third-person camera position
+  updateThirdPersonCamera() {
+    // Get current user's ID from socket client
+    const myId = socketClient.getMyId();
+    if (!myId) {
+      console.warn('Cannot position third-person camera: no user ID found');
+      return;
+    }
+
+    // Get the player model for the current user
+    const playerModel = this.playerModels.get(myId);
+    if (!playerModel) {
+      console.warn(`Cannot position third-person camera: no player model found for user ${myId}`);
+      return;
+    }
+
+    // Get player position
+    const playerPosition = playerModel.position.clone();
+    
+    // Get player rotation (which determines the forward direction)
+    const playerRotation = playerModel.rotation.y;
+    
+    // Check if user is a viewer or fighter
+    const isViewer = socketClient.gameState.myRole === 'viewer';
+    
+    if (isViewer) {
+      // For viewers: Position camera behind player and look at the ring center
+      
+      // Check if the viewer model is incorrectly rotated (happens after falling as a fighter)
+      const needsRotationReset = Math.abs(playerModel.rotation.x) > 0.1 || Math.abs(playerModel.rotation.z) > 0.1;
+      
+      // If viewer model has incorrect rotation (from previous fighter fall animation),
+      // gradually reset it to proper upright position
+      if (needsRotationReset) {
+        // Gradually reset X and Z rotation back to 0 (upright)
+        playerModel.rotation.x *= 0.8;
+        playerModel.rotation.z *= 0.8;
+        
+        // If rotation is very small, just set it to 0
+        if (Math.abs(playerModel.rotation.x) < 0.01) playerModel.rotation.x = 0;
+        if (Math.abs(playerModel.rotation.z) < 0.01) playerModel.rotation.z = 0;
+      }
+      
+      // Calculate vector from player to ring center (0,0,0)
+      const toRingCenter = new THREE.Vector3(0, 0, 0).sub(playerPosition).normalize();
+      
+      // Calculate a position behind the viewer (opposite direction from ring)
+      const offset = 2.5; // Distance behind viewer
+      const height = 2.5; // Height above ground
+      
+      // Position the camera behind the viewer, opposite of where they're facing
+      const cameraPosition = new THREE.Vector3(
+        playerPosition.x - toRingCenter.x * offset,
+        playerPosition.y + height,
+        playerPosition.z - toRingCenter.z * offset
+      );
+      
+      // Smoothly move camera to this position
+      this.camera.position.lerp(cameraPosition, 0.1);
+      
+      // Look at ring center (0,0,0) over the viewer's shoulder
+      this.camera.lookAt(new THREE.Vector3(0, 0.5, 0));
+    } else {
+      // For fighters: Standard behind-player view
+      
+      // Calculate direction vector (where the player is facing)
+      const direction = new THREE.Vector3(
+        -Math.sin(playerRotation), 
+        0, 
+        -Math.cos(playerRotation)
+      );
+      
+      // Calculate camera position (behind player and slightly elevated)
+      const offset = 4; // Distance behind player
+      const height = 2.5; // Height above ground
+      
+      const cameraPosition = new THREE.Vector3(
+        playerPosition.x + direction.x * offset,
+        playerPosition.y + height,
+        playerPosition.z + direction.z * offset
+      );
+      
+      // Smoothly move camera to this position
+      this.camera.position.lerp(cameraPosition, 0.1);
+      
+      // Make camera look at a point in front of the player
+      const lookTarget = new THREE.Vector3(
+        playerPosition.x - direction.x * 2,
+        playerPosition.y + 1.0,
+        playerPosition.z - direction.z * 2
+      );
+      
+      this.camera.lookAt(lookTarget);
+    }
   }
 }
 

@@ -112,30 +112,29 @@
         </p>
 
         <div class="viewer-only-container">
-          <label class="viewer-only-label">
-            <input
-              type="checkbox"
-              id="viewer-only-toggle"
-              onchange="uiManager.toggleViewerOnly(this)"
-            />
-            <span class="viewer-only-text">Viewer Only</span>
-          </label>
-          <label class="viewer-only-label">
-            <input
-              type="checkbox"
-              id="free-camera-toggle"
-              onchange="uiManager.toggleFreeCamera(this)"
-            />
-            <span class="viewer-only-text">Fly Around</span>
-          </label>
-          <!-- <label class="viewer-only-label">
-            <input
-              type="checkbox"
-              id="developer-mode-toggle"
-              onchange="uiManager.toggleDeveloperMode(this)"
-            />
-            <span class="viewer-only-text">Developer Mode</span>
-          </label> -->
+          <div class="mode-selection">
+            <button id="fighter-mode-toggle" class="mode-btn active" data-mode="fighter" onclick="uiManager.toggleViewerOnly(false, this)" title="Fighter Mode">
+              <span class="option-icon">👊</span>
+              <span class="option-text">Fighter</span>
+            </button>
+            <button id="viewer-only-toggle" class="mode-btn" data-mode="viewer" onclick="uiManager.toggleViewerOnly(true, this)" title="Viewer Only">
+              <span class="option-icon">👁️</span>
+              <span class="option-text">Viewer</span>
+            </button>
+          </div>
+          
+          <!-- Second row: Camera view options -->
+          <div class="camera-view-options">
+            <button id="default-camera" class="camera-btn active" onclick="uiManager.setDefaultCamera(this)" title="Default Camera View">
+              <span class="camera-icon">📷</span>
+            </button>
+            <button id="free-camera-toggle" class="camera-btn" onclick="uiManager.toggleFreeCamera(this)" title="Free-fly Camera (WASD to move)">
+              <span class="camera-icon">🕊️</span>
+            </button>
+            <button id="third-person-toggle" class="camera-btn" onclick="uiManager.toggleThirdPersonView(this)" title="Third-Person View">
+              <span class="camera-icon">👤</span>
+            </button>
+          </div>
         </div>
       </div>
 
