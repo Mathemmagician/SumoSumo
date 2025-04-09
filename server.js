@@ -317,8 +317,14 @@ function selectFighters() {
   // Always start with empty fighters array
   gameState.fighters = [];
 
-  // Filter out viewer-only players
-  const eligibleViewers = gameState.viewers.filter(viewer => !viewer.viewerOnly);
+  // Filter out viewer-only players with additional logging
+  const eligibleViewers = gameState.viewers.filter(viewer => {
+    const isEligible = !viewer.viewerOnly;
+    if (!isEligible) {
+      console.log(`Player ${viewer.id} is in viewer-only mode and will not be selected as a fighter`);
+    }
+    return isEligible;
+  });
 
   // Get count of real users (non-NPC players)
   const realUserCount = gameState.viewers.filter(viewer => !viewer.id.startsWith('npc-')).length;
@@ -326,7 +332,7 @@ function selectFighters() {
   // Get count of active users (real users who are not viewer-only)
   const activeUserCount = countActiveUsers();
   
-  console.log(`Real user count: ${realUserCount}, Active user count: ${activeUserCount}`);
+  console.log(`Real user count: ${realUserCount}, Active user count: ${activeUserCount}, Eligible viewers: ${eligibleViewers.length}`);
 
   // Clean up any existing bot movement intervals
   if (BOT_CONFIG.botMovementIntervals.size > 0) {
@@ -376,33 +382,60 @@ function selectFighters() {
     const activeViewer = gameState.viewers.find(viewer => !viewer.id.startsWith('npc-') && !viewer.viewerOnly);
     
     if (activeViewer) {
-      // Remove active user from viewers
-      gameState.viewers = gameState.viewers.filter(v => v.id !== activeViewer.id);
+      // Double check viewer-only status before proceeding
+      if (activeViewer.viewerOnly) {
+        console.log(`Player ${activeViewer.id} is in viewer-only mode, using bots instead`);
+        // Use bots instead
+        const fighter1 = createBot(BOT_TYPES.FIGHTER, 'fighter');
+        const fighter2 = createBot(BOT_TYPES.FIGHTER, 'fighter');
+        const referee = createBot(BOT_TYPES.REFEREE, 'referee');
 
-      // Make active user a fighter
-      activeViewer.role = 'fighter';
-      activeViewer.position = { x: -3, y: 3, z: 0 };
-      activeViewer.rotation = Math.PI / 2;
-      gameState.fighters.push(activeViewer);
+        fighter1.position = { x: -3, y: 3, z: 0 };
+        fighter1.rotation = Math.PI / 2;
+        
+        fighter2.position = { x: 3, y: 3, z: 0 };
+        fighter2.rotation = -Math.PI / 2;
+        
+        referee.position = { x: 0, y: 3, z: -4 };
+        
+        const midpoint = {
+          x: (fighter1.position.x + fighter2.position.x) / 2,
+          z: (fighter1.position.z + fighter2.position.z) / 2
+        };
+        referee.rotation = Math.atan2(midpoint.x - referee.position.x, midpoint.z - referee.position.z);
 
-      // Add bot fighter
-      const botFighter = createBot(BOT_TYPES.FIGHTER, 'fighter');
-      botFighter.position = { x: 3, y: 3, z: 0 };
-      botFighter.rotation = -Math.PI / 2;
-      gameState.fighters.push(botFighter);
+        gameState.fighters.push(fighter1);
+        gameState.fighters.push(fighter2);
+        gameState.referee = referee;
+      } else {
+        // Remove active user from viewers
+        gameState.viewers = gameState.viewers.filter(v => v.id !== activeViewer.id);
 
-      // Add bot referee
-      const botReferee = createBot(BOT_TYPES.REFEREE, 'referee');
-      botReferee.position = { x: 0, y: 3, z: -4 }; // Position on opposite side (-z)
-      
-      // Calculate midpoint and set rotation
-      const midpoint = {
-        x: (activeViewer.position.x + botFighter.position.x) / 2,
-        z: (activeViewer.position.z + botFighter.position.z) / 2
-      };
-      botReferee.rotation = Math.atan2(midpoint.x - botReferee.position.x, midpoint.z - botReferee.position.z);
-      
-      gameState.referee = botReferee;
+        // Make active user a fighter
+        activeViewer.role = 'fighter';
+        activeViewer.position = { x: -3, y: 3, z: 0 };
+        activeViewer.rotation = Math.PI / 2;
+        gameState.fighters.push(activeViewer);
+
+        // Add bot fighter
+        const botFighter = createBot(BOT_TYPES.FIGHTER, 'fighter');
+        botFighter.position = { x: 3, y: 3, z: 0 };
+        botFighter.rotation = -Math.PI / 2;
+        gameState.fighters.push(botFighter);
+
+        // Add bot referee
+        const botReferee = createBot(BOT_TYPES.REFEREE, 'referee');
+        botReferee.position = { x: 0, y: 3, z: -4 }; // Position on opposite side (-z)
+        
+        // Calculate midpoint and set rotation
+        const midpoint = {
+          x: (activeViewer.position.x + botFighter.position.x) / 2,
+          z: (activeViewer.position.z + botFighter.position.z) / 2
+        };
+        botReferee.rotation = Math.atan2(midpoint.x - botReferee.position.x, midpoint.z - botReferee.position.z);
+        
+        gameState.referee = botReferee;
+      }
     }
   }
   else if (activeUserCount === 2) {
@@ -410,34 +443,61 @@ function selectFighters() {
     const activeViewers = gameState.viewers.filter(viewer => !viewer.id.startsWith('npc-') && !viewer.viewerOnly).slice(0, 2);
 
     if (activeViewers.length === 2) {
-      // Set up first active fighter
-      const fighter1 = activeViewers[0];
-      gameState.viewers = gameState.viewers.filter(v => v.id !== fighter1.id);
-      fighter1.role = 'fighter';
-      fighter1.position = { x: -3, y: 3, z: 0 };
-      fighter1.rotation = Math.PI / 2;
-      gameState.fighters.push(fighter1);
+      // Double check viewer-only status for both viewers
+      if (activeViewers.some(viewer => viewer.viewerOnly)) {
+        console.log("One or more viewers are in viewer-only mode, using bots instead");
+        // Use bots instead
+        const fighter1 = createBot(BOT_TYPES.FIGHTER, 'fighter');
+        const fighter2 = createBot(BOT_TYPES.FIGHTER, 'fighter');
+        const referee = createBot(BOT_TYPES.REFEREE, 'referee');
 
-      // Set up second active fighter
-      const fighter2 = activeViewers[1];
-      gameState.viewers = gameState.viewers.filter(v => v.id !== fighter2.id);
-      fighter2.role = 'fighter';
-      fighter2.position = { x: 3, y: 3, z: 0 };
-      fighter2.rotation = -Math.PI / 2;
-      gameState.fighters.push(fighter2);
+        fighter1.position = { x: -3, y: 3, z: 0 };
+        fighter1.rotation = Math.PI / 2;
+        
+        fighter2.position = { x: 3, y: 3, z: 0 };
+        fighter2.rotation = -Math.PI / 2;
+        
+        referee.position = { x: 0, y: 3, z: -4 };
+        
+        const midpoint = {
+          x: (fighter1.position.x + fighter2.position.x) / 2,
+          z: (fighter1.position.z + fighter2.position.z) / 2
+        };
+        referee.rotation = Math.atan2(midpoint.x - referee.position.x, midpoint.z - referee.position.z);
 
-      // Add bot referee
-      const botReferee = createBot(BOT_TYPES.REFEREE, 'referee');
-      botReferee.position = { x: 0, y: 3, z: -4 }; // Position on opposite side (-z)
-      
-      // Calculate midpoint and set rotation
-      const midpoint = {
-        x: (fighter1.position.x + fighter2.position.x) / 2,
-        z: (fighter1.position.z + fighter2.position.z) / 2
-      };
-      botReferee.rotation = Math.atan2(midpoint.x - botReferee.position.x, midpoint.z - botReferee.position.z);
-      
-      gameState.referee = botReferee;
+        gameState.fighters.push(fighter1);
+        gameState.fighters.push(fighter2);
+        gameState.referee = referee;
+      } else {
+        // Set up first active fighter
+        const fighter1 = activeViewers[0];
+        gameState.viewers = gameState.viewers.filter(v => v.id !== fighter1.id);
+        fighter1.role = 'fighter';
+        fighter1.position = { x: -3, y: 3, z: 0 };
+        fighter1.rotation = Math.PI / 2;
+        gameState.fighters.push(fighter1);
+
+        // Set up second active fighter
+        const fighter2 = activeViewers[1];
+        gameState.viewers = gameState.viewers.filter(v => v.id !== fighter2.id);
+        fighter2.role = 'fighter';
+        fighter2.position = { x: 3, y: 3, z: 0 };
+        fighter2.rotation = -Math.PI / 2;
+        gameState.fighters.push(fighter2);
+
+        // Add bot referee
+        const botReferee = createBot(BOT_TYPES.REFEREE, 'referee');
+        botReferee.position = { x: 0, y: 3, z: -4 }; // Position on opposite side (-z)
+        
+        // Calculate midpoint and set rotation
+        const midpoint = {
+          x: (fighter1.position.x + fighter2.position.x) / 2,
+          z: (fighter1.position.z + fighter2.position.z) / 2
+        };
+        botReferee.rotation = Math.atan2(midpoint.x - botReferee.position.x, midpoint.z - botReferee.position.z);
+        
+        gameState.referee = botReferee;
+      }
     }
   }
   else {
