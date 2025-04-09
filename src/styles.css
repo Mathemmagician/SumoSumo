@@ -497,8 +497,8 @@ body {
 /* Story Button styled like tutorial and music buttons */
 #story-btn {
   position: fixed;
-  top: 220px;
-  right: 20px;
+  top: 160px;
+  right: 10px;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -581,8 +581,8 @@ body {
 /* Tutorial button */
 #tutorial-btn {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: 10px;
+  right: 10px;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -608,8 +608,8 @@ body {
 /* Music toggle button styled like tutorial button */
 #music-btn {
   position: fixed;
-  top: 70px;
-  right: 20px;
+  top: 60px;
+  right: 10px;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -636,6 +636,36 @@ body {
   background-color: #666;
   color: #ccc;
   border-color: #999;
+}
+
+/* Discord button styles */
+#discord-btn {
+  position: fixed;
+  top: 10px;
+  right: 60px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #5865F2;
+  border: 2px solid #f9d9aa;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+#discord-btn:hover {
+  background-color: #7289DA;
+  transform: scale(1.1);
+}
+
+#discord-btn svg {
+  width: 22px;
+  height: 22px;
 }
 
 /* Modal styles */
@@ -781,8 +811,8 @@ body {
 /* Fullscreen Button Styles */
 #fullscreen-btn {
   position: fixed;
-  top: 120px;
-  right: 20px;
+  top: 110px;
+  right: 10px;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -930,6 +960,11 @@ body {
     width: 20px;
     height: 20px;
   }
+  
+  /* Discord button positioning on mobile */
+  #discord-btn {
+    top: 170px;
+  }
 }
 
 /* For very small screens (phones in portrait) */
@@ -968,6 +1003,19 @@ body {
   }
   
   #fullscreen-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  /* Discord button adjustments for very small screens */
+  #discord-btn {
+    width: 35px;
+    height: 35px;
+    top: 170px;
+    right: 15px;
+  }
+  
+  #discord-btn svg {
     width: 18px;
     height: 18px;
   }
@@ -1081,8 +1129,8 @@ body {
 /* Tutorial Arrow Styles */
 .tutorial-arrow {
   position: fixed;
-  top: 40px;
-  right: 80px;
+  top: 30px;
+  right: 60px;
   transform: translateY(-50%);
   z-index: 1000;
   animation: bounce 1s infinite;
@@ -1128,8 +1176,8 @@ body {
 /* Buy Your Spot Button Styles */
 #buy-spot-btn {
   position: fixed;
-  top: 170px;
-  right: 20px;
+  top: 10px;
+  right: 110px;
   width: 40px;
   height: 40px;
   border-radius: 50%;

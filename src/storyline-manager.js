@@ -1,6 +1,3 @@
-// Storyline Manager for SumoSumo
-import { socketClient } from './socket-client';
-
 // Story content - epic tale of SumoSumo tournament
 const STORYLINE = [
   {
@@ -379,15 +376,14 @@ class StorylineManager {
       this.setupVoice();
     }
     
-    // Automatically start narration with Thunder Voice
-    this.isNarrating = true;
+    // Set narration to off by default
+    this.isNarrating = false;
     if (this.narrationButton) {
-      this.narrationButton.classList.add('active');
-      this.narrationButton.title = "Disable narration";
+      this.narrationButton.classList.remove('active');
+      this.narrationButton.title = "Enable narration";
     }
     
-    // Start speaking with Thunder Voice
-    this.speakCurrentSlide();
+    // Don't auto-start speaking
   }
 
   closeStoryline() {
