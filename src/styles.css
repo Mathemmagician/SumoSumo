@@ -497,8 +497,8 @@ body {
 /* Story Button styled like tutorial and music buttons */
 #story-btn {
   position: fixed;
-  top: 220px;
-  right: 20px;
+  top: 160px;
+  right: 10px;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -581,8 +581,8 @@ body {
 /* Tutorial button */
 #tutorial-btn {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: 10px;
+  right: 10px;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -608,8 +608,8 @@ body {
 /* Music toggle button styled like tutorial button */
 #music-btn {
   position: fixed;
-  top: 70px;
-  right: 20px;
+  top: 60px;
+  right: 10px;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -636,6 +636,36 @@ body {
   background-color: #666;
   color: #ccc;
   border-color: #999;
+}
+
+/* Discord button styles */
+#discord-btn {
+  position: fixed;
+  top: 10px;
+  right: 60px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #5865F2;
+  border: 2px solid #f9d9aa;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+#discord-btn:hover {
+  background-color: #7289DA;
+  transform: scale(1.1);
+}
+
+#discord-btn svg {
+  width: 22px;
+  height: 22px;
 }
 
 /* Modal styles */
@@ -781,8 +811,8 @@ body {
 /* Fullscreen Button Styles */
 #fullscreen-btn {
   position: fixed;
-  top: 120px;
-  right: 20px;
+  top: 110px;
+  right: 10px;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -930,6 +960,11 @@ body {
     width: 20px;
     height: 20px;
   }
+  
+  /* Discord button positioning on mobile */
+  #discord-btn {
+    top: 170px;
+  }
 }
 
 /* For very small screens (phones in portrait) */
@@ -968,6 +1003,19 @@ body {
   }
   
   #fullscreen-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  /* Discord button adjustments for very small screens */
+  #discord-btn {
+    width: 35px;
+    height: 35px;
+    top: 170px;
+    right: 15px;
+  }
+  
+  #discord-btn svg {
     width: 18px;
     height: 18px;
   }
@@ -1081,8 +1129,8 @@ body {
 /* Tutorial Arrow Styles */
 .tutorial-arrow {
   position: fixed;
-  top: 40px;
-  right: 80px;
+  top: 30px;
+  right: 60px;
   transform: translateY(-50%);
   z-index: 1000;
   animation: bounce 1s infinite;
@@ -1128,8 +1176,8 @@ body {
 /* Buy Your Spot Button Styles */
 #buy-spot-btn {
   position: fixed;
-  top: 170px;
-  right: 20px;
+  top: 10px;
+  right: 110px;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -1369,7 +1417,7 @@ body {
 /* Caption Container at bottom */
 .story-caption-container {
   position: absolute;
-  bottom: 80px;
+  bottom: 50px;
   left: 0;
   width: 100%;
   padding: 0 20px;
@@ -1385,7 +1433,7 @@ body {
   margin: 0 auto;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9), 0 0 20px rgba(0, 0, 0, 0.7);
   opacity: 0;
-  max-width: 1000px;
+  max-width: 1200px;
   padding: 15px 25px;
   background-color: rgba(0, 0, 0, 0.5);
   border-radius: 12px;
@@ -1418,7 +1466,7 @@ body {
   font-size: 40px;
   font-weight: bold;
   cursor: pointer;
-  z-index: 10;
+  z-index: 11;
   background: none;
   border: none;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
@@ -1431,26 +1479,24 @@ body {
 /* Navigation Buttons Styles - repositioned */
 .story-nav-buttons {
   position: absolute;
-  bottom: 20px;
+  bottom: 10px;
   left: 0;
   width: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 40px;
-  z-index: 10;
+  gap: 20px;
+  z-index: 11;
 }
 
 .story-nav-btn {
   background-color: rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(156, 102, 68, 0.7);
   color: #f9d9aa;
-  padding: 12px 20px;
   border-radius: 50%;
   cursor: pointer;
-  font-size: 1.5rem;
-  width: 50px;
-  height: 50px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1471,10 +1517,9 @@ body {
 /* Slide indicator */
 .slide-indicator {
   font-family: "Sawarabi Mincho", serif;
-  font-size: 1rem;
   color: #f9d9aa;
   background-color: rgba(0, 0, 0, 0.5);
-  padding: 8px 15px;
+  padding: 4px;
   border-radius: 20px;
   border: 1px solid rgba(156, 102, 68, 0.5);
   min-width: 60px;
@@ -1489,7 +1534,7 @@ body {
   }
   
   .story-caption-container {
-    bottom: 70px;
+    bottom: 50px;
   }
   
   .story-nav-btn {
@@ -1507,7 +1552,7 @@ body {
   }
   
   .story-caption-container {
-    bottom: 60px;
+    bottom: 50px;
   }
   
   .story-nav-btn {
