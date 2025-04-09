@@ -87,8 +87,9 @@ class UIManager {
     setupSocketEvents() {
         // Listen for game state updates
         socketClient.on('gameStateUpdated', (gameState) => {
-            // Check if role has changed since last update
-            if (this._lastRole && this._lastRole !== gameState.myRole) {
+            // Check if role has changed since last update AND we're in the fighter selection stage
+            if (this._lastRole && this._lastRole !== gameState.myRole && 
+                gameState.stage === 'selecting_fighters') {
                 this.showRoleChangeNotification(gameState.myRole);
             }
             
@@ -200,6 +201,12 @@ class UIManager {
             // Toggle mobile controls visibility if needed
             if (this.isMobile) {
                 this.toggleMobileControls(socketClient.gameState.myRole, data.name);
+                
+                // Additionally, ensure joystick controls are visible if free camera is enabled
+                const freeCameraEnabled = document.getElementById('free-camera-toggle')?.checked;
+                if (freeCameraEnabled) {
+                    setTimeout(() => this.updateJoystickControlsVisibility(), 100);
+                }
             }
             
             // Start stage timer if needed
@@ -369,8 +376,41 @@ class UIManager {
             if (this.isMobile) {
                 const freeCameraMode = e.target.checked;
                 const joystickControls = document.getElementById('joystick-controls');
+                
+                // Save the state for later reference
+                this.freeCameraEnabled = freeCameraMode;
+                
                 if (joystickControls) {
-                    joystickControls.style.display = freeCameraMode ? 'flex' : 'none';
+                    if (freeCameraMode) {
+                        // Show joystick controls
+                        joystickControls.style.display = 'flex';
+                        // Ensure the mobile controls container is visible
+                        this.mobileControls.style.display = 'block';
+                        
+                        // Start the visibility interval to ensure controls stay visible
+                        this.updateJoystickControlsVisibility();
+                        
+                        // Also trigger the free camera event for the renderer
+                        const freeCameraEvent = new CustomEvent('freeCameraToggled', { 
+                            detail: { enabled: true } 
+                        });
+                        document.dispatchEvent(freeCameraEvent);
+                    } else {
+                        // Hide joystick controls
+                        joystickControls.style.display = 'none';
+                        
+                        // Clear the visibility interval when free camera is disabled
+                        if (this._joystickVisibilityInterval) {
+                            clearInterval(this._joystickVisibilityInterval);
+                            this._joystickVisibilityInterval = null;
+                        }
+                        
+                        // Also trigger the free camera event for the renderer
+                        const freeCameraEvent = new CustomEvent('freeCameraToggled', { 
+                            detail: { enabled: false } 
+                        });
+                        document.dispatchEvent(freeCameraEvent);
+                    }
                 }
             }
         });
@@ -646,6 +686,23 @@ class UIManager {
         });
         document.dispatchEvent(freeCameraEvent);
         
+        // Hide joystick controls when not in free camera mode
+        if (this.isMobile) {
+            const joystickControls = document.getElementById('joystick-controls');
+            if (joystickControls) {
+                joystickControls.style.display = 'none';
+            }
+            
+            // Clear the joystick visibility interval
+            if (this._joystickVisibilityInterval) {
+                clearInterval(this._joystickVisibilityInterval);
+                this._joystickVisibilityInterval = null;
+            }
+            
+            // Reset the free camera state
+            this.freeCameraEnabled = false;
+        }
+        
         // Disable third-person view if it's active
         const thirdPersonEvent = new CustomEvent('thirdPersonToggled', { 
             detail: { enabled: false } 
@@ -682,12 +739,20 @@ class UIManager {
         });
         document.dispatchEvent(freeCameraEvent);
         
-        // Update joystick controls visibility for free camera mode
+        // Set the free camera state
+        this.freeCameraEnabled = true;
+        
+        // Show joystick controls for free camera mode
         if (this.isMobile) {
             const joystickControls = document.getElementById('joystick-controls');
             if (joystickControls) {
                 joystickControls.style.display = 'flex';
+                // Ensure mobile controls container is visible
+                this.mobileControls.style.display = 'block';
             }
+            
+            // Start the visibility interval to ensure controls stay visible
+            this.updateJoystickControlsVisibility();
         }
         
         // Update camera explanation label
@@ -713,6 +778,23 @@ class UIManager {
             detail: { enabled: false } 
         });
         document.dispatchEvent(freeCameraEvent);
+        
+        // Hide joystick controls when not in free camera mode
+        if (this.isMobile) {
+            const joystickControls = document.getElementById('joystick-controls');
+            if (joystickControls) {
+                joystickControls.style.display = 'none';
+            }
+            
+            // Clear the joystick visibility interval
+            if (this._joystickVisibilityInterval) {
+                clearInterval(this._joystickVisibilityInterval);
+                this._joystickVisibilityInterval = null;
+            }
+            
+            // Reset the free camera state
+            this.freeCameraEnabled = false;
+        }
         
         // Enable third-person view
         const thirdPersonEvent = new CustomEvent('thirdPersonToggled', { 
@@ -1251,12 +1333,23 @@ class UIManager {
             if (fighterControls) fighterControls.style.display = 'none';
         }
         
-        // Handle fly around controls - show only if free camera is enabled
-        if (this.isMobile && this.isLandscape && document.getElementById('free-camera-toggle')?.checked) {
-            console.log("Showing joystick mobile controls for free camera");
-            if (joystickControls) joystickControls.style.display = 'flex';
-        } else {
-            if (joystickControls) joystickControls.style.display = 'none';
+        // Store the current state before checking free camera to prevent modifications
+        // from other events overriding the free camera state
+        const freeCameraControlsWereVisible = joystickControls && joystickControls.style.display === 'flex';
+        
+        // Check if free camera is enabled, independently of role
+        const freeCameraEnabled = document.getElementById('free-camera-toggle')?.checked;
+        
+        // If free camera was previously visible, keep it visible regardless of other state changes
+        if (this.isMobile && this.isLandscape && (freeCameraEnabled || this.freeCameraEnabled || freeCameraControlsWereVisible)) {
+            console.log("Preserving joystick controls visibility for free camera");
+            if (joystickControls) {
+                joystickControls.style.display = 'flex';
+                // Also ensure the container is visible
+                this.mobileControls.style.display = 'block';
+            }
+        } else if (joystickControls) {
+            joystickControls.style.display = 'none';
         }
     }
     
@@ -1360,6 +1453,7 @@ class UIManager {
         let active = false;
         let startX, startY;
         let currentX, currentY;
+        let touchId = null; // Track the specific touch identifier
         const maxDistance = 40; // Maximum distance the joystick can move
         
         // Maps to track which keys are currently pressed
@@ -1378,10 +1472,12 @@ class UIManager {
             }
         };
         
-        // Set up touch event handlers
+        // Set up touch event handlers - Only listen on the specific joystick element
         outerElement.addEventListener('touchstart', handleStart, { passive: false });
-        outerElement.addEventListener('touchmove', handleMove, { passive: false });
-        outerElement.addEventListener('touchend', handleEnd, { passive: false });
+        // Listen for touchmove/end on document for better handling when finger moves out of joystick
+        document.addEventListener('touchmove', handleMove, { passive: false });
+        document.addEventListener('touchend', handleEnd, { passive: false });
+        document.addEventListener('touchcancel', handleEnd, { passive: false });
         
         // Set up mouse event handlers for testing on desktop
         outerElement.addEventListener('mousedown', handleStart);
@@ -1390,26 +1486,46 @@ class UIManager {
         
         function handleStart(e) {
             e.preventDefault();
-            active = true;
+            
+            // Only process if not already active
+            if (active) return;
             
             // Get starting position
             if (e.type === 'touchstart') {
-                const touch = e.touches[0];
-                const rect = outerElement.getBoundingClientRect();
-                startX = rect.left + rect.width / 2;
-                startY = rect.top + rect.height / 2;
-                currentX = touch.clientX;
-                currentY = touch.clientY;
+                // Find the touch that started on this joystick
+                for (let i = 0; i < e.touches.length; i++) {
+                    const touch = e.touches[i];
+                    const rect = outerElement.getBoundingClientRect();
+                    
+                    // Check if this touch is within this joystick's bounds
+                    if (touch.clientX >= rect.left && touch.clientX <= rect.right && 
+                        touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+                        
+                        // Store the touch identifier
+                        touchId = touch.identifier;
+                        active = true;
+                        
+                        startX = rect.left + rect.width / 2;
+                        startY = rect.top + rect.height / 2;
+                        currentX = touch.clientX;
+                        currentY = touch.clientY;
+                        
+                        // Initialize joystick position
+                        updateJoystickPosition();
+                        break;
+                    }
+                }
             } else {
+                active = true;
                 const rect = outerElement.getBoundingClientRect();
                 startX = rect.left + rect.width / 2;
                 startY = rect.top + rect.height / 2;
                 currentX = e.clientX;
                 currentY = e.clientY;
+                
+                // Initialize joystick position
+                updateJoystickPosition();
             }
-            
-            // Initialize joystick position
-            updateJoystickPosition();
         }
         
         function handleMove(e) {
@@ -1418,9 +1534,21 @@ class UIManager {
             
             // Update current position
             if (e.type === 'touchmove') {
-                const touch = e.touches[0];
-                currentX = touch.clientX;
-                currentY = touch.clientY;
+                // Find our specific touch using the stored identifier
+                let touchFound = false;
+                
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    if (touch.identifier === touchId) {
+                        currentX = touch.clientX;
+                        currentY = touch.clientY;
+                        touchFound = true;
+                        break;
+                    }
+                }
+                
+                // If we couldn't find our touch, do nothing
+                if (!touchFound) return;
             } else {
                 currentX = e.clientX;
                 currentY = e.clientY;
@@ -1433,8 +1561,25 @@ class UIManager {
         
         function handleEnd(e) {
             if (!active) return;
+            
+            if (e.type.startsWith('touch')) {
+                // For touch events, only end if our specific touch ended
+                let touchEnded = false;
+                
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    if (touch.identifier === touchId) {
+                        touchEnded = true;
+                        break;
+                    }
+                }
+                
+                if (!touchEnded) return; // Not our touch
+            }
+            
             e.preventDefault();
             active = false;
+            touchId = null;
             
             // Reset joystick position
             innerElement.style.transform = 'translate(0px, 0px)';
@@ -1565,6 +1710,7 @@ class UIManager {
         let active = false;
         let startX, startY;
         let currentX, currentY;
+        let touchId = null; // Track the specific touch identifier
         const maxDistance = 40; // Maximum distance the joystick can move
         
         // Maps to track which keys are currently pressed
@@ -1575,10 +1721,12 @@ class UIManager {
             ArrowRight: false  // right
         };
         
-        // Set up touch event handlers
+        // Set up touch event handlers - Only listen on the specific joystick element
         outerElement.addEventListener('touchstart', handleStart, { passive: false });
-        outerElement.addEventListener('touchmove', handleMove, { passive: false });
-        outerElement.addEventListener('touchend', handleEnd, { passive: false });
+        // Listen for touchmove/end on document for better handling when finger moves out of joystick
+        document.addEventListener('touchmove', handleMove, { passive: false });
+        document.addEventListener('touchend', handleEnd, { passive: false });
+        document.addEventListener('touchcancel', handleEnd, { passive: false });
         
         // Set up mouse event handlers for testing on desktop
         outerElement.addEventListener('mousedown', handleStart);
@@ -1587,26 +1735,46 @@ class UIManager {
         
         function handleStart(e) {
             e.preventDefault();
-            active = true;
+            
+            // Only process if not already active
+            if (active) return;
             
             // Get starting position
             if (e.type === 'touchstart') {
-                const touch = e.touches[0];
-                const rect = outerElement.getBoundingClientRect();
-                startX = rect.left + rect.width / 2;
-                startY = rect.top + rect.height / 2;
-                currentX = touch.clientX;
-                currentY = touch.clientY;
+                // Find the touch that started on this joystick
+                for (let i = 0; i < e.touches.length; i++) {
+                    const touch = e.touches[i];
+                    const rect = outerElement.getBoundingClientRect();
+                    
+                    // Check if this touch is within this joystick's bounds
+                    if (touch.clientX >= rect.left && touch.clientX <= rect.right && 
+                        touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+                        
+                        // Store the touch identifier
+                        touchId = touch.identifier;
+                        active = true;
+                        
+                        startX = rect.left + rect.width / 2;
+                        startY = rect.top + rect.height / 2;
+                        currentX = touch.clientX;
+                        currentY = touch.clientY;
+                        
+                        // Initialize joystick position
+                        updateJoystickPosition();
+                        break;
+                    }
+                }
             } else {
+                active = true;
                 const rect = outerElement.getBoundingClientRect();
                 startX = rect.left + rect.width / 2;
                 startY = rect.top + rect.height / 2;
                 currentX = e.clientX;
                 currentY = e.clientY;
+                
+                // Initialize joystick position
+                updateJoystickPosition();
             }
-            
-            // Initialize joystick position
-            updateJoystickPosition();
         }
         
         function handleMove(e) {
@@ -1615,9 +1783,21 @@ class UIManager {
             
             // Update current position
             if (e.type === 'touchmove') {
-                const touch = e.touches[0];
-                currentX = touch.clientX;
-                currentY = touch.clientY;
+                // Find our specific touch using the stored identifier
+                let touchFound = false;
+                
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    if (touch.identifier === touchId) {
+                        currentX = touch.clientX;
+                        currentY = touch.clientY;
+                        touchFound = true;
+                        break;
+                    }
+                }
+                
+                // If we couldn't find our touch, do nothing
+                if (!touchFound) return;
             } else {
                 currentX = e.clientX;
                 currentY = e.clientY;
@@ -1630,13 +1810,30 @@ class UIManager {
         
         function handleEnd(e) {
             if (!active) return;
+            
+            if (e.type.startsWith('touch')) {
+                // For touch events, only end if our specific touch ended
+                let touchEnded = false;
+                
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    if (touch.identifier === touchId) {
+                        touchEnded = true;
+                        break;
+                    }
+                }
+                
+                if (!touchEnded) return; // Not our touch
+            }
+            
             e.preventDefault();
             active = false;
+            touchId = null;
             
             // Reset joystick position
             innerElement.style.transform = 'translate(0px, 0px)';
             
-            // Reset all keys
+            // Reset all keys for this joystick
             for (const key in keysPressed) {
                 if (keysPressed[key]) {
                     keysPressed[key] = false;
@@ -1672,7 +1869,7 @@ class UIManager {
             
             // Don't send events if joystick is in center position (with small deadzone)
             if (distance < 5) {
-                // Reset all keys
+                // Reset all keys for this joystick
                 for (const key in keysPressed) {
                     if (keysPressed[key]) {
                         keysPressed[key] = false;
@@ -1726,15 +1923,13 @@ class UIManager {
         if (explanationElement) {
             explanationElement.textContent = text;
         }
+        
+        // When camera explanation changes, ensure joystick controls remain visible if free camera is enabled
+        this.updateJoystickControlsVisibility();
     }
 
     // Show notification when role changes
     showRoleChangeNotification(newRole) {
-        // Only show role change notifications during fighter selection
-        if (socketClient.gameState.stage !== 'selecting_fighters') {
-            return;
-        }
-        
         let message;
         
         switch(newRole.toLowerCase()) {
@@ -1788,6 +1983,38 @@ class UIManager {
         }
         
         this.showCenterNotification(message, duration);
+    }
+
+    // Add a method to explicitly update the joystick controls visibility
+    updateJoystickControlsVisibility() {
+        const joystickControls = document.getElementById('joystick-controls');
+        const freeCameraEnabled = document.getElementById('free-camera-toggle')?.checked;
+        
+        if (joystickControls && this.isMobile && this.isLandscape && 
+            (freeCameraEnabled || this.freeCameraEnabled)) {
+            console.log("Explicitly showing joystick controls for free camera");
+            joystickControls.style.display = 'flex';
+            this.mobileControls.style.display = 'block';
+            
+            // Set a repeated check to ensure controls remain visible during animations
+            if (!this._joystickVisibilityInterval) {
+                this._joystickVisibilityInterval = setInterval(() => {
+                    // Only keep checking if free camera is still enabled
+                    const stillEnabled = document.getElementById('free-camera-toggle')?.checked;
+                    if (stillEnabled) {
+                        if (joystickControls.style.display !== 'flex') {
+                            console.log("Restoring hidden joystick controls");
+                            joystickControls.style.display = 'flex';
+                            this.mobileControls.style.display = 'block';
+                        }
+                    } else {
+                        // Clear interval if free camera is no longer enabled
+                        clearInterval(this._joystickVisibilityInterval);
+                        this._joystickVisibilityInterval = null;
+                    }
+                }, 200); // Check every 200ms
+            }
+        }
     }
 }
 
