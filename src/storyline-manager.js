@@ -398,18 +398,6 @@ class StorylineManager {
     this.currentSlide = 0;
     this.updateSlide();
     
-    // Save previous role state and set to viewer-only
-    this.previousUserRole = socketClient.gameState.myRole;
-    
-    // Set player to viewer-only mode
-    socketClient.toggleViewerOnly(true);
-    
-    // Update the viewer-only toggle checkbox
-    const viewerOnlyToggle = document.getElementById('viewer-only-toggle');
-    if (viewerOnlyToggle) {
-      viewerOnlyToggle.checked = true;
-    }
-    
     // Initialize voice if not already done
     if (!this.speechUtterance && this.speechSynthesis) {
       this.setupVoice();
@@ -437,15 +425,6 @@ class StorylineManager {
       if (this.narrationButton) {
         this.narrationButton.classList.remove('active');
       }
-    }
-    
-    // Restore previous role state
-    socketClient.toggleViewerOnly(false);
-    
-    // Update the viewer-only toggle checkbox
-    const viewerOnlyToggle = document.getElementById('viewer-only-toggle');
-    if (viewerOnlyToggle) {
-      viewerOnlyToggle.checked = false;
     }
   }
 

@@ -38,6 +38,8 @@ export const ROW_SPACING = BENCH_WIDTH;
 // Camera constants
 export const CAMERA_MOVE_SPEED = 0.5;
 export const CAMERA_ROTATE_SPEED = 0.02;
+export const MOBILE_CAMERA_MOVE_SPEED = 0.25; // 10% of the original speed for mobile
+export const MOBILE_CAMERA_ROTATE_SPEED = 0.004; // 10% of the original rotation speed for mobile
 export const FACE_ZOOM_DISTANCE = 1.2;
 export const FACE_ZOOM_HEIGHT = 1.0;
 

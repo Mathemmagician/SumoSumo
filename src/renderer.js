@@ -14,6 +14,8 @@ import {
   CAMERA_ROTATE_SPEED,
   BENCH_WIDTH,
   BENCH_HEIGHT,
+  MOBILE_CAMERA_MOVE_SPEED,
+  MOBILE_CAMERA_ROTATE_SPEED,
 } from "./constants";
 import { ModelFactory } from "./models";
 import { CameraSystem } from './camera-system';
@@ -737,33 +739,37 @@ export class Renderer {
     const right = new THREE.Vector3();
     right.crossVectors(direction, new THREE.Vector3(0, 1, 0)).normalize();
 
+    // Determine speed based on device type
+    const moveSpeed = this.isMobile ? MOBILE_CAMERA_MOVE_SPEED : CAMERA_MOVE_SPEED;
+    const rotateSpeed = this.isMobile ? MOBILE_CAMERA_ROTATE_SPEED : CAMERA_ROTATE_SPEED;
+
     // Forward/backward movement along camera's direction
     if (this.cameraMovement.forward) {
-      this.camera.position.addScaledVector(direction, CAMERA_MOVE_SPEED);
+      this.camera.position.addScaledVector(direction, moveSpeed);
     }
     if (this.cameraMovement.backward) {
-      this.camera.position.addScaledVector(direction, -CAMERA_MOVE_SPEED);
+      this.camera.position.addScaledVector(direction, -moveSpeed);
     }
 
     // Left/right movement (strafe)
     if (this.cameraMovement.left) {
-      this.camera.position.addScaledVector(right, -CAMERA_MOVE_SPEED);
+      this.camera.position.addScaledVector(right, -moveSpeed);
     }
     if (this.cameraMovement.right) {
-      this.camera.position.addScaledVector(right, CAMERA_MOVE_SPEED);
+      this.camera.position.addScaledVector(right, moveSpeed);
     }
 
     // Up/down movement
     if (this.cameraMovement.up) {
-      this.camera.position.y += CAMERA_MOVE_SPEED;
+      this.camera.position.y += moveSpeed;
     }
     if (this.cameraMovement.down) {
-      this.camera.position.y -= CAMERA_MOVE_SPEED;
+      this.camera.position.y -= moveSpeed;
     }
 
     // Rotation (arrow keys) - using 3x faster rotation speed
     if (this.cameraMovement.rotateLeft || this.cameraMovement.rotateRight) {
-      const rotationAngle = (CAMERA_ROTATE_SPEED * 3) * 
+      const rotationAngle = (rotateSpeed * 3) * 
         (this.cameraMovement.rotateLeft ? 1 : -1);
       
       // Create rotation matrix around world Y axis
