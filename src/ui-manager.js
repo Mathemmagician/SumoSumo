@@ -273,7 +273,7 @@ class UIManager {
         const viewerOnlyToggle = document.getElementById('viewer-only-toggle');
         if (viewerOnlyToggle) {
             viewerOnlyToggle.addEventListener('change', () => {
-                this.toggleViewerOnly(viewerOnlyToggle);
+                this.toggleViewerOnly(viewerOnlyToggle.checked, null);
             });
         }
         
@@ -489,14 +489,32 @@ class UIManager {
         }
     }
 
-    toggleViewerOnly(button) {
-        // Toggle active state
-        button.classList.toggle('active');
-        const viewerOnlyMode = button.classList.contains('active');
+    toggleViewerOnly(isViewerOnly, button) {
+        // Get both mode buttons
+        const viewerOnlyBtn = document.querySelector('.mode-btn[data-mode="viewer"]');
+        const fighterModeBtn = document.querySelector('.mode-btn[data-mode="fighter"]');
+        
+        if (viewerOnlyBtn && fighterModeBtn) {
+            // Remove active class from both buttons
+            viewerOnlyBtn.classList.remove('active');
+            fighterModeBtn.classList.remove('active');
+            
+            // Add active class to the clicked button
+            if (button) {
+                button.classList.add('active');
+            } else {
+                // If no button reference, set based on the mode
+                if (isViewerOnly) {
+                    viewerOnlyBtn.classList.add('active');
+                } else {
+                    fighterModeBtn.classList.add('active');
+                }
+            }
+        }
         
         // Send to server
-        socketClient.socket.emit('toggleViewerOnly', viewerOnlyMode);
-        console.log(`Toggled viewer-only mode: ${viewerOnlyMode}`);
+        socketClient.socket.emit('toggleViewerOnly', isViewerOnly);
+        console.log(`Toggled viewer-only mode: ${isViewerOnly}`);
     }
 
     // Set default camera (deactivate other camera options)
