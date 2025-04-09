@@ -1466,7 +1466,7 @@ body {
   font-size: 40px;
   font-weight: bold;
   cursor: pointer;
-  z-index: 10;
+  z-index: 11;
   background: none;
   border: none;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
@@ -1486,7 +1486,7 @@ body {
   justify-content: center;
   align-items: center;
   gap: 20px;
-  z-index: 10;
+  z-index: 11;
 }
 
 .story-nav-btn {
